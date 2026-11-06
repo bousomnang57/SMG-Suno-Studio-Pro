@@ -50,6 +50,10 @@ hiddenimports = [
     'threading',
     'pathlib',
     'hashlib',
+    'hmac',
+    'winreg',
+    'platform',
+    'uuid',
     'zipfile',
     're',
 ]

@@ -14,12 +14,13 @@ from app.config import config_manager, GEMINI_MODELS, get_asset_path, APP_VERSIO
 from app.ui.styles import STUDIO_THEMES, get_theme
 from app.gemini_client import ConnectionTestWorker
 from app.ui.multi_key_dialog import MultiKeyDialog
+from app.license_manager import license_manager
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, is_dark: bool = None):
         super().__init__(parent)
         self.setWindowTitle(f"{APP_NAME} — Settings")
-        self.setFixedSize(620, 685)
+        self.setFixedSize(620, 715)
         self.setModal(True)
         self.update_worker = None
 
@@ -171,8 +172,8 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.theme_group)
         self._update_theme_cards_ui()
 
-        # ── 🚀 Application Updates & Version Section ──
-        self.update_group = QGroupBox("🚀 Application Updates && Version")
+        # ── 🚀 Application Updates & License Section ──
+        self.update_group = QGroupBox("🚀 Application Updates && License")
         u_layout = QVBoxLayout(self.update_group)
         u_layout.setContentsMargins(14, 12, 14, 12)
         u_layout.setSpacing(6)
@@ -201,6 +202,27 @@ class SettingsDialog(QDialog):
         self.lbl_update_status = QLabel("● Ready to check for updates")
         self.lbl_update_status.setStyleSheet("font-size: 10.5px;")
         u_layout.addWidget(self.lbl_update_status)
+
+        # ── License Status & Activation Row ──
+        self.lic_separator = QFrame()
+        self.lic_separator.setFrameShape(QFrame.Shape.HLine)
+        self.lic_separator.setFrameShadow(QFrame.Shadow.Sunken)
+        u_layout.addWidget(self.lic_separator)
+
+        lic_row = QHBoxLayout()
+        lic_row.setSpacing(10)
+
+        self.lbl_license_status = QLabel()
+        self.lbl_license_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        lic_row.addWidget(self.lbl_license_status, 1)
+
+        self.btn_manage_license = QPushButton("🔑 Activate Pro")
+        self.btn_manage_license.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_manage_license.setFixedHeight(28)
+        self.btn_manage_license.clicked.connect(self._open_license_dialog)
+        lic_row.addWidget(self.btn_manage_license)
+
+        u_layout.addLayout(lic_row)
 
         layout.addWidget(self.update_group)
 
@@ -361,6 +383,24 @@ class SettingsDialog(QDialog):
                     }}
                 """)
                 self.lbl_update_status.setStyleSheet(f"color: {t['text_muted']}; font-size: 10px; background: transparent;")
+                if hasattr(self, "lic_separator"):
+                    self.lic_separator.setStyleSheet(f"color: {t['border']}; background-color: {t['border']}; max-height: 1px;")
+                if hasattr(self, "btn_manage_license"):
+                    self.btn_manage_license.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {t['bg_input']};
+                            color: {t['text_primary']};
+                            border: 1px solid {t['border']};
+                            border-radius: 6px;
+                            font-size: 11px;
+                            font-weight: 700;
+                            padding: 4px 12px;
+                        }}
+                        QPushButton:hover {{
+                            border-color: {t['border_accent']};
+                            color: #ffffff;
+                        }}
+                    """)
             self.lbl_key_title.setStyleSheet(f"color: {t['text_secondary']}; font-weight: 700; font-size: 11px; background: transparent;")
             self.key_input.setStyleSheet(f"""
                 QLineEdit {{
@@ -611,6 +651,25 @@ class SettingsDialog(QDialog):
                     }
                 """)
                 self.lbl_update_status.setStyleSheet("color: #64748b; font-size: 10px; background: transparent;")
+                if hasattr(self, "lic_separator"):
+                    self.lic_separator.setStyleSheet("color: #e2e8f0; background-color: #e2e8f0; max-height: 1px;")
+                if hasattr(self, "btn_manage_license"):
+                    self.btn_manage_license.setStyleSheet("""
+                        QPushButton {
+                            background-color: #ffffff;
+                            color: #0f172a;
+                            border: 1px solid #cbd5e1;
+                            border-radius: 6px;
+                            font-size: 11px;
+                            font-weight: 700;
+                            padding: 4px 12px;
+                        }
+                        QPushButton:hover {
+                            border-color: #2563eb;
+                            color: #2563eb;
+                            background-color: #f1f5f9;
+                        }
+                    """)
             self.lbl_key_title.setStyleSheet("color: #1e293b; font-weight: 700; font-size: 11px; background: transparent;")
             self.key_input.setStyleSheet("""
                 QLineEdit {
@@ -774,6 +833,7 @@ class SettingsDialog(QDialog):
 
         self._update_badge_style()
         self._update_theme_cards_ui()
+        self._refresh_license_status_label()
 
 
     def _on_key_text_changed(self, text: str):
@@ -966,6 +1026,37 @@ class SettingsDialog(QDialog):
         self.btn_check_update.setText("🔄 Check for Updates")
         self.lbl_update_status.setText(f"⚠️ Check failed: {error_msg}")
         self.lbl_update_status.setStyleSheet("color: #f87171; font-weight: 600; font-size: 10.5px;" if self.is_dark else "color: #dc2626; font-weight: 600; font-size: 10.5px;")
+
+    def _open_license_dialog(self):
+        from app.ui.activation_dialog import LicenseActivationDialog
+        dlg = LicenseActivationDialog(self, theme_key=self.selected_theme)
+        dlg.exec()
+        self._refresh_license_status_label()
+        if self.parent():
+            if hasattr(self.parent(), "_update_license_btn_style"):
+                self.parent()._update_license_btn_style()
+            if hasattr(self.parent(), "_update_status_bar"):
+                self.parent()._update_status_bar()
+
+    def _refresh_license_status_label(self):
+        if not hasattr(self, "lbl_license_status"):
+            return
+        info = license_manager.get_license_info()
+        machine_id = license_manager.get_machine_id()
+        if info["is_active"]:
+            self.lbl_license_status.setText(f"💎 <b>{info['plan_name']}</b> — Active (ID: <code>{machine_id}</code>)")
+            if self.is_dark:
+                self.lbl_license_status.setStyleSheet("color: #34d399; font-size: 11px; background: transparent;")
+            else:
+                self.lbl_license_status.setStyleSheet("color: #059669; font-size: 11px; background: transparent;")
+            self.btn_manage_license.setText("💎 License Info")
+        else:
+            self.lbl_license_status.setText(f"🔒 <b>Demo Mode</b> (ID: <code>{machine_id}</code>)")
+            if self.is_dark:
+                self.lbl_license_status.setStyleSheet("color: #fbbf24; font-size: 11px; background: transparent;")
+            else:
+                self.lbl_license_status.setStyleSheet("color: #d97706; font-size: 11px; background: transparent;")
+            self.btn_manage_license.setText("🔑 Activate Pro")
 
     def _save_settings(self):
         key = self.key_input.text().strip()

@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QIcon, QFont, QPixmap, QKeySequence, QShortcut
 
 from app.config import config_manager, GEMINI_MODELS, get_asset_path, APP_VERSION, APP_NAME, DEFAULT_UPDATE_URL
+from app.license_manager import license_manager
 from app.ui.generator_panel import GeneratorPanel
 from app.ui.editor_panel import EditorPanel
 from app.ui.tools_panel import ToolsPanel
@@ -492,7 +493,7 @@ class MainWindow(QMainWindow):
         self.btn_mode_clone.clicked.connect(lambda: self._set_studio_mode(4))
 
         for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone]:
-            btn.setFixedWidth(82)
+            btn.setFixedWidth(74)
             btn.setFixedHeight(28)
             mb_layout.addWidget(btn)
 
@@ -501,19 +502,19 @@ class MainWindow(QMainWindow):
 
         # ── Zone 3: Grouped Production & Utility Capsules (Right) ──
         right_box = QHBoxLayout()
-        right_box.setSpacing(8)
+        right_box.setSpacing(6)
         right_box.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
         # Production Capsule (New, Export)
         self.capsule_prod = QFrame()
         self.capsule_prod.setObjectName("headerCapsuleProd")
         cp_layout = QHBoxLayout(self.capsule_prod)
-        cp_layout.setContentsMargins(4, 2, 4, 2)
-        cp_layout.setSpacing(4)
+        cp_layout.setContentsMargins(3, 2, 3, 2)
+        cp_layout.setSpacing(3)
         cp_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
         self.header_btn_new = QPushButton("➕ ថ្មី")
-        self.header_btn_new.setFixedWidth(54)
+        self.header_btn_new.setFixedWidth(52)
         self.header_btn_new.setFixedHeight(28)
         self.header_btn_new.setToolTip("New Lyric Project [Ctrl+N]")
         self.header_btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -547,14 +548,14 @@ class MainWindow(QMainWindow):
         self.capsule_util = QFrame()
         self.capsule_util.setObjectName("headerCapsuleUtil")
         cu_layout = QHBoxLayout(self.capsule_util)
-        cu_layout.setContentsMargins(4, 2, 4, 2)
-        cu_layout.setSpacing(4)
+        cu_layout.setContentsMargins(3, 2, 3, 2)
+        cu_layout.setSpacing(3)
         cu_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
         # Quick Model Engine Selector
         self.header_model_combo = QComboBox()
         self.header_model_combo.setFixedHeight(28)
-        self.header_model_combo.setMaximumWidth(125)
+        self.header_model_combo.setMaximumWidth(110)
         self.header_model_combo.addItems(GEMINI_MODELS)
         current_model = config_manager.get("gemini_model", "gemini-3.5-flash")
         idx = self.header_model_combo.findText(current_model)
@@ -599,6 +600,14 @@ class MainWindow(QMainWindow):
         self.header_btn_update.clicked.connect(lambda: self._open_update_dialog())
         self.header_btn_update.hide()  # Hidden until update is found
         cu_layout.addWidget(self.header_btn_update)
+
+        # License Status & Activation Pill Button
+        self.header_btn_license = QPushButton("🔑 Activate Pro")
+        self.header_btn_license.setObjectName("headerBtnLicense")
+        self.header_btn_license.setFixedHeight(28)
+        self.header_btn_license.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.header_btn_license.clicked.connect(self._open_license_dialog)
+        cu_layout.addWidget(self.header_btn_license)
 
         right_box.addWidget(self.capsule_util)
         layout.addLayout(right_box)
@@ -804,6 +813,7 @@ class MainWindow(QMainWindow):
                 """)
             self.export_menu.setStyleSheet(f"background-color: {bg_card}; color: {text_pri}; border: 1px solid {border_subtle}; padding: 4px;")
             self.theme_menu.setStyleSheet(f"background-color: {bg_card}; color: {text_pri}; border: 1px solid {border_subtle}; padding: 4px;")
+            self._update_license_btn_style()
 
             # Style Workflow Ribbon
             if hasattr(self, "workflow_ribbon"):
@@ -1013,6 +1023,7 @@ class MainWindow(QMainWindow):
                 """)
             self.export_menu.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; padding: 4px;")
             self.theme_menu.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; padding: 4px;")
+            self._update_license_btn_style()
 
             # Style Workflow Ribbon
             if hasattr(self, "workflow_ribbon"):
@@ -1724,12 +1735,14 @@ class MainWindow(QMainWindow):
     def _update_status_bar(self):
         key_count = config_manager.get_key_count()
         model = config_manager.get("gemini_model", "gemini-3.5-flash")
+        lic_info = license_manager.get_license_info()
+        lic_badge = "💎 PRO" if lic_info["is_active"] else "🟡 DEMO"
         if key_count > 0:
             tag = "🟢 Gemini Pro Active" if "pro" in model else "⚡ Gemini Flash Active"
             badge = f"Pool: {key_count} keys verified" if key_count > 1 else "Key Verified"
-            self.status_bar.showMessage(f"{tag} | Model: {model} | ✓ {badge}")
+            self.status_bar.showMessage(f"[{lic_badge}] {tag} | Model: {model} | ✓ {badge}")
         else:
-            self.status_bar.showMessage(f"🟡 Demo Mode (Add API Key in Settings) | Engine: {model}")
+            self.status_bar.showMessage(f"[{lic_badge}] 🟡 Demo Mode (Add API Key in Settings) | Engine: {model}")
 
     def _load_last_session(self):
         last_lyrics = config_manager.get("last_lyrics", "")
@@ -1777,6 +1790,75 @@ class MainWindow(QMainWindow):
         from app.ui.update_dialog import StudioUpdateDialog
         dlg = StudioUpdateDialog(self, manifest=info, theme_key=self.current_theme)
         dlg.exec()
+
+    def _open_license_dialog(self):
+        """Opens the License Activation Dialog."""
+        from app.ui.activation_dialog import LicenseActivationDialog
+        dlg = LicenseActivationDialog(self, theme_key=self.current_theme)
+        dlg.exec()
+        self._update_license_btn_style()
+        self._update_status_bar()
+
+    def _update_license_btn_style(self):
+        """Updates the Header License Button appearance based on activation state."""
+        if not hasattr(self, "header_btn_license"):
+            return
+        info = license_manager.get_license_info()
+        t_data = get_theme(self.current_theme)
+        is_dark = t_data.get("is_dark", True)
+
+        if info["is_active"]:
+            self.header_btn_license.setText("💎 PRO")
+            self.header_btn_license.setToolTip(f"{info['plan_name']} (Active) • Click to view license details")
+            if is_dark:
+                self.header_btn_license.setStyleSheet("""
+                    QPushButton {
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                        color: #ffffff;
+                        border: 1px solid #6ee7b7;
+                        font-weight: 800;
+                        font-size: 8.5pt;
+                        padding: 3px 8px;
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        opacity: 0.92;
+                    }
+                """)
+            else:
+                self.header_btn_license.setStyleSheet("""
+                    QPushButton {
+                        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                        color: #ffffff;
+                        border: 1px solid #047857;
+                        font-weight: 800;
+                        font-size: 8.5pt;
+                        padding: 3px 8px;
+                        border-radius: 6px;
+                    }
+                    QPushButton:hover {
+                        opacity: 0.92;
+                    }
+                """)
+        else:
+            self.header_btn_license.setText("🔑 Activate Pro")
+            self.header_btn_license.setToolTip("Free Demo Mode • Click to activate Studio Pro License")
+            self.header_btn_license.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #f59e0b);
+                    color: #ffffff;
+                    border: 1px solid #fde68a;
+                    font-weight: 800;
+                    font-size: 8.5pt;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                }
+                QPushButton:hover {
+                    opacity: 0.92;
+                }
+            """)
+        self.capsule_util.adjustSize()
+        self.header_frame.adjustSize()
 
     def closeEvent(self, event):
         workers_to_stop = [
