@@ -24,3 +24,7 @@ scratch/
 Thumbs.db
 Desktop.ini
 
+# Customer & License local records
+customer_licenses.csv
+license.json
+
