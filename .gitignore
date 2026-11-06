@@ -1,0 +1,26 @@
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Build outputs & Binaries (Installers are hosted via GitHub Releases)
+build/
+dist/
+dist_installer/
+*.exe
+*.zip
+
+# Environment & Config local overrides
+.env
+venv/
+env/
+.venv/
+scratch/
+
+# IDE & OS files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+

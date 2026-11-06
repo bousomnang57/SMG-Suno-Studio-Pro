@@ -1,0 +1,874 @@
+"""
+Easy Song Creation Wizard & Step-by-Step Production Roadmap (ទិសដៅនៃការធ្វើបទចម្រៀង).
+Guides songwriters and producers from initial concept, BPM & chords,
+AI lyric creation, audition & mic recording, through Suno/DAW export in 5 intuitive steps.
+"""
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QTextEdit, QScrollArea, QFrame, QGridLayout,
+    QStackedWidget, QSlider, QComboBox, QMessageBox, QGroupBox, QApplication
+)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from app.song_blueprints import SONG_BLUEPRINTS
+from app.chord_engine import CHORD_PROGRESSIONS, VOCAL_RANGES
+
+class SongCreationWizardView(QWidget):
+    generate_requested = pyqtSignal(dict)
+    open_editor_requested = pyqtSignal()
+    open_batch_requested = pyqtSignal(dict)
+    export_bundle_requested = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.is_dark = False
+        self.current_step = 0
+
+        # State stored across steps
+        self.state_genre = "Khmer pop ballad"
+        self.state_mood = "ស្រណោះស្រណោក (Heartfelt & Nostalgic)"
+        self.state_theme = "រឿងស្នេហាបែកបាក់ នឹកស្ទឹងសង្កែ"
+        self.state_bpm = 74
+        self.state_vocal = "Male Baritone / Sinn Sisamouth Style"
+        self.state_chords = "Khmer Sinn Sisamouth Sentimental (i - iv - V7 - i)"
+        self.state_structure = "Khmer Sinn Sisamouth Golden Classic (រចនាសម្ព័ន្ធមាស ៦០-៧០)"
+
+        self._init_ui()
+
+    def _init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 16, 20, 16)
+        main_layout.setSpacing(14)
+
+        # Title & Subtitle Header
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+
+        self.main_title = QLabel("🗺️ ទិសដៅនៃការធ្វើបទចម្រៀង (Easy Songwriting Roadmap)")
+        self.main_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #1e293b;")
+        title_box.addWidget(self.main_title)
+
+        self.sub_title = QLabel("បង្កើតបទចម្រៀងអាជីពយ៉ាងងាយស្រួល ៥ ជំហាន៖ ពីគំនិតដំបូង រហូតដល់ Suno AI និង DAW")
+        self.sub_title.setStyleSheet("font-size: 12px; color: #64748b;")
+        title_box.addWidget(self.sub_title)
+
+        main_layout.addLayout(title_box)
+
+        # 5-Step Visual Stepper Bar
+        self.stepper_frame = self._create_stepper_bar()
+        main_layout.addWidget(self.stepper_frame)
+
+        # Main Wizard Stack (5 Steps)
+        self.step_stack = QStackedWidget()
+        self.step_stack.addWidget(self._create_step1_concept())
+        self.step_stack.addWidget(self._create_step2_harmony())
+        self.step_stack.addWidget(self._create_step3_lyrics())
+        self.step_stack.addWidget(self._create_step4_audition())
+        self.step_stack.addWidget(self._create_step5_export())
+        main_layout.addWidget(self.step_stack, stretch=1)
+
+        # Bottom Navigation Controls
+        self.nav_frame = QFrame()
+        self.nav_frame.setStyleSheet("border-top: 1px solid #e2e8f0; padding-top: 8px;")
+        nav_frame = self.nav_frame
+        nav_layout = QHBoxLayout(nav_frame)
+        nav_layout.setContentsMargins(0, 8, 0, 0)
+
+        self.btn_prev = QPushButton("⬅ ថយក្រោយ (Back)")
+        self.btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_prev.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; padding: 8px 16px; border-radius: 6px;")
+        self.btn_prev.setEnabled(False)
+        self.btn_prev.clicked.connect(self._go_prev)
+        nav_layout.addWidget(self.btn_prev)
+
+        nav_layout.addStretch()
+
+        self.lbl_step_indicator = QLabel("ជំហាន ១ នៃ ៥ : ជ្រើសរើសទម្រង់បទ")
+        self.lbl_step_indicator.setStyleSheet("color: #64748b; font-weight: 600; font-size: 12px;")
+        nav_layout.addWidget(self.lbl_step_indicator)
+
+        nav_layout.addStretch()
+
+        self.btn_next = QPushButton("បន្ទាប់ (Next Step) ➔")
+        self.btn_next.setObjectName("primaryGenerateButton")
+        self.btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_next.setStyleSheet("background: #2563eb; color: #ffffff; font-weight: 700; padding: 8px 20px; border-radius: 6px;")
+        self.btn_next.clicked.connect(self._go_next)
+        nav_layout.addWidget(self.btn_next)
+
+        main_layout.addWidget(nav_frame)
+
+    # --- Stepper Bar Component ---
+    def _create_stepper_bar(self) -> QFrame:
+        self.stepper_frame = QFrame()
+        self.stepper_frame.setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px;")
+        layout = QHBoxLayout(self.stepper_frame)
+        layout.setContentsMargins(8, 4, 8, 4)
+
+        self.step_labels = []
+        steps = [
+            "① គំនិតបទ (Vibe)",
+            "② ចង្វាក់ & Chords",
+            "③ ទំនុកច្រៀង (AI Lyrics)",
+            "④ ហាត់ច្រៀង (Vocal)",
+            "⑤ ផលិត & Export"
+        ]
+        for i, text in enumerate(steps):
+            lbl = QLabel(text)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet(self._get_step_style(i == 0))
+            layout.addWidget(lbl, stretch=1)
+            self.step_labels.append(lbl)
+            if i < len(steps) - 1:
+                arrow = QLabel("➔")
+                arrow.setStyleSheet("color: #cbd5e1; font-weight: 700; font-size: 13px;")
+                layout.addWidget(arrow)
+
+        return self.stepper_frame
+
+    def _get_step_style(self, active: bool) -> str:
+        if active:
+            if getattr(self, "is_dark", False):
+                return "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7c3aed, stop:1 #4f46e5); color: #ffffff; font-weight: 700; font-size: 11px; padding: 6px 12px; border-radius: 6px; border: 1px solid #8b5cf6;"
+            return "background-color: #2563eb; color: #ffffff; font-weight: 700; font-size: 11px; padding: 6px 12px; border-radius: 6px;"
+        if getattr(self, "is_dark", False):
+            return "background-color: transparent; color: #94a3b8; font-weight: 600; font-size: 11px; padding: 6px 12px;"
+        return "background-color: transparent; color: #64748b; font-weight: 600; font-size: 11px; padding: 6px 12px;"
+
+    def _update_stepper(self):
+        for i, lbl in enumerate(self.step_labels):
+            lbl.setStyleSheet(self._get_step_style(i == self.current_step))
+
+        step_names = [
+            "ជ្រើសរើសទម្រង់បទ និងអារម្មណ៍",
+            "កំណត់ចង្វាក់ BPM & Chords",
+            "បង្កើតទំនុកច្រៀងជាមួយ Gemini AI",
+            "ហាត់ច្រៀង និងថតសាកល្បង (Audition)",
+            "ផលិត និង Export យកទៅប្រើប្រាស់"
+        ]
+        self.lbl_step_indicator.setText(f"ជំហាន {self.current_step + 1} នៃ ៥ : {step_names[self.current_step]}")
+        self.btn_prev.setEnabled(self.current_step > 0)
+        if self.current_step == 4:
+            self.btn_next.setText("✍️ បើកបន្ទប់កែច្នៃពេញលេញ ➔")
+        else:
+            self.btn_next.setText("បន្ទាប់ (Next Step) ➔")
+
+    # --- Step 1: Concept, Genre & Mood ---
+    def _create_step1_concept(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(14)
+
+        self.step1_header = QLabel("ជំហានទី ១ : តើអ្នកចង់ធ្វើបទចម្រៀងប្រភេទអ្វី?")
+        self.step1_header.setStyleSheet("font-size: 16px; font-weight: 700; color: #1e293b;")
+        layout.addWidget(self.step1_header)
+
+        # Big Genre Cards Grid
+        grid_genres = QGridLayout()
+        grid_genres.setSpacing(10)
+
+        genres = [
+            ("💖 បទមនោសញ្ចេតនាខ្មែរ", "Khmer pop ballad, 60s sentimental acoustic", "Khmer pop ballad"),
+            ("💃 រាំវង់ រាំក្បាច់ សប្បាយៗ", "Traditional Khmer Romvong folk festive dance", "Khmer Romvong"),
+            ("🎤 រ៉េប & ត្រេប កូនខ្មែរ", "Modern Khmer Trap / Hip-Hop with 808 bass", "Khmer Trap"),
+            ("🌟 Global Pop & R&B", "International catchy earworm radio pop", "Global Radio Pop"),
+            ("⚡ EDM & Club Festival", "Mainstage festival drop with euphoric synths", "EDM Dance"),
+            ("🎸 Acoustic Folk & Indie", "Delicate fingerpicked acoustic guitar ballad", "Acoustic Indie")
+        ]
+
+        self.genre_buttons = []
+        for i, (title, desc, key) in enumerate(genres):
+            card = QPushButton(f"{title}\n{desc}")
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            card.setCheckable(True)
+            if i == 0:
+                card.setChecked(True)
+            card.setStyleSheet("""
+                QPushButton {
+                    background-color: #ffffff;
+                    border: 2px solid #e2e8f0;
+                    border-radius: 10px;
+                    padding: 12px;
+                    text-align: left;
+                    font-size: 12px;
+                    color: #1e293b;
+                }
+                QPushButton:hover {
+                    border-color: #93c5fd;
+                    background-color: #eff6ff;
+                }
+                QPushButton:checked {
+                    border-color: #2563eb;
+                    background-color: #eff6ff;
+                    font-weight: 700;
+                    color: #1d4ed8;
+                }
+            """)
+            card.clicked.connect(lambda _, k=key, b=card: self._select_genre_card(k, b))
+            grid_genres.addWidget(card, i // 2, i % 2)
+            self.genre_buttons.append(card)
+
+        layout.addLayout(grid_genres)
+
+        # Mood & Theme Row
+        self.lbl_step1_mood_theme = QLabel("អារម្មណ៍នៃបទ (Mood) & រឿងរ៉ាវ (Theme / Story):")
+        layout.addWidget(self.lbl_step1_mood_theme)
+        input_row = QHBoxLayout()
+
+        self.input_theme = QLineEdit("រឿងស្នេហាបែកបាក់ នឹកអនុស្សាវរីយ៍ស្ទឹងសង្កែ")
+        self.input_theme.setPlaceholderText("ឧ. ស្នេហាដំបូង, ការតស៊ូជីវិត, បែកបាក់ឯកា...")
+        self.input_theme.setStyleSheet("padding: 8px 12px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        input_row.addWidget(self.input_theme, stretch=2)
+
+        self.combo_mood = QComboBox()
+        self.combo_mood.addItems([
+            "ស្រណោះស្រណោក (Heartfelt & Nostalgic)",
+            "ផ្អែមល្ហែម ស្នេហ៍ដំបូង (Romantic & Sweet)",
+            "ក្ដៅសាច់ រំភើបញាក់ (Energetic & Hype)",
+            "លើកទឹកចិត្ត ក្ដីសង្ឃឹម (Uplifting & Inspiring)",
+            "សោកសៅ ឈឺចាប់ (Sad & Melancholic)"
+        ])
+        self.combo_mood.setStyleSheet("padding: 7px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        input_row.addWidget(self.combo_mood, stretch=1)
+
+        layout.addLayout(input_row)
+        layout.addStretch()
+        return widget
+
+    def _select_genre_card(self, genre_key: str, active_btn: QPushButton):
+        self.state_genre = genre_key
+        for btn in self.genre_buttons:
+            btn.setChecked(btn == active_btn)
+
+    # --- Step 2: Harmony, BPM & Chords ---
+    def _create_step2_harmony(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(14)
+
+        self.step2_header = QLabel("ជំហានទី ២ : កំណត់ចង្វាក់ភ្លេង (BPM), កម្រិតសំឡេង និង Chords")
+        self.step2_header.setStyleSheet("font-size: 16px; font-weight: 700; color: #1e293b;")
+        layout.addWidget(self.step2_header)
+
+        # BPM Row with Presets
+        self.bpm_box = QGroupBox("១. ល្បឿនចង្វាក់ភ្លេង (Tempo / BPM)")
+        bpm_box = self.bpm_box
+        b_layout = QVBoxLayout(bpm_box)
+        b_layout.setSpacing(8)
+
+        self.lbl_bpm_display = QLabel("ល្បឿនបច្ចុប្បន្ន: 74 BPM (ចង្វាក់ Ballad ស្រទន់)")
+        self.lbl_bpm_display.setStyleSheet("font-weight: 700; color: #2563eb; font-size: 13px;")
+        b_layout.addWidget(self.lbl_bpm_display)
+
+        preset_row = QHBoxLayout()
+        self.bpm_preset_btns = []
+        presets = [("🐢 Ballad (74 BPM)", 74), ("🚶 Mid-Tempo (96 BPM)", 96), ("🏃 Dance Pop (120 BPM)", 120), ("⚡ Trap / EDM (140 BPM)", 140)]
+        for text, val in presets:
+            btn = QPushButton(text)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet("background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 6px; font-size: 11px;")
+            btn.clicked.connect(lambda _, v=val: self._set_bpm_val(v))
+            preset_row.addWidget(btn)
+            self.bpm_preset_btns.append(btn)
+        b_layout.addLayout(preset_row)
+
+        self.bpm_slider = QSlider(Qt.Orientation.Horizontal)
+        self.bpm_slider.setRange(50, 180)
+        self.bpm_slider.setValue(74)
+        self.bpm_slider.valueChanged.connect(self._set_bpm_val)
+        b_layout.addWidget(self.bpm_slider)
+        layout.addWidget(bpm_box)
+
+        # Singer Vocal Range & Key
+        self.vocal_box = QGroupBox("២. កម្រិតសំឡេងអ្នកច្រៀង (Vocal Type & Key)")
+        vocal_box = self.vocal_box
+        v_layout = QVBoxLayout(vocal_box)
+        v_layout.setSpacing(6)
+
+        self.combo_vocal = QComboBox()
+        self.combo_vocal.addItems(list(VOCAL_RANGES.keys()))
+        self.combo_vocal.setCurrentIndex(1) # Default to Baritone (Sinn Sisamouth)
+        self.combo_vocal.setStyleSheet("padding: 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        v_layout.addWidget(self.combo_vocal)
+
+        self.lbl_vocal_info = QLabel("Key ស័ក្តិសម: G Major, A Major, Bb Major, F Minor (ស័ក្តិសមបទស៊ីន ស៊ីសាមុត)")
+        self.lbl_vocal_info.setStyleSheet("color: #64748b; font-size: 11px;")
+        v_layout.addWidget(self.lbl_vocal_info)
+        layout.addWidget(vocal_box)
+
+        # Chord Progression
+        self.prog_box = QGroupBox("៣. រូបមន្តគន្លង Chords (Chord Progression)")
+        prog_box = self.prog_box
+        p_layout = QVBoxLayout(prog_box)
+        p_layout.setSpacing(6)
+
+        self.combo_chords = QComboBox()
+        self.combo_chords.addItems(list(CHORD_PROGRESSIONS.keys()))
+        self.combo_chords.setCurrentIndex(2) # Default to Sinn Sisamouth Sentimental
+        self.combo_chords.setStyleSheet("padding: 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        self.combo_chords.currentTextChanged.connect(self._on_chord_selected)
+        p_layout.addWidget(self.combo_chords)
+
+        self.lbl_chord_preview = QLabel("Chords: [Am] - [Dm] - [E7] - [Am] (មនោសញ្ចេតនាជ្រាលជ្រៅ)")
+        self.lbl_chord_preview.setStyleSheet("font-weight: 700; color: #2563eb; background: #eff6ff; padding: 6px 10px; border-radius: 6px;")
+        p_layout.addWidget(self.lbl_chord_preview)
+
+        # Synth audition row in wizard
+        synth_row = QHBoxLayout()
+        self.btn_w_play_chords = QPushButton("🔊 ស្ដាប់ Chords (Audio Synth)")
+        self.btn_w_play_chords.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_play_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; font-weight: 700; border: 1px solid #ddd6fe; border-radius: 6px; padding: 6px 12px;")
+        self.btn_w_play_chords.clicked.connect(self._play_wizard_chords)
+
+        self.btn_w_stop_chords = QPushButton("⏹ Stop")
+        self.btn_w_stop_chords.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_stop_chords.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px;")
+        self.btn_w_stop_chords.clicked.connect(self._stop_wizard_chords)
+
+        synth_row.addWidget(self.btn_w_play_chords)
+        synth_row.addWidget(self.btn_w_stop_chords)
+        synth_row.addStretch()
+        p_layout.addLayout(synth_row)
+
+        layout.addWidget(prog_box)
+
+        layout.addStretch()
+        return widget
+
+    def _play_wizard_chords(self):
+        from app.chord_engine import AudioChordSynthesizer, CHORD_PROGRESSIONS
+        info = CHORD_PROGRESSIONS.get(self.state_chords)
+        if info:
+            chords = info.get("chords_in_c", ["Am", "Dm", "E7", "Am"])
+            AudioChordSynthesizer.play_progression(chords, bpm=self.state_bpm)
+
+    def _stop_wizard_chords(self):
+        from app.chord_engine import AudioChordSynthesizer
+        AudioChordSynthesizer.stop()
+
+    def _set_bpm_val(self, val: int):
+        self.state_bpm = val
+        self.bpm_slider.setValue(val)
+        self.lbl_bpm_display.setText(f"ល្បឿនបច្ចុប្បន្ន: {val} BPM")
+
+    def _on_chord_selected(self, name: str):
+        self.state_chords = name
+        info = CHORD_PROGRESSIONS.get(name)
+        if info:
+            chords_str = " - ".join(f"[{c}]" for c in info.get("chords_in_c", []))
+            self.lbl_chord_preview.setText(f"Chords: {chords_str} ({info.get('mood')})")
+
+    # --- Step 3: AI Lyric Generation ---
+    def _create_step3_lyrics(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(12)
+
+        self.step3_header = QLabel("ជំហានទី ៣ : បង្កើតទំនុកច្រៀងស្វ័យប្រវត្តជាមួយ Google Gemini")
+        self.step3_header.setStyleSheet("font-size: 16px; font-weight: 700; color: #1e293b;")
+        layout.addWidget(self.step3_header)
+
+        # Generation Summary & Trigger Card
+        self.action_card = QFrame()
+        self.action_card.setStyleSheet("background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px;")
+        a_layout = QVBoxLayout(self.action_card)
+        a_layout.setSpacing(8)
+
+        self.lbl_gen_summary = QLabel("គំនិតបទ: Khmer pop ballad • 74 BPM • Am-Dm-E7-Am")
+        self.lbl_gen_summary.setStyleSheet("font-weight: 600; color: #1d4ed8; font-size: 12px;")
+        a_layout.addWidget(self.lbl_gen_summary)
+
+        self.btn_wizard_generate = QPushButton("✨ បង្កើតទំនុកច្រៀងពេញលេញ (Generate Lyrics with Gemini)")
+        self.btn_wizard_generate.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_wizard_generate.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563eb, stop:1 #3b82f6);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 14px;
+                padding: 12px;
+                border: none;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background: #1d4ed8;
+            }
+        """)
+        self.btn_wizard_generate.clicked.connect(self._trigger_generate)
+        a_layout.addWidget(self.btn_wizard_generate)
+
+        self.btn_wizard_humanize = QPushButton("👤 Humanize & Add Breath Cues (កែសម្រួលបែបមនុស្សពិត)")
+        self.btn_wizard_humanize.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_wizard_humanize.setToolTip("Transform into a human masterpiece: inject natural breath pauses, sensory realism, and vulnerable bridge revelation")
+        self.btn_wizard_humanize.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #0284c7);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 11.5px;
+                padding: 8px;
+                border: 1px solid #10b981;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #38bdf8);
+            }
+        """)
+        self.btn_wizard_humanize.clicked.connect(self._humanize_wizard_lyrics)
+        a_layout.addWidget(self.btn_wizard_humanize)
+
+        layout.addWidget(self.action_card)
+
+        # Live Lyric Preview Window
+        self.lbl_step3_preview = QLabel("លទ្ធផលទំនុកច្រៀងដែលបានបង្កើត (Live Preview):")
+        layout.addWidget(self.lbl_step3_preview)
+        self.txt_preview = QTextEdit()
+        self.txt_preview.setReadOnly(False)
+        self.txt_preview.setPlaceholderText("ទំនុកច្រៀងពេញលេញ (Intro, វគ្គ ១, វគ្គ ២, បន្ទរ, Outro) នឹងបង្ហាញនៅទីនេះបន្ទាប់ពីចុច Generate...")
+        self.txt_preview.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 12px;")
+        layout.addWidget(self.txt_preview, stretch=1)
+
+        return widget
+
+    def _humanize_wizard_lyrics(self):
+        curr = self.txt_preview.toPlainText().strip()
+        if not curr:
+            return
+        from app.humanizer_engine import HumanizerEngine
+        lang = "Khmer" if "Khmer" in getattr(self, "state_genre", "") or "ខ្មែរ" in getattr(self, "state_genre", "") else "English"
+        h_lyrics = HumanizerEngine.humanize_lyrics_locally(curr, lang)
+        self.txt_preview.setPlainText(h_lyrics)
+        self.btn_wizard_humanize.setText("✅ Human Breath & Soul Injected!")
+        QTimer.singleShot(2500, lambda: self.btn_wizard_humanize.setText("👤 Humanize & Add Breath Cues (កែសម្រួលបែបមនុស្សពិត)") if hasattr(self, "btn_wizard_humanize") else None)
+
+    def _trigger_generate(self):
+        theme = self.input_theme.text().strip() or "A bittersweet love story"
+        mood = self.combo_mood.currentText()
+
+        params = {
+            "genre": self.state_genre,
+            "region": "Cambodia & Southeast Asia",
+            "language": "Khmer (ភាសាខ្មែរ)",
+            "mood": mood,
+            "theme": theme,
+            "structure": self.state_structure,
+            "rhyme": "AABB",
+            "bpm": f"{self.state_bpm} BPM",
+            "user_notes": f"Write authentic Khmer lyrics with vivid poetic metaphors, chords: {self.state_chords}, tempo {self.state_bpm} BPM"
+        }
+        self.btn_wizard_generate.setText("⏳ កំពុងបង្កើតជាមួយ Gemini...")
+        self.btn_wizard_generate.setEnabled(False)
+        self.generate_requested.emit(params)
+
+    def set_generated_lyrics(self, title: str, lyrics: str):
+        self.btn_wizard_generate.setText("✨ បង្កើតទំនុកច្រៀងឡើងវិញ (Regenerate)")
+        self.btn_wizard_generate.setEnabled(True)
+        self.txt_preview.setPlainText(f"=== {title} ===\n\n{lyrics}")
+
+    # --- Step 4: Audition & Vocal Scratchpad ---
+    def _create_step4_audition(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(14)
+
+        self.step4_header = QLabel("ជំហានទី ៤ : ហាត់ច្រៀង ពិនិត្យចង្វាក់ និងថតសាកល្បងសំនៀង (Audition & Voice)")
+        self.step4_header.setStyleSheet("font-size: 16px; font-weight: 700; color: #1e293b;")
+        layout.addWidget(self.step4_header)
+
+        # Metronome Row
+        self.metro_box = QGroupBox("១. បើកចង្វាក់ភ្លេងហាត់ច្រៀង (Studio Metronome)")
+        metro_box = self.metro_box
+        m_layout = QHBoxLayout(metro_box)
+        m_layout.setSpacing(10)
+
+        self.lbl_m_info = QLabel("ចុចហាត់ច្រៀងតាមចង្វាក់ 74 BPM ដើម្បីពិនិត្យមើលថាតើព្យាង្គធ្លាក់ត្រូវចង្វាក់ដែរឬទេ:")
+        self.lbl_m_info.setStyleSheet("color: #475569; font-size: 11px;")
+        m_layout.addWidget(self.lbl_m_info, stretch=1)
+
+        self.btn_w_metro = QPushButton("▶ បើក Metronome")
+        self.btn_w_metro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_metro.setStyleSheet("background: #f1f5f9; color: #2563eb; font-weight: 700; padding: 8px 14px; border-radius: 6px;")
+        m_layout.addWidget(self.btn_w_metro)
+        layout.addWidget(metro_box)
+
+        # Voice Scratchpad
+        self.voice_box = QGroupBox("២. ថតសាកល្បងសំនៀងភ្លេងតាម Microphone (Melody Scratchpad)")
+        voice_box = self.voice_box
+        v_layout = QVBoxLayout(voice_box)
+        v_layout.setSpacing(8)
+
+        self.v_desc = QLabel("ចុចច្រៀង ឬហួចសំនៀងភ្លេង (Humming) ទុកភ្លាមៗកុំឱ្យភ្លេច Melodies ពេលកំពុងសរសេរ:")
+        v_desc = self.v_desc
+        v_desc.setStyleSheet("color: #64748b; font-size: 11px;")
+        v_layout.addWidget(v_desc)
+
+        btn_row = QHBoxLayout()
+        self.btn_w_record = QPushButton("🔴 Record Scratch Melody (Mic)")
+        self.btn_w_record.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_record.setStyleSheet("background-color: #fee2e2; color: #dc2626; font-weight: 700; border: 1px solid #fca5a5; border-radius: 6px; padding: 10px;")
+        btn_row.addWidget(self.btn_w_record)
+
+        self.btn_w_play_rec = QPushButton("▶ ស្ដាប់សំនៀងដែលបានថតឡើងវិញ")
+        self.btn_w_play_rec.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_play_rec.setEnabled(False)
+        self.btn_w_play_rec.setStyleSheet("background: #f1f5f9; color: #334155; font-weight: 600; padding: 10px; border-radius: 6px;")
+        btn_row.addWidget(self.btn_w_play_rec)
+        v_layout.addLayout(btn_row)
+
+        self.lbl_w_rec_status = QLabel("Ready to record voice take")
+        self.lbl_w_rec_status.setStyleSheet("color: #64748b; font-size: 11px; font-style: italic;")
+        v_layout.addWidget(self.lbl_w_rec_status)
+        layout.addWidget(voice_box)
+
+        layout.addStretch()
+        return widget
+
+    # --- Step 5: Publishing & Production Export ---
+    def _create_step5_export(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(14)
+
+        self.step5_header = QLabel("ជំហានទី ៥ : បញ្ចប់ការផលិត និង Export យកទៅប្រើប្រាស់ក្នុង Suno ឬ DAW")
+        self.step5_header.setStyleSheet("font-size: 16px; font-weight: 700; color: #1e293b;")
+        layout.addWidget(self.step5_header)
+
+        # Big 1-Click ZIP Bundle Card
+        self.bundle_card = QFrame()
+        self.bundle_card.setStyleSheet("background: #f0fdf4; border: 2px solid #86efac; border-radius: 12px; padding: 16px;")
+        b_layout = QVBoxLayout(self.bundle_card)
+        b_layout.setSpacing(10)
+
+        self.lbl_b_title = QLabel("📦 ទាញយកកញ្ចប់ Suno & DAW ពេញលេញ (1-Click Production Bundle)")
+        self.lbl_b_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #166534;")
+        b_layout.addWidget(self.lbl_b_title)
+
+        self.lbl_b_desc = QLabel("បង្កើតឯកសារ .zip ដែលមានស្រាប់៖\n1. Suno Style Prompt (<120 chars) & Negative Style\n2. ទំនុកច្រៀងដែលមាន Audio Tags\n3. Chords MIDI File (.mid សម្រាប់ FL Studio/Ableton)\n4. Printable HTML Lead Sheet\n5. Project Metadata (.json)")
+        self.lbl_b_desc.setStyleSheet("color: #14532d; font-size: 12px; line-height: 1.5;")
+        b_layout.addWidget(self.lbl_b_desc)
+
+        btn_bundle = QPushButton("💾 ទាញយកកញ្ចប់ ZIP ឥឡូវនេះ (Export Production Bundle)")
+        btn_bundle.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_bundle.setStyleSheet("""
+            QPushButton {
+                background: #16a34a;
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 13px;
+                padding: 10px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background: #15803d;
+            }
+        """)
+        btn_bundle.clicked.connect(lambda: self.export_bundle_requested.emit())
+        b_layout.addWidget(btn_bundle)
+        layout.addWidget(self.bundle_card)
+
+        # Action to open in full editor or Batch Pro
+        self.lbl_step5_more = QLabel("ឬបន្តកែសម្រួល ឬផលិត ២០ បទប្លែកៗគ្នាភ្លាមៗ៖")
+        layout.addWidget(self.lbl_step5_more)
+        w_actions = QHBoxLayout()
+        self.btn_open_full = QPushButton("✍️ បើកបន្ទប់កែសម្រួល (Open Editor)")
+        self.btn_open_full.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_full.setStyleSheet("background: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; padding: 10px; border-radius: 8px;")
+        self.btn_open_full.clicked.connect(lambda: self.open_editor_requested.emit())
+        w_actions.addWidget(self.btn_open_full)
+
+        self.btn_w_batch = QPushButton("⚡ បង្កើត ២០ បទ (Produce 20 in Batch Pro)")
+        self.btn_w_batch.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_batch.setStyleSheet("background: #faf5ff; color: #7c3aed; font-weight: 700; border: 1px solid #d8b4fe; padding: 10px; border-radius: 8px;")
+        self.btn_w_batch.clicked.connect(self._emit_open_batch)
+        w_actions.addWidget(self.btn_w_batch)
+
+        layout.addLayout(w_actions)
+
+        layout.addStretch()
+        return widget
+
+    def _emit_open_batch(self):
+        params = self.get_wizard_parameters()
+        self.open_batch_requested.emit(params)
+
+    def apply_theme(self, is_dark: bool):
+        self.is_dark = is_dark
+        if is_dark:
+            if hasattr(self, "main_title"):
+                self.main_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #f8fafc;")
+            if hasattr(self, "sub_title"):
+                self.sub_title.setStyleSheet("font-size: 12px; color: #94a3b8;")
+            if hasattr(self, "nav_frame"):
+                self.nav_frame.setStyleSheet("border-top: 1px solid #1e2540; padding-top: 8px;")
+            if hasattr(self, "lbl_step_indicator"):
+                self.lbl_step_indicator.setStyleSheet("color: #94a3b8; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "stepper_frame"):
+                self.stepper_frame.setStyleSheet("background-color: #111526; border: 1px solid #1e2540; border-radius: 10px; padding: 6px;")
+            self.btn_prev.setStyleSheet("background-color: #161b30; color: #cbd5e1; border: 1px solid #283256; font-weight: 600; padding: 8px 16px; border-radius: 6px;")
+            self.btn_next.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7c3aed, stop:1 #4f46e5); color: #ffffff; font-weight: 800; padding: 8px 20px; border-radius: 6px; border: 1px solid #8b5cf6;")
+
+            # Step Headers
+            for h in [getattr(self, "step1_header", None), getattr(self, "step2_header", None), getattr(self, "step3_header", None), getattr(self, "step4_header", None), getattr(self, "step5_header", None)]:
+                if h:
+                    h.setStyleSheet("font-size: 16px; font-weight: 700; color: #f8fafc;")
+
+            # Step 1 Genre Buttons (Sleek Studio Cards in Dark Mode)
+            if hasattr(self, "genre_buttons"):
+                for b in self.genre_buttons:
+                    b.setStyleSheet("""
+                        QPushButton {
+                            background-color: #111526;
+                            border: 1px solid #1e2640;
+                            border-radius: 10px;
+                            padding: 12px;
+                            text-align: left;
+                            font-size: 12px;
+                            color: #f1f5f9;
+                        }
+                        QPushButton:hover {
+                            border-color: #6366f1;
+                            background-color: #171d34;
+                        }
+                        QPushButton:checked {
+                            border: 2px solid #a855f7;
+                            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2e1065, stop:1 #1e1b4b);
+                            font-weight: 700;
+                            color: #ffffff;
+                        }
+                    """)
+
+            if hasattr(self, "lbl_step1_mood_theme"):
+                self.lbl_step1_mood_theme.setStyleSheet("color: #cbd5e1; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "input_theme"):
+                self.input_theme.setStyleSheet("background-color: #161b30; color: #f8fafc; border: 1px solid #283256; border-radius: 6px; padding: 8px 12px; font-size: 12px;")
+            if hasattr(self, "combo_mood"):
+                self.combo_mood.setStyleSheet("background-color: #161b30; color: #f8fafc; border: 1px solid #283256; border-radius: 6px; padding: 7px; font-size: 12px;")
+
+            # Step 2 Group Boxes & Inputs
+            gb_qss_dark = """
+                QGroupBox {
+                    font-weight: 700;
+                    color: #f8fafc;
+                    border: 1px solid #1e2540;
+                    border-radius: 8px;
+                    margin-top: 10px;
+                    padding: 10px;
+                    background-color: #111526;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 4px;
+                    color: #38bdf8;
+                }
+            """
+            for gb in [getattr(self, "bpm_box", None), getattr(self, "vocal_box", None), getattr(self, "prog_box", None), getattr(self, "metro_box", None), getattr(self, "voice_box", None)]:
+                if gb:
+                    gb.setStyleSheet(gb_qss_dark)
+
+            if hasattr(self, "lbl_bpm_display"):
+                self.lbl_bpm_display.setStyleSheet("font-weight: 700; color: #38bdf8; font-size: 13px;")
+            if hasattr(self, "bpm_preset_btns"):
+                for b in self.bpm_preset_btns:
+                    b.setStyleSheet("background: #161b30; color: #94a3b8; border: 1px solid #283256; padding: 6px 10px; border-radius: 6px; font-size: 11px;")
+            if hasattr(self, "combo_vocal"):
+                self.combo_vocal.setStyleSheet("background-color: #161b30; color: #f8fafc; border: 1px solid #283256; border-radius: 6px; padding: 6px; font-size: 12px;")
+            if hasattr(self, "lbl_vocal_info"):
+                self.lbl_vocal_info.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            if hasattr(self, "combo_chords"):
+                self.combo_chords.setStyleSheet("background-color: #161b30; color: #f8fafc; border: 1px solid #283256; border-radius: 6px; padding: 6px; font-size: 12px;")
+            if hasattr(self, "lbl_chord_preview"):
+                self.lbl_chord_preview.setStyleSheet("font-weight: 700; color: #38bdf8; background: #090b14; border: 1px solid #1e2540; padding: 6px 10px; border-radius: 6px;")
+            if hasattr(self, "btn_w_play_chords"):
+                self.btn_w_play_chords.setStyleSheet("background-color: #2e1065; color: #d8b4fe; font-weight: 700; border: 1px solid #7c3aed; border-radius: 6px; padding: 6px 12px;")
+            if hasattr(self, "btn_w_stop_chords"):
+                self.btn_w_stop_chords.setStyleSheet("background-color: #161b30; color: #94a3b8; font-weight: 600; border: 1px solid #283256; border-radius: 6px; padding: 6px 10px;")
+
+            # Step 3
+            if hasattr(self, "action_card"):
+                self.action_card.setStyleSheet("background: #111526; border: 1px solid #1e2540; border-radius: 10px; padding: 12px;")
+            if hasattr(self, "lbl_gen_summary"):
+                self.lbl_gen_summary.setStyleSheet("font-weight: 600; color: #38bdf8; font-size: 12px;")
+            if hasattr(self, "lbl_step3_preview"):
+                self.lbl_step3_preview.setStyleSheet("color: #cbd5e1; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "txt_preview"):
+                self.txt_preview.setStyleSheet("background: #090b14; color: #f1f5f9; border: 1px solid #1e2540; border-radius: 8px; padding: 8px; font-size: 12px;")
+
+            # Step 4
+            if hasattr(self, "lbl_m_info"):
+                self.lbl_m_info.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            if hasattr(self, "btn_w_metro"):
+                self.btn_w_metro.setStyleSheet("background: #161b30; color: #38bdf8; border: 1px solid #0284c7; font-weight: 700; padding: 8px 14px; border-radius: 6px;")
+            if hasattr(self, "v_desc"):
+                self.v_desc.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            if hasattr(self, "btn_w_record"):
+                self.btn_w_record.setStyleSheet("background-color: #3b1115; color: #f87171; font-weight: 700; border: 1px solid #7f1d1d; border-radius: 6px; padding: 10px;")
+            if hasattr(self, "btn_w_play_rec"):
+                self.btn_w_play_rec.setStyleSheet("background: #161b30; color: #cbd5e1; border: 1px solid #283256; font-weight: 600; padding: 10px; border-radius: 6px;")
+            if hasattr(self, "lbl_w_rec_status"):
+                self.lbl_w_rec_status.setStyleSheet("color: #94a3b8; font-size: 11px; font-style: italic;")
+
+            # Step 5
+            if hasattr(self, "bundle_card"):
+                self.bundle_card.setStyleSheet("background: #064e3b; border: 1px solid #059669; border-radius: 12px; padding: 16px;")
+            if hasattr(self, "lbl_b_title"):
+                self.lbl_b_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #6ee7b7;")
+            if hasattr(self, "lbl_b_desc"):
+                self.lbl_b_desc.setStyleSheet("color: #a7f3d0; font-size: 12px; line-height: 1.5;")
+            if hasattr(self, "lbl_step5_more"):
+                self.lbl_step5_more.setStyleSheet("color: #cbd5e1; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "btn_open_full"):
+                self.btn_open_full.setStyleSheet("background: #1e1b4b; color: #c084fc; font-weight: 700; border: 1px solid #4338ca; padding: 12px; border-radius: 8px;")
+            if hasattr(self, "btn_w_batch"):
+                self.btn_w_batch.setStyleSheet("background: #2e1065; color: #e9d5ff; font-weight: 700; border: 1px solid #7c3aed; padding: 12px; border-radius: 8px;")
+        else:
+            if hasattr(self, "main_title"):
+                self.main_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #1e293b;")
+            if hasattr(self, "sub_title"):
+                self.sub_title.setStyleSheet("font-size: 12px; color: #64748b;")
+            if hasattr(self, "nav_frame"):
+                self.nav_frame.setStyleSheet("border-top: 1px solid #e2e8f0; padding-top: 8px;")
+            if hasattr(self, "lbl_step_indicator"):
+                self.lbl_step_indicator.setStyleSheet("color: #64748b; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "stepper_frame"):
+                self.stepper_frame.setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px;")
+            self.btn_prev.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; padding: 8px 16px; border-radius: 6px;")
+            self.btn_next.setStyleSheet("background: #2563eb; color: #ffffff; font-weight: 700; padding: 8px 20px; border-radius: 6px;")
+
+            # Step Headers
+            for h in [getattr(self, "step1_header", None), getattr(self, "step2_header", None), getattr(self, "step3_header", None), getattr(self, "step4_header", None), getattr(self, "step5_header", None)]:
+                if h:
+                    h.setStyleSheet("font-size: 16px; font-weight: 700; color: #1e293b;")
+
+            # Step 1 Genre Buttons (Light Mode)
+            if hasattr(self, "genre_buttons"):
+                for b in self.genre_buttons:
+                    b.setStyleSheet("""
+                        QPushButton {
+                            background-color: #ffffff;
+                            border: 2px solid #e2e8f0;
+                            border-radius: 10px;
+                            padding: 12px;
+                            text-align: left;
+                            font-size: 12px;
+                            color: #1e293b;
+                        }
+                        QPushButton:hover {
+                            border-color: #93c5fd;
+                            background-color: #eff6ff;
+                        }
+                        QPushButton:checked {
+                            border: 2px solid #2563eb;
+                            background-color: #eff6ff;
+                            font-weight: 700;
+                            color: #1d4ed8;
+                        }
+                    """)
+
+            if hasattr(self, "lbl_step1_mood_theme"):
+                self.lbl_step1_mood_theme.setStyleSheet("color: #1e293b; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "input_theme"):
+                self.input_theme.setStyleSheet("padding: 8px 12px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #ffffff; color: #1e293b;")
+            if hasattr(self, "combo_mood"):
+                self.combo_mood.setStyleSheet("padding: 7px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #ffffff; color: #1e293b;")
+
+            # Step 2 Group Boxes & Inputs
+            gb_qss_light = """
+                QGroupBox {
+                    font-weight: 700;
+                    color: #1e293b;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    margin-top: 10px;
+                    padding: 10px;
+                    background-color: #f8fafc;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 4px;
+                    color: #2563eb;
+                }
+            """
+            for gb in [getattr(self, "bpm_box", None), getattr(self, "vocal_box", None), getattr(self, "prog_box", None), getattr(self, "metro_box", None), getattr(self, "voice_box", None)]:
+                if gb:
+                    gb.setStyleSheet(gb_qss_light)
+
+            if hasattr(self, "lbl_bpm_display"):
+                self.lbl_bpm_display.setStyleSheet("font-weight: 700; color: #2563eb; font-size: 13px;")
+            if hasattr(self, "bpm_preset_btns"):
+                for b in self.bpm_preset_btns:
+                    b.setStyleSheet("background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 6px; font-size: 11px;")
+            if hasattr(self, "combo_vocal"):
+                self.combo_vocal.setStyleSheet("padding: 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #1e293b;")
+            if hasattr(self, "lbl_vocal_info"):
+                self.lbl_vocal_info.setStyleSheet("color: #64748b; font-size: 11px;")
+            if hasattr(self, "combo_chords"):
+                self.combo_chords.setStyleSheet("padding: 6px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; color: #1e293b;")
+            if hasattr(self, "lbl_chord_preview"):
+                self.lbl_chord_preview.setStyleSheet("font-weight: 700; color: #2563eb; background: #eff6ff; padding: 6px 10px; border-radius: 6px;")
+            if hasattr(self, "btn_w_play_chords"):
+                self.btn_w_play_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; font-weight: 700; border: 1px solid #ddd6fe; border-radius: 6px; padding: 6px 12px;")
+            if hasattr(self, "btn_w_stop_chords"):
+                self.btn_w_stop_chords.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px;")
+
+            # Step 3
+            if hasattr(self, "action_card"):
+                self.action_card.setStyleSheet("background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px;")
+            if hasattr(self, "lbl_gen_summary"):
+                self.lbl_gen_summary.setStyleSheet("font-weight: 600; color: #1d4ed8; font-size: 12px;")
+            if hasattr(self, "lbl_step3_preview"):
+                self.lbl_step3_preview.setStyleSheet("color: #1e293b; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "txt_preview"):
+                self.txt_preview.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; font-size: 12px; color: #1e293b;")
+
+            # Step 4
+            if hasattr(self, "lbl_m_info"):
+                self.lbl_m_info.setStyleSheet("color: #475569; font-size: 11px;")
+            if hasattr(self, "btn_w_metro"):
+                self.btn_w_metro.setStyleSheet("background: #f1f5f9; color: #2563eb; font-weight: 700; padding: 8px 14px; border-radius: 6px;")
+            if hasattr(self, "v_desc"):
+                self.v_desc.setStyleSheet("color: #64748b; font-size: 11px;")
+            if hasattr(self, "btn_w_record"):
+                self.btn_w_record.setStyleSheet("background-color: #fee2e2; color: #dc2626; font-weight: 700; border: 1px solid #fca5a5; border-radius: 6px; padding: 10px;")
+            if hasattr(self, "btn_w_play_rec"):
+                self.btn_w_play_rec.setStyleSheet("background: #f1f5f9; color: #334155; font-weight: 600; padding: 10px; border-radius: 6px;")
+            if hasattr(self, "lbl_w_rec_status"):
+                self.lbl_w_rec_status.setStyleSheet("color: #64748b; font-size: 11px; font-style: italic;")
+
+            # Step 5
+            if hasattr(self, "bundle_card"):
+                self.bundle_card.setStyleSheet("background: #f0fdf4; border: 2px solid #86efac; border-radius: 12px; padding: 16px;")
+            if hasattr(self, "lbl_b_title"):
+                self.lbl_b_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #166534;")
+            if hasattr(self, "lbl_b_desc"):
+                self.lbl_b_desc.setStyleSheet("color: #14532d; font-size: 12px; line-height: 1.5;")
+            if hasattr(self, "lbl_step5_more"):
+                self.lbl_step5_more.setStyleSheet("color: #1e293b; font-weight: 600; font-size: 12px;")
+            if hasattr(self, "btn_open_full"):
+                self.btn_open_full.setStyleSheet("background: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; padding: 12px; border-radius: 8px;")
+            if hasattr(self, "btn_w_batch"):
+                self.btn_w_batch.setStyleSheet("background: #faf5ff; color: #7c3aed; font-weight: 700; border: 1px solid #d8b4fe; padding: 12px; border-radius: 8px;")
+
+        self._update_stepper()
+
+    # --- Navigation Logic ---
+    def _go_next(self):
+        if self.current_step < 4:
+            self.current_step += 1
+            self.step_stack.setCurrentIndex(self.current_step)
+            self._update_stepper()
+        else:
+            # Step 5 next goes to full editor workbench
+            self.open_editor_requested.emit()
+
+    def _go_prev(self):
+        if self.current_step > 0:
+            self.current_step -= 1
+            self.step_stack.setCurrentIndex(self.current_step)
+            self._update_stepper()

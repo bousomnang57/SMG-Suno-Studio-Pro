@@ -1,0 +1,24 @@
+{
+  "version": "2.1.0",
+  "name": "SMG Suno Studio Pro",
+  "title_kh": "SMG Suno Studio Pro v2.1.0 — កំណែអាប់ដេតថ្មី បង្កើនល្បឿន និងបន្ថែមមុខងារពិសេស",
+  "title_en": "SMG Suno Studio Pro v2.1.0 — Major Performance & Feature Release",
+  "release_date": "2026-11-05",
+  "min_os_version": "Windows 10 / 11 (64-bit)",
+  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_Setup.exe",
+  "installer_name": "SMG_Suno_Studio_Pro_v2.1_Setup.exe",
+  "file_size_mb": 68.8,
+  "changelog_kh": [
+    "🚀 បន្ថែមមុខងារ Live Auto-Updater៖ ជូនដំណឹង និង Restart ដំឡើងភ្លាមៗដោយស្វ័យប្រវត្តិ",
+    "🎨 គាំទ្រ Studio Themes ទាំង 5 ជាមួយកម្រិត Contrast ច្បាស់ និង Font ខ្មែរស្អាតឥតខ្ចោះ",
+    "⚡ បង្កើនល្បឿន Batch Generation និង Song DNA Cloner ឲ្យកាន់តែលឿន",
+    "🛠️ ជួសជុលបញ្ហា Font Glyph លើ Windows មួយចំនួន និងរក្សាទម្រង់ស្អាតគ្រប់ Window Resolution"
+  ],
+  "changelog_en": [
+    "🚀 Added In-App Live Auto-Updater: Instant update notifications & one-click restart install",
+    "🎨 Enhanced all 5 Studio Themes with high-contrast text and crisp DirectWrite Khmer fonts",
+    "⚡ Accelerated Batch Generation and Song DNA Cloner algorithms",
+    "🛠️ Resolved font glyph rendering across diverse Windows versions and screen resolutions"
+  ]
+}
+
