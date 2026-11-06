@@ -47,6 +47,47 @@ def is_newer_version(remote_ver: str, current_ver: str = APP_VERSION) -> bool:
     return tuple(r_parts) > tuple(c_parts)
 
 
+def resolve_github_asset_url(download_url: str) -> str:
+    """
+    If download_url points to a GitHub Release, queries GitHub Releases API
+    to dynamically retrieve the exact live installer .exe asset, avoiding 404 filename mismatches.
+    """
+    if "github.com" not in download_url or "releases" not in download_url:
+        return download_url
+
+    match = re.search(r'github\.com/([^/]+)/([^/]+)/releases', download_url)
+    if not match:
+        return download_url
+
+    owner, repo = match.group(1), match.group(2)
+    tag_match = re.search(r'/releases/download/([^/]+)/', download_url)
+    if tag_match:
+        tag = tag_match.group(1)
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}"
+    else:
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+
+    try:
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "User-Agent": f"SMG-Suno-Studio-Pro/{APP_VERSION} (Windows; x64)",
+                "Accept": "application/vnd.github.v3+json"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            assets = data.get("assets", [])
+            for asset in assets:
+                name = asset.get("name", "")
+                if name.endswith(".exe"):
+                    return asset.get("browser_download_url", download_url)
+    except Exception:
+        pass
+
+    return download_url
+
+
 class UpdateCheckWorker(QThread):
     """
     Background worker that queries the version manifest JSON from remote URL without blocking the GUI.
@@ -63,8 +104,12 @@ class UpdateCheckWorker(QThread):
 
     def run(self):
         try:
+            check_url = self.update_url
+            sep = "&" if "?" in check_url else "?"
+            check_url = f"{check_url}{sep}_t={int(time.time())}"
+
             req = urllib.request.Request(
-                self.update_url,
+                check_url,
                 headers={
                     "User-Agent": f"SMG-Suno-Studio-Pro/{self.current_version} (Windows; x64)",
                     "Cache-Control": "no-cache",
@@ -118,16 +163,24 @@ class UpdateDownloadWorker(QThread):
         try:
             temp_dir = Path(tempfile.gettempdir())
             dest_file = temp_dir / self.target_filename
-            
+
+            download_url = self.download_url
+            try:
+                resolved = resolve_github_asset_url(download_url)
+                if resolved:
+                    download_url = resolved
+            except Exception:
+                pass
+
             req = urllib.request.Request(
-                self.download_url,
+                download_url,
                 headers={"User-Agent": f"SMG-Suno-Studio-Pro/{APP_VERSION} (Windows; x64)"}
             )
 
             start_time = time.time()
             bytes_read = 0
 
-            with urllib.request.urlopen(req, timeout=15) as response:
+            with urllib.request.urlopen(req, timeout=20) as response:
                 total_bytes = int(response.headers.get("Content-Length", 0))
                 chunk_size = 64 * 1024  # 64 KB chunks
 
