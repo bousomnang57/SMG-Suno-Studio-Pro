@@ -6,7 +6,7 @@ Integrates with `google-genai` SDK and provides mock demo fallback.
 import time
 from PyQt6.QtCore import QThread, pyqtSignal
 from app.config import config_manager
-from app.music_data import WORLD_REGIONS, ONE_CLICK_PRESETS
+from app.music_data import ONE_CLICK_PRESETS
 
 DEMO_SONGS = {
     "Synthpop": """[Intro - Neon Synthesizer Arpeggio]

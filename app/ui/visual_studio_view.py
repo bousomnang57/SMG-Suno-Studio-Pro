@@ -103,24 +103,6 @@ MASTER_PRESETS = [
 ]
 
 
-class FlowLayoutWidget(QWidget):
-    """Container displaying child buttons in a wrapped, responsive grid flow."""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.is_dark = False
-        self.layout = QGridLayout(self)
-        self.layout.setContentsMargins(2, 2, 2, 2)
-        self.layout.setSpacing(6)
-        self.col_count = 6
-
-    def add_buttons(self, buttons: list, cols: int = 6):
-        self.col_count = cols
-        for i, btn in enumerate(buttons):
-            row = i // cols
-            col = i % cols
-            self.layout.addWidget(btn, row, col)
-
-
 class VisualStudioView(QWidget):
     generate_requested = pyqtSignal(dict)
     demo_requested = pyqtSignal(dict)

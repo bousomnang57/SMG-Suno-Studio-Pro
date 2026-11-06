@@ -6,12 +6,12 @@ Khmer/English Dual Metatag Bar, Inline Chord Studio & Transposer.
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QPlainTextEdit, QFrame, QMenu, QToolBar,
-    QProgressBar, QSpinBox, QComboBox, QApplication, QMessageBox,
+    QPushButton, QPlainTextEdit, QFrame, QMenu,
+    QSpinBox, QComboBox, QApplication, QMessageBox,
     QInputDialog, QSlider, QFileDialog
 )
 from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal, QTimer, QUrl
-from PyQt6.QtGui import QColor, QPainter, QTextFormat, QFont, QTextCursor
+from PyQt6.QtGui import QColor, QPainter, QTextFormat, QFont
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from pathlib import Path
 from app.syllable_meter import count_line_syllables, LyricMeterAnalyzer

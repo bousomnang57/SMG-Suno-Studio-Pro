@@ -3,7 +3,6 @@ Song Lyric Exporter: TXT, LRC (Karaoke Synced), JSON, and PDF Lyric Sheets.
 """
 
 import json
-from pathlib import Path
 from fpdf import FPDF
 from app.syllable_meter import count_line_syllables
 

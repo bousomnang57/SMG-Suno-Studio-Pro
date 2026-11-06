@@ -5,10 +5,9 @@ audio file reverse-engineering, and generating commercial semantic counterparts 
 """
 
 import re
-from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QScrollArea, QFrame, QGridLayout,
+    QPushButton, QTextEdit, QFrame,
     QComboBox, QSpinBox, QMessageBox, QApplication, QFileDialog,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView
 )

@@ -18,7 +18,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QApplication
 
-from app.config import APP_VERSION, APP_NAME, DEFAULT_UPDATE_URL
+from app.config import APP_VERSION, DEFAULT_UPDATE_URL
 
 def parse_version(ver_str: str) -> tuple[int, ...]:
     """

@@ -5,7 +5,6 @@ Supports CLI terminal mode and standalone GUI window mode.
 """
 
 import sys
-import os
 import csv
 from pathlib import Path
 from datetime import datetime, timedelta

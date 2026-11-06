@@ -4,13 +4,12 @@ Allows end-users to view and copy their unique Machine ID,
 paste their purchased license key, and activate their software cleanly.
 """
 
-from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QMessageBox, QApplication
 )
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QIcon, QClipboard, QDesktopServices
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 
 from app.config import APP_NAME, get_asset_path
 from app.ui.styles import get_theme

@@ -7,10 +7,10 @@ and seamless one-click Detached Restart & Install.
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QProgressBar, QTabWidget, QTextEdit, QFrame, QMessageBox, QWidget
+    QProgressBar, QTabWidget, QTextEdit, QFrame, QMessageBox
 )
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtGui import QIcon
 
 from app.config import APP_VERSION, APP_NAME, get_asset_path
 from app.ui.styles import get_theme

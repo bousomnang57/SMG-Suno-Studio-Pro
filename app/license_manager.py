@@ -3,14 +3,11 @@ Hardware-Locked Cryptographic License Management System for SMG Suno Studio Pro.
 Generates unique, stable Windows Machine IDs (HWID) and verifies offline HMAC-SHA256 license signatures.
 """
 
-import os
 import sys
 import json
-import time
 import hmac
 import hashlib
 import platform
-from pathlib import Path
 from datetime import datetime, timedelta
 
 from app.config import CONFIG_DIR

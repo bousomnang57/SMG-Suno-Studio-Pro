@@ -3,7 +3,6 @@ Settings Dialog: Configure Gemini API Key Pool, Model Selection, and Application
 Engineered for clean UI fit, high contrast, responsive feedback, and seamless Light/Dark themes.
 """
 
-from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QComboBox, QGroupBox, QMessageBox, QFrame, QCheckBox

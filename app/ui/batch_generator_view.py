@@ -7,21 +7,18 @@ and 1-click Quick-Queue workflows for Suno v3.5 / v4 / v6.
 
 import json
 import re
-from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QScrollArea, QFrame, QGridLayout,
-    QComboBox, QApplication, QSplitter, QFileDialog, QMessageBox,
+    QComboBox, QApplication, QFileDialog, QMessageBox,
     QProgressBar, QMenu, QSizePolicy, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QColor, QAction, QPixmap
-from app.config import config_manager, GEMINI_MODELS
+from PyQt6.QtGui import QFont, QColor, QAction
 from app.gemini_client import BatchGenerateWorker, DeepenLyricWorker
 from app.ui.styles import get_theme
 from app.ui.batch_song_dialog import StudioSongInspectorDialog
-from app.ui.multi_key_dialog import MultiKeyDialog
 
 
 def inject_suno_v6_cues(lyrics: str, bpm: str, key: str, genre: str, vocal_type: str = "Mixed") -> str:
@@ -1070,9 +1067,6 @@ class BatchGeneratorView(QWidget):
             self._check_and_update_columns()
         self._update_column_toggle_ui()
 
-    def _set_column_mode(self, cols):
-        self._set_view_mode(cols)
-
     def _update_column_toggle_ui(self):
         mode = getattr(self, "_view_mode", getattr(self, "_user_fixed_cols", None))
         is_dark = getattr(self, "is_dark", True)
@@ -2020,169 +2014,6 @@ class BatchGeneratorView(QWidget):
                 background-color: #bae6fd;
             }
         """
-
-    # ── Bottom Inspector Panel ──
-    def _create_inspector_panel(self) -> QFrame:
-        self.inspector_panel = QFrame()
-        self.inspector_panel.setStyleSheet("background-color: #0d1020; border: 1px solid #1f2845; border-radius: 8px; padding: 8px;")
-        layout = QVBoxLayout(self.inspector_panel)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-
-        # Header with actions
-        top_row = QHBoxLayout()
-        top_row.setSpacing(5)
-
-        self.lbl_inst = QLabel("🔍 Song Inspector:")
-        self.lbl_inst.setStyleSheet("font-size: 11px; font-weight: 800; color: #a5b4fc;")
-        top_row.addWidget(self.lbl_inst)
-        top_row.addStretch()
-
-        self.btn_insp_title = QPushButton("📋 Title")
-        self.btn_insp_title.clicked.connect(self._copy_insp_title)
-        top_row.addWidget(self.btn_insp_title)
-
-        self.btn_insp_style = QPushButton("📋 Style")
-        self.btn_insp_style.clicked.connect(self._copy_insp_style)
-        top_row.addWidget(self.btn_insp_style)
-
-        self.btn_insp_lyrics = QPushButton("📋 Lyrics")
-        self.btn_insp_lyrics.clicked.connect(self._copy_insp_lyrics)
-        top_row.addWidget(self.btn_insp_lyrics)
-
-        self.btn_insp_all = QPushButton("📦 Bundle")
-        self.btn_insp_all.setToolTip("Copy Full Suno Bundle (Title + Style Prompt + Lyrics)")
-        self.btn_insp_all.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #7c3aed); color: #ffffff; font-weight: 800; border: 1px solid #818cf8; border-radius: 5px; padding: 4px 9px; font-size: 10px;")
-        self.btn_insp_all.clicked.connect(self._copy_insp_all)
-        top_row.addWidget(self.btn_insp_all)
-
-        # Suno v6 Metatags Injector Button
-        self.btn_insp_inject_v6 = QPushButton("⚡ v6 Cues")
-        self.btn_insp_inject_v6.setToolTip("Inject Suno v6 audio cues ([Tempo], [Key], [Instrumental Solo], [Drop], [Fade Out]) into this song")
-        self.btn_insp_inject_v6.setStyleSheet("background-color: #312e81; color: #c084fc; font-weight: 700; border: 1px solid #6366f1; border-radius: 5px; padding: 4px 8px; font-size: 10px;")
-        self.btn_insp_inject_v6.clicked.connect(self._inject_v6_to_selected)
-        top_row.addWidget(self.btn_insp_inject_v6)
-
-        # Style Mutator Button (3 Takes)
-        self.btn_insp_mutate = QPushButton("🎨 3 Takes")
-        self.btn_insp_mutate.setToolTip("Explore 3 alternative production styles (Acoustic, Electronic, Rock) for this track")
-        self.btn_insp_mutate.setStyleSheet("background-color: #064e3b; color: #34d399; font-weight: 700; border: 1px solid #059669; border-radius: 5px; padding: 4px 8px; font-size: 10px;")
-        self.btn_insp_mutate.clicked.connect(self._open_style_mutator_menu)
-        top_row.addWidget(self.btn_insp_mutate)
-
-        # Deepen Meaning Button (Berklee Sensory & Poetics)
-        self.btn_insp_crossover = QPushButton("🌐 Crossover Hook")
-        self.btn_insp_crossover.setToolTip("Swap / Generate Billboard Bilingual Crossover Hook (Khmer ➔ English / English ➔ Khmer)")
-        self.btn_insp_crossover.setStyleSheet("background-color: #064e3b; color: #6ee7b7; font-weight: 700; border: 1px solid #10b981; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-        self.btn_insp_crossover.clicked.connect(self._swap_selected_crossover_hook)
-        top_row.addWidget(self.btn_insp_crossover)
-
-        self.btn_insp_deepen = QPushButton("💎 Deepen")
-        self.btn_insp_deepen.setToolTip("Deepen Meaning (កែច្នៃអត្ថន័យ): Berklee sensory objects, emotional bridge revelation, and deep subtext")
-        self.btn_insp_deepen.setStyleSheet("background-color: #3b0764; color: #e9d5ff; font-weight: 700; border: 1px solid #7c3aed; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-        self.btn_insp_deepen.clicked.connect(self._deepen_selected_song_meaning)
-        top_row.addWidget(self.btn_insp_deepen)
-
-        self.btn_insp_humanize = QPushButton("👤 Humanize & Approve")
-        self.btn_insp_humanize.setToolTip("Inject natural singer breath marks, emotional pauses, sensory realism, and live pocket groove")
-        self.btn_insp_humanize.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #0284c7); color: #ffffff; font-weight: 800; border: 1px solid #10b981; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-        self.btn_insp_humanize.clicked.connect(self._humanize_selected_track)
-        top_row.addWidget(self.btn_insp_humanize)
-
-        self.btn_insp_open_editor = QPushButton("📝 Lyric Editor")
-        self.btn_insp_open_editor.setToolTip("Open this song directly in Lyric Editor Workbench")
-        self.btn_insp_open_editor.setStyleSheet("background-color: #0284c7; color: #ffffff; font-weight: 800; border-radius: 5px; padding: 4px 10px; font-size: 10px; border: 1px solid #38bdf8;")
-        self.btn_insp_open_editor.clicked.connect(self._open_selected_in_editor)
-        top_row.addWidget(self.btn_insp_open_editor)
-
-        for b in [self.btn_insp_title, self.btn_insp_style, self.btn_insp_lyrics]:
-            b.setStyleSheet("""
-                QPushButton {
-                    background-color: #161c32;
-                    color: #cbd5e1;
-                    border: 1px solid #283354;
-                    font-size: 10px;
-                    font-weight: 700;
-                    padding: 4px 8px;
-                    border-radius: 5px;
-                }
-                QPushButton:hover {
-                    background-color: #232c4d;
-                    color: #ffffff;
-                    border-color: #4f46e5;
-                }
-            """)
-
-        layout.addLayout(top_row)
-
-        # Content Split: Style box (Left) and Lyrics box (Right)
-        split_h = QHBoxLayout()
-        split_h.setSpacing(8)
-
-        left_side = QVBoxLayout()
-        l_head = QHBoxLayout()
-        self.l_lbl = QLabel("STYLE PROMPT (សម្រាប់ SUNO STYLE BOX):")
-        self.l_lbl.setStyleSheet("font-size: 11px; font-weight: 800; color: #38bdf8;")
-        l_head.addWidget(self.l_lbl)
-        l_head.addStretch()
-
-        l_head.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_insp_style_chars = QLabel("0 / 200 chars")
-        self.lbl_insp_style_chars.setFixedHeight(22)
-        self.lbl_insp_style_chars.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_insp_style_chars.setStyleSheet("color: #38bdf8; font-size: 10px; font-weight: 700; background: #0c2d48; padding: 2px 8px; border-radius: 4px; border: 1px solid #0284c7;")
-        l_head.addWidget(self.lbl_insp_style_chars)
-        left_side.addLayout(l_head)
-
-        self.txt_insp_style = QTextEdit()
-        self.txt_insp_style.setStyleSheet("background: #0b0f1f; border: 1px solid #1c2642; border-radius: 6px; font-size: 11px; color: #38bdf8; padding: 6px;")
-        self.txt_insp_style.setFixedHeight(95)
-        self.txt_insp_style.textChanged.connect(self._on_inspector_style_edited)
-        left_side.addWidget(self.txt_insp_style)
-        split_h.addLayout(left_side, stretch=1)
-
-        right_side = QVBoxLayout()
-        r_head = QHBoxLayout()
-        self.r_lbl = QLabel("LYRICS & SECTION METATAGS:")
-        self.r_lbl.setStyleSheet("font-size: 11px; font-weight: 800; color: #c084fc;")
-        r_head.addWidget(self.r_lbl)
-        r_head.addStretch()
-
-        # Suno Metatag Quick Insert Pills
-        for tag in ["[Verse]", "[Chorus]", "[Beat Drop]", "[Guitar Solo]", "[Acoustic Breakdown]", "[Vocal Ad-libs]", "[Fade Out]"]:
-            pill = QPushButton(tag)
-            pill.setStyleSheet("""
-                QPushButton {
-                    background-color: #1e1b4b;
-                    color: #c084fc;
-                    border: 1px solid #4338ca;
-                    border-radius: 4px;
-                    font-size: 9.5px;
-                    padding: 2px 6px;
-                    font-weight: 700;
-                }
-                QPushButton:hover {
-                    background-color: #312e81;
-                    color: #ffffff;
-                    border-color: #818cf8;
-                }
-            """)
-            pill.setToolTip(f"Insert {tag} at cursor position")
-            pill.clicked.connect(lambda _, t=tag: self._insert_metatag(t))
-            self.metatag_pills.append(pill)
-            r_head.addWidget(pill)
-
-        right_side.addLayout(r_head)
-
-        self.txt_insp_lyrics = QTextEdit()
-        self.txt_insp_lyrics.setStyleSheet("background: #070913; border: 1px solid #181f33; border-radius: 6px; font-size: 11px; font-family: 'Cascadia Code', 'Consolas', monospace; color: #f8fafc; padding: 6px;")
-        self.txt_insp_lyrics.setFixedHeight(95)
-        self.txt_insp_lyrics.textChanged.connect(self._on_inspector_lyrics_edited)
-        right_side.addWidget(self.txt_insp_lyrics)
-        split_h.addLayout(right_side, stretch=2)
-
-        layout.addLayout(split_h)
-        return self.inspector_panel
 
     # ── State Updates ──
     def _update_dynamic_language_presets(self, lang: str):
@@ -3561,26 +3392,6 @@ Genre: {next_song.get('genre', '')} ({next_song.get('bpm', '')}, Key: {next_song
                     break
             self._flash_btn(self.btn_insp_mutate, f"✓ Applied {genre_label}!")
 
-    def _on_inspector_style_edited(self):
-        if self.selected_song:
-            txt = self.txt_insp_style.toPlainText().strip()
-            self.selected_song["style_prompt"] = txt
-            if hasattr(self, "lbl_insp_style_chars"):
-                self.lbl_insp_style_chars.setText(f"{len(txt)} / {self.current_style_limit} chars")
-            for card in self.card_widgets:
-                if card.song_data.get("id") == self.selected_song.get("id"):
-                    card.update_style_preview()
-                    break
-
-    def _on_inspector_lyrics_edited(self):
-        if self.selected_song:
-            txt = self.txt_insp_lyrics.toPlainText()
-            self.selected_song["lyrics"] = txt
-            for card in self.card_widgets:
-                if card.song_data.get("id") == self.selected_song.get("id"):
-                    card.update_lyrics_preview()
-                    break
-
     # ── Generation Actions ──
     def _start_batch_generation(self):
         if self._is_worker_running():
@@ -4054,42 +3865,6 @@ Stand up for the stories never told!"""
         except Exception as e:
             QMessageBox.critical(self, "Export Error", str(e))
 
-    def _copy_insp_title(self):
-        if self.selected_song:
-            QApplication.clipboard().setText(self.selected_song.get("title", ""))
-            self._flash_btn(self.btn_insp_title, "Copied!")
-
-    def _copy_insp_style(self):
-        text = self.txt_insp_style.toPlainText().strip()
-        if text:
-            QApplication.clipboard().setText(text)
-            self._flash_btn(self.btn_insp_style, "Copied!")
-
-    def _copy_insp_lyrics(self):
-        text = self.txt_insp_lyrics.toPlainText().strip()
-        if text:
-            QApplication.clipboard().setText(text)
-            self._flash_btn(self.btn_insp_lyrics, "Copied!")
-
-    def _copy_insp_all(self):
-        if self.selected_song:
-            bundle = f"""Title: {self.selected_song.get('title', '')}
-Genre: {self.selected_song.get('genre', '')} ({self.selected_song.get('bpm', '')}, Key: {self.selected_song.get('key', '')})
-
-[STYLE OF MUSIC]
-{self.selected_song.get('style_prompt', '')}
-
-[LYRICS]
-{self.selected_song.get('lyrics', '')}"""
-            QApplication.clipboard().setText(bundle)
-            self.selected_song["status"] = "copied"
-            for card in self.card_widgets:
-                if card.song_data.get("id") == self.selected_song.get("id"):
-                    card._update_status_ui()
-                    break
-            self._update_filter_counts()
-            self._flash_btn(self.btn_insp_all, "✓ Done")
-
     def _flash_btn(self, btn: QPushButton, label: str):
         orig_text = btn.text()
         btn.setText(label)
@@ -4232,33 +4007,6 @@ Genre: {self.selected_song.get('genre', '')} ({self.selected_song.get('bpm', '')
             if hasattr(self, "btn_inject_all_v6"):
                 self.btn_inject_all_v6.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 11px; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 4px 10px;")
 
-            if hasattr(self, "inspector_panel"):
-                self.inspector_panel.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 8px;")
-            if hasattr(self, "txt_insp_style"):
-                self.txt_insp_style.setStyleSheet(f"background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 6px; font-size: 11px; color: {t['text_accent']}; padding: 6px;")
-            if hasattr(self, "txt_insp_lyrics"):
-                self.txt_insp_lyrics.setStyleSheet(f"background: {t['bg_window']}; border: 1px solid {t['border_subtle']}; border-radius: 6px; font-size: 11px; font-family: 'Cascadia Code', 'Consolas', monospace; color: {t['text_primary']}; padding: 6px;")
-
-            for b in [getattr(self, "btn_insp_title", None), getattr(self, "btn_insp_style", None), getattr(self, "btn_insp_lyrics", None)]:
-                if b:
-                    b.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 5px;")
-            if hasattr(self, "btn_insp_mutate"):
-                self.btn_insp_mutate.setStyleSheet("background-color: #064e3b; color: #34d399; font-weight: 700; border: 1px solid #059669; border-radius: 5px; padding: 4px 8px; font-size: 10px;")
-            if hasattr(self, "btn_insp_deepen"):
-                self.btn_insp_deepen.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-            if hasattr(self, "btn_insp_inject_v6"):
-                self.btn_insp_inject_v6.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 4px 8px; font-size: 10px;")
-            if hasattr(self, "btn_insp_all"):
-                self.btn_insp_all.setStyleSheet(f"background: {t['accent_gradient']}; color: #ffffff; font-weight: 800; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 4px 9px; font-size: 10px;")
-            if hasattr(self, "btn_insp_open_editor"):
-                self.btn_insp_open_editor.setStyleSheet(f"background-color: {t['accent']}; color: #ffffff; font-weight: 800; border-radius: 5px; padding: 4px 10px; font-size: 10px; border: 1px solid {t['border_accent']};")
-
-            if hasattr(self, "lbl_insp_style_chars"):
-                self.lbl_insp_style_chars.setFixedHeight(22)
-                self.lbl_insp_style_chars.setStyleSheet(f"color: {t['text_accent']}; font-size: 10px; font-weight: 700; background: {t['subtle_pill_bg']}; padding: 2px 8px; border-radius: 4px; border: 1px solid {t['border_accent']};")
-            if hasattr(self, "metatag_pills"):
-                for pill in self.metatag_pills:
-                    pill.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border']}; border-radius: 4px; font-size: 9.5px; padding: 2px 6px; font-weight: 700;")
             if hasattr(self, "theme_pills"):
                 for p in self.theme_pills:
                     p.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 1px 4px; font-size: 9px; font-weight: 600;")
@@ -4351,34 +4099,6 @@ Genre: {self.selected_song.get('genre', '')} ({self.selected_song.get('bpm', '')
                 self.txt_grid_search.setStyleSheet("background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 5px; padding: 4px 8px; font-size: 11px;")
             if hasattr(self, "btn_inject_all_v6"):
                 self.btn_inject_all_v6.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 11px; border: 1px solid #bfdbfe; border-radius: 5px; padding: 4px 10px;")
-
-            if hasattr(self, "inspector_panel"):
-                self.inspector_panel.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px;")
-            if hasattr(self, "lbl_insp_style_chars"):
-                self.lbl_insp_style_chars.setFixedHeight(22)
-                self.lbl_insp_style_chars.setStyleSheet("color: #0369a1; font-size: 10px; font-weight: 700; background: #f0f9ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #bae6fd;")
-            if hasattr(self, "txt_insp_style"):
-                self.txt_insp_style.setStyleSheet("background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 11px; color: #1d4ed8; padding: 6px;")
-            if hasattr(self, "txt_insp_lyrics"):
-                self.txt_insp_lyrics.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; font-family: 'Cascadia Code', 'Consolas', monospace; color: #0f172a; padding: 6px;")
-
-            for b in [getattr(self, "btn_insp_title", None), getattr(self, "btn_insp_style", None), getattr(self, "btn_insp_lyrics", None)]:
-                if b:
-                    b.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 5px;")
-            if hasattr(self, "btn_insp_mutate"):
-                self.btn_insp_mutate.setStyleSheet("background-color: #d1fae5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0; border-radius: 5px; padding: 4px 8px; font-size: 10px;")
-            if hasattr(self, "btn_insp_crossover"):
-                self.btn_insp_crossover.setStyleSheet("background-color: #d1fae5; color: #047857; font-weight: 700; border: 1px solid #a7f3d0; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-            if hasattr(self, "btn_insp_deepen"):
-                self.btn_insp_deepen.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-            if hasattr(self, "btn_insp_humanize"):
-                self.btn_insp_humanize.setStyleSheet("background: #10b981; color: #ffffff; font-weight: 800; border: 1px solid #059669; border-radius: 5px; padding: 4px 10px; font-size: 10px;")
-            if hasattr(self, "btn_insp_inject_v6"):
-                self.btn_insp_inject_v6.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; border-radius: 5px; padding: 4px 8px; font-size: 10px;")
-            if hasattr(self, "btn_insp_all"):
-                self.btn_insp_all.setStyleSheet(f"background: {t['accent_gradient']}; color: #ffffff; font-weight: 800; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 4px 9px; font-size: 10px;")
-            if hasattr(self, "btn_insp_open_editor"):
-                self.btn_insp_open_editor.setStyleSheet(f"background-color: {t['accent']}; color: #ffffff; font-weight: 800; border-radius: 5px; padding: 4px 10px; font-size: 10px; border: 1px solid {t['border_accent']};")
 
             if hasattr(self, "metatag_pills"):
                 for pill in self.metatag_pills:

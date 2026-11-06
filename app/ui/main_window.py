@@ -12,9 +12,9 @@ from PyQt6.QtWidgets import (
     QStackedWidget, QFrame, QComboBox, QLayout
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QFont, QPixmap, QKeySequence, QShortcut
+from PyQt6.QtGui import QIcon, QPixmap, QKeySequence, QShortcut
 
-from app.config import config_manager, GEMINI_MODELS, get_asset_path, APP_VERSION, APP_NAME, DEFAULT_UPDATE_URL
+from app.config import config_manager, GEMINI_MODELS, get_asset_path, APP_VERSION, DEFAULT_UPDATE_URL
 from app.license_manager import license_manager
 from app.ui.generator_panel import GeneratorPanel
 from app.ui.editor_panel import EditorPanel
@@ -23,8 +23,7 @@ from app.ui.settings_dialog import SettingsDialog
 from app.ui.visual_studio_view import VisualStudioView
 from app.ui.wizard_view import SongCreationWizardView
 from app.ui.batch_generator_view import BatchGeneratorView
-from app.ui.transport_bar import MasterStudioTransportBar
-from app.ui.styles import DARK_STUDIO_QSS, LIGHT_STUDIO_QSS, STUDIO_THEMES, get_theme, get_theme_qss
+from app.ui.styles import STUDIO_THEMES, get_theme
 from app.gemini_client import (
     GenerateLyricWorker, RewriteWorker, RhymeWorker, SunoPromptWorker
 )
@@ -119,9 +118,6 @@ class MainWindow(QMainWindow):
         # Contextual Studio Workflow Ribbon
         self.workflow_ribbon = self._create_workflow_ribbon()
         master_layout.addWidget(self.workflow_ribbon)
-
-        # Master Studio Transport Bar removed to eliminate duplication and maximize vertical space
-        self.transport_bar = None
 
         # Stacked Widget: Easy Wizard vs Visual Studio vs Batch vs Lyric Editor vs Clone
         self.stack = QStackedWidget()
@@ -1208,8 +1204,6 @@ class MainWindow(QMainWindow):
             app.setStyleSheet(t_data["qss"])
 
         self._apply_header_theme(theme_key)
-        if hasattr(self, "transport_bar") and self.transport_bar:
-            self.transport_bar.apply_theme(theme_key)
         if hasattr(self, "generator_panel"):
             self.generator_panel.apply_theme(theme_key)
         if hasattr(self, "editor_panel"):
@@ -1286,20 +1280,6 @@ class MainWindow(QMainWindow):
         self._set_studio_mode(3) # Switch to Lyric Editor
         self.status_bar.showMessage(f"Loaded '{title}' into Lyric Editor Workbench", 3000)
 
-    def _on_master_bpm_changed(self, bpm: int):
-        self.editor_panel.metro_bpm_spin.setValue(bpm)
-        self.editor_panel.metronome.set_bpm(bpm)
-        self.visual_studio.current_bpm = f"{bpm} BPM"
-        if hasattr(self.visual_studio, "lbl_bpm_display"):
-            self.visual_studio.lbl_bpm_display.setText(f"{bpm} BPM")
-        self.visual_studio._update_formula_card()
-
-    def _on_master_key_changed(self, key_name: str):
-        self.visual_studio._on_key_selected(key_name)
-
-    def _on_master_title_changed(self, title: str):
-        self.editor_panel.title_input.setText(title)
-
     def _on_wizard_toggle_recording(self):
         self.tools_panel._toggle_mic_recording()
         if self.tools_panel.melody_recorder.is_recording:
@@ -1307,13 +1287,11 @@ class MainWindow(QMainWindow):
             self.wizard_view.btn_w_record.setStyleSheet("background-color: #dc2626; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 10px;")
             self.wizard_view.lbl_w_rec_status.setText("Recording from microphone... Sing or hum your melody take")
             self.wizard_view.btn_w_play_rec.setEnabled(False)
-            if self.transport_bar: self.transport_bar.set_recording_active(True)
         else:
             self.wizard_view.btn_w_record.setText("🔴 Record Scratch Melody (Mic)")
             self.wizard_view.btn_w_record.setStyleSheet("background-color: #fee2e2; color: #dc2626; font-weight: 700; border: 1px solid #fca5a5; border-radius: 6px; padding: 10px;")
             self.wizard_view.lbl_w_rec_status.setText("Voice take saved successfully!")
             self.wizard_view.btn_w_play_rec.setEnabled(True)
-            if self.transport_bar: self.transport_bar.set_recording_active(False)
 
     def _on_transpose_chords(self, semitones: int):
         from app.chord_engine import ChordEngine
@@ -1324,8 +1302,6 @@ class MainWindow(QMainWindow):
             dir_str = f"+{semitones}" if semitones > 0 else f"{semitones}"
             self.status_bar.showMessage(f"Transposed chords in lyrics by {dir_str} semitone(s)", 3000)
         self.visual_studio._transpose_chords(semitones)
-        if self.transport_bar:
-            self.transport_bar.set_key(self.visual_studio.current_key)
 
     def _transfer_to_editor(self, params: dict):
         self._set_studio_mode(3)

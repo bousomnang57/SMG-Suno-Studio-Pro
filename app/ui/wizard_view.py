@@ -9,17 +9,15 @@ Professional DAW-grade Songwriting Wizard guiding creators across 5 intuitive st
 """
 
 import re
-from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QScrollArea, QFrame, QGridLayout,
+    QPushButton, QTextEdit, QFrame, QGridLayout,
     QStackedWidget, QSlider, QComboBox, QMessageBox, QGroupBox,
     QApplication, QFileDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 
-from app.song_blueprints import SONG_BLUEPRINTS
 from app.chord_engine import AudioChordSynthesizer, CHORD_PROGRESSIONS, VOCAL_RANGES
 from app.rhythm_engine import RhythmEngine
 from app.hit_analyzer import HitAnalyzer
