@@ -16,6 +16,7 @@ from app.chord_engine import CHORD_PROGRESSIONS, VOCAL_RANGES, ChordEngine
 from app.midi_exporter import MidiExporter
 from app.sensory_thesaurus import SENSORY_CATEGORIES
 from app.melody_recorder import MelodyRecorder
+from app.ui.styles import get_theme
 
 class ToolsPanel(QWidget):
     rhyme_requested = pyqtSignal(str) # word
@@ -760,7 +761,9 @@ class ToolsPanel(QWidget):
         else:
             self.progress_bar.setValue(0)
 
-    def apply_theme(self, is_dark: bool):
+    def apply_theme(self, theme_or_dark=True):
+        t = get_theme(theme_or_dark)
+        is_dark = t.get("is_dark", True)
         self.is_dark = is_dark
         if is_dark:
             self.tabs.setStyleSheet("""

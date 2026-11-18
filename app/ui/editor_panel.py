@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QPlainTextEdit, QFrame, QMenu,
     QSpinBox, QComboBox, QApplication, QMessageBox,
-    QInputDialog, QSlider, QFileDialog
+    QInputDialog, QSlider, QFileDialog, QStackedWidget
 )
 from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal, QTimer, QUrl
 from PyQt6.QtGui import QColor, QPainter, QTextFormat, QFont
@@ -229,15 +229,16 @@ class EditorPanel(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(6)
 
-        # ── 1. Top Title & Advanced Multi-Take Production Bar ──
+        # ── 1. Top Title, Multi-Take & Quick Copy Bar ──
         top_bar = QHBoxLayout()
-        top_bar.setSpacing(6)
+        top_bar.setSpacing(5)
 
         self.title_input = QLineEdit("Untitled Song")
-        self.title_input.setStyleSheet("font-size: 14px; font-weight: 700; color: #1e293b; padding: 5px 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;")
+        self.title_input.setMinimumWidth(140)
+        self.title_input.setStyleSheet("font-size: 13.5px; font-weight: 700; color: #1e293b; padding: 4px 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;")
         top_bar.addWidget(self.title_input, stretch=2)
 
-        # Multi-Take Controls (Take combo, Add Take, Duplicate Take, Delete Take)
+        # Multi-Take Controls
         take_box = QHBoxLayout()
         take_box.setSpacing(3)
         self.lbl_take = QLabel("Take:")
@@ -247,159 +248,190 @@ class EditorPanel(QWidget):
         self.take_combo = QComboBox()
         self.take_combo.addItems(self.version_manager.list_takes())
         self.take_combo.setFont(QFont("Segoe UI", 9))
-        self.take_combo.setStyleSheet("padding: 3px 6px; font-weight: 600; min-width: 110px;")
+        self.take_combo.setStyleSheet("padding: 3px 6px; font-weight: 600; min-width: 95px;")
         self.take_combo.currentTextChanged.connect(self._on_take_switched)
         take_box.addWidget(self.take_combo)
 
         self.btn_add_take = QPushButton("+ Take")
         self.btn_add_take.setToolTip("Add New Empty Take")
         self.btn_add_take.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_add_take.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border: 1px solid #bfdbfe; border-radius: 4px;")
+        self.btn_add_take.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border: 1px solid #bfdbfe; border-radius: 4px;")
         self.btn_add_take.clicked.connect(self._on_add_take)
         take_box.addWidget(self.btn_add_take)
 
-        self.btn_dup_take = QPushButton("📋 Dup")
+        self.btn_dup_take = QPushButton("Dup")
         self.btn_dup_take.setToolTip("Duplicate Current Take (A/B Variations)")
         self.btn_dup_take.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_dup_take.setStyleSheet("background-color: #f0fdf4; color: #15803d; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border: 1px solid #bbf7d0; border-radius: 4px;")
+        self.btn_dup_take.setStyleSheet("background-color: #f0fdf4; color: #15803d; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border: 1px solid #bbf7d0; border-radius: 4px;")
         self.btn_dup_take.clicked.connect(self._on_dup_take)
         take_box.addWidget(self.btn_dup_take)
 
-        self.btn_del_take = QPushButton("🗑️ Del")
+        self.btn_del_take = QPushButton("Del")
         self.btn_del_take.setToolTip("Delete Current Take")
         self.btn_del_take.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_del_take.setStyleSheet("background-color: #fef2f2; color: #dc2626; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border: 1px solid #fecaca; border-radius: 4px;")
+        self.btn_del_take.setStyleSheet("background-color: #fef2f2; color: #dc2626; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border: 1px solid #fecaca; border-radius: 4px;")
         self.btn_del_take.clicked.connect(self._on_del_take)
         take_box.addWidget(self.btn_del_take)
+
+        # Quick Copy & Clean Actions right in top bar for instant access
+        self.btn_clean_tags = QPushButton("🧹 Clean")
+        self.btn_clean_tags.setToolTip("Strip all [bracket] tags and copy clean lyrics for singers")
+        self.btn_clean_tags.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clean_tags.setStyleSheet("background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 600;")
+        self.btn_clean_tags.clicked.connect(self._copy_clean_lyrics)
+        take_box.addWidget(self.btn_clean_tags)
+
+        self.btn_copy_lyrics = QPushButton("📋 Copy All")
+        self.btn_copy_lyrics.setToolTip("Copy complete lyric sheet to clipboard")
+        self.btn_copy_lyrics.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy_lyrics.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 700;")
+        self.btn_copy_lyrics.clicked.connect(self._copy_full_lyrics)
+        take_box.addWidget(self.btn_copy_lyrics)
 
         top_bar.addLayout(take_box)
         layout.addLayout(top_bar)
 
-        # ── 2. Studio Metronome, Tap Tempo & Live Chord Audition Bar ──
-        self.metro_frame = QFrame()
-        self.metro_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px;")
-        metro_layout = QHBoxLayout(self.metro_frame)
-        metro_layout.setContentsMargins(6, 3, 6, 3)
-        metro_layout.setSpacing(6)
+        # ── 2. Sleek Segmented Studio Sub-Bar Deck (Decluttered Pro DAW UI) ──
+        self.tool_deck_frame = QFrame()
+        self.tool_deck_frame.setObjectName("toolDeckFrame")
+        deck_outer = QVBoxLayout(self.tool_deck_frame)
+        deck_outer.setContentsMargins(6, 4, 6, 4)
+        deck_outer.setSpacing(4)
 
-        # Visual LED pulse
+        # Segmented Sub-Tab Row + Always-Accessible Chord Audition
+        deck_tabs_row = QHBoxLayout()
+        deck_tabs_row.setSpacing(4)
+
+        self.btn_sub_tags = QPushButton("🏷️ Tags & Chords")
+        self.btn_sub_tags.setCheckable(True)
+        self.btn_sub_tags.setChecked(True)
+        self.btn_sub_tags.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_sub_tags.clicked.connect(lambda: self._switch_tool_deck(0))
+
+        self.btn_sub_audio = QPushButton("🥁 Tempo & Audio")
+        self.btn_sub_audio.setCheckable(True)
+        self.btn_sub_audio.setChecked(False)
+        self.btn_sub_audio.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_sub_audio.clicked.connect(lambda: self._switch_tool_deck(1))
+
+        self.btn_sub_pro = QPushButton("🎛️ Studio Pro Tools")
+        self.btn_sub_pro.setCheckable(True)
+        self.btn_sub_pro.setChecked(False)
+        self.btn_sub_pro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_sub_pro.clicked.connect(lambda: self._switch_tool_deck(2))
+
+        for sb in [self.btn_sub_tags, self.btn_sub_audio, self.btn_sub_pro]:
+            sb.setFixedHeight(24)
+            deck_tabs_row.addWidget(sb)
+
+        deck_tabs_row.addStretch()
+
+        # Quick live chord audition right on sub-header
+        self.btn_audition_chords = QPushButton("🔊 Chords")
+        self.btn_audition_chords.setToolTip("Audition chords in lyrics using polyphonic audio synth")
+        self.btn_audition_chords.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_audition_chords.setFixedHeight(24)
+        self.btn_audition_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; font-size: 8.5pt; padding: 2px 8px; border-radius: 4px; font-weight: 700;")
+        self.btn_audition_chords.clicked.connect(self._audition_lyrics_chords)
+        deck_tabs_row.addWidget(self.btn_audition_chords)
+
+        self.btn_arranger_jump = QPushButton("🎨 Arranger")
+        self.btn_arranger_jump.setToolTip("Jump to Visual Arranger (DAW Timeline & Chords)")
+        self.btn_arranger_jump.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_arranger_jump.setFixedHeight(24)
+        self.btn_arranger_jump.setStyleSheet("background-color: #faf5ff; color: #7c3aed; font-weight: 700; font-size: 8.5pt; padding: 2px 8px; border-radius: 4px; border: 1px solid #d8b4fe;")
+        self.btn_arranger_jump.clicked.connect(self.visual_arranger_requested.emit)
+        deck_tabs_row.addWidget(self.btn_arranger_jump)
+
+        deck_outer.addLayout(deck_tabs_row)
+
+        self.tool_deck_stack = QStackedWidget()
+        self.tool_deck_stack.setFixedHeight(32)
+        deck_outer.addWidget(self.tool_deck_stack)
+        layout.addWidget(self.tool_deck_frame)
+
+        # ── Deck Page 1 widget (Tempo, Metronome & Audio Stem) ──
+        self.metro_frame = QFrame()
+        self.metro_frame.setObjectName("metroFrame")
+        metro_layout = QHBoxLayout(self.metro_frame)
+        metro_layout.setContentsMargins(2, 2, 2, 2)
+        metro_layout.setSpacing(4)
+
         self.metro_led = QLabel("●")
-        self.metro_led.setStyleSheet("color: #94a3b8; font-size: 16px;")
+        self.metro_led.setStyleSheet("color: #94a3b8; font-size: 14px; border: none; background: transparent;")
         metro_layout.addWidget(self.metro_led)
 
-        self.btn_metro_toggle = QPushButton("▶ Metronome")
+        self.btn_metro_toggle = QPushButton("▶ Metro")
         self.btn_metro_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_metro_toggle.setStyleSheet("background-color: #f1f5f9; color: #2563eb; font-weight: 700; font-size: 9pt; padding: 4px 8px; border-radius: 5px;")
+        self.btn_metro_toggle.setStyleSheet("background-color: #f1f5f9; color: #2563eb; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px;")
         self.btn_metro_toggle.clicked.connect(self._toggle_metronome)
         metro_layout.addWidget(self.btn_metro_toggle)
 
-        # BPM Spinbox
         self.lbl_bpm_tag = QLabel("BPM:")
-        self.lbl_bpm_tag.setStyleSheet("font-weight: 700; color: #94a3b8; font-size: 9pt;")
+        self.lbl_bpm_tag.setStyleSheet("font-weight: 700; color: #94a3b8; font-size: 8.5pt; border: none; background: transparent;")
         metro_layout.addWidget(self.lbl_bpm_tag)
         self.metro_bpm_spin = QSpinBox()
         self.metro_bpm_spin.setRange(40, 240)
         self.metro_bpm_spin.setValue(120)
-        self.metro_bpm_spin.setStyleSheet("font-weight: 700; padding: 2px 4px;")
+        self.metro_bpm_spin.setStyleSheet("font-weight: 700; padding: 1px 4px;")
         self.metro_bpm_spin.valueChanged.connect(lambda v: self.metronome.set_bpm(v))
         metro_layout.addWidget(self.metro_bpm_spin)
 
-        # Tap Tempo button
         self.btn_tap = QPushButton("👆 Tap")
         self.btn_tap.setToolTip("Tap Tempo Rhythmically")
         self.btn_tap.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_tap.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 9pt; padding: 3px 6px; border-radius: 4px; font-weight: 600;")
+        self.btn_tap.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 8.5pt; padding: 2px 5px; border-radius: 4px; font-weight: 600;")
         self.btn_tap.clicked.connect(self._on_tap_clicked)
         metro_layout.addWidget(self.btn_tap)
 
-        # Time signature
         self.metro_sig_combo = QComboBox()
-        self.metro_sig_combo.addItems(["4/4 Time", "3/4 Waltz", "6/8 Time"])
-        self.metro_sig_combo.setFont(QFont("Segoe UI", 9))
+        self.metro_sig_combo.addItems(["4/4", "3/4", "6/8"])
+        self.metro_sig_combo.setFont(QFont("Segoe UI", 8))
         self.metro_sig_combo.currentIndexChanged.connect(self._on_time_sig_changed)
         metro_layout.addWidget(self.metro_sig_combo)
 
-        metro_layout.addSpacing(6)
-
-        # Live Chord Audition button
-        self.btn_audition_chords = QPushButton("🔊 Chords")
-        self.btn_audition_chords.setToolTip("Audition chords in lyrics using polyphonic audio synth")
-        self.btn_audition_chords.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_audition_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; font-size: 9pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
-        self.btn_audition_chords.clicked.connect(self._audition_lyrics_chords)
-        metro_layout.addWidget(self.btn_audition_chords)
-
-        metro_layout.addStretch()
-
-        # Clean Tags button (copies plain lyrics without bracket tags)
-        self.btn_clean_tags = QPushButton("🧹 Clean Tags")
-        self.btn_clean_tags.setToolTip("Strip all [bracket] tags and copy clean lyrics for singers")
-        self.btn_clean_tags.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clean_tags.setStyleSheet("background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; font-weight: 600;")
-        self.btn_clean_tags.clicked.connect(self._copy_clean_lyrics)
-        metro_layout.addWidget(self.btn_clean_tags)
-
-        # Copy Full Lyrics button
-        self.btn_copy_lyrics = QPushButton("📋 Copy All")
-        self.btn_copy_lyrics.setToolTip("Copy complete lyric sheet to clipboard")
-        self.btn_copy_lyrics.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_copy_lyrics.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
-        self.btn_copy_lyrics.clicked.connect(self._copy_full_lyrics)
-        metro_layout.addWidget(self.btn_copy_lyrics)
-
-        layout.addWidget(self.metro_frame)
-
-        # ── 2b. Attached Audio Stem & Rhythm Studio Strip ──
-        self.stem_frame = QFrame()
-        self.stem_frame.setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 2px 6px;")
-        stem_layout = QHBoxLayout(self.stem_frame)
-        stem_layout.setContentsMargins(6, 2, 6, 2)
-        stem_layout.setSpacing(6)
-
-        # Rhythm Beat Groove Dropdown
-        self.lbl_groove = QLabel("🥁 Groove:")
-        self.lbl_groove.setStyleSheet("font-weight: 700; color: #64748b; font-size: 8.5pt;")
-        stem_layout.addWidget(self.lbl_groove)
+        self.lbl_groove = QLabel("🥁")
+        self.lbl_groove.setStyleSheet("font-weight: 700; color: #64748b; font-size: 9pt; border: none; background: transparent;")
+        metro_layout.addWidget(self.lbl_groove)
 
         self.combo_groove = QComboBox()
         self.combo_groove.addItems(RhythmEngine.get_available_grooves())
         self.combo_groove.setFont(QFont("Segoe UI", 8))
-        self.combo_groove.setMinimumWidth(210)
+        self.combo_groove.setMinimumWidth(105)
+        self.combo_groove.setMaximumWidth(155)
         self.combo_groove.setToolTip("Play authentic Khmer or Pop rhythm groove loop with tempo")
-        self.combo_groove.setStyleSheet("font-weight: 600; padding: 2px 4px; min-width: 175px;")
+        self.combo_groove.setStyleSheet("font-weight: 600; padding: 2px 4px;")
         self.combo_groove.currentTextChanged.connect(self._on_groove_changed)
-        stem_layout.addWidget(self.combo_groove)
+        metro_layout.addWidget(self.combo_groove)
 
-        stem_layout.addSpacing(6)
-
-        self.btn_load_stem = QPushButton("📂 Attach Audio")
+        self.btn_load_stem = QPushButton("📂 Audio")
         self.btn_load_stem.setToolTip("Attach Suno/Udio generated MP3/WAV to play alongside lyrics")
         self.btn_load_stem.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_load_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border: 1px solid #bfdbfe; border-radius: 4px;")
+        self.btn_load_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid #bfdbfe; border-radius: 4px;")
         self.btn_load_stem.clicked.connect(self._attach_audio_stem)
-        stem_layout.addWidget(self.btn_load_stem)
+        metro_layout.addWidget(self.btn_load_stem)
 
-        self.btn_play_stem = QPushButton("▶ Play")
+        self.btn_play_stem = QPushButton("▶")
         self.btn_play_stem.setEnabled(False)
         self.btn_play_stem.setToolTip("Play / Pause attached audio track")
         self.btn_play_stem.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_play_stem.setStyleSheet("font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px;")
+        self.btn_play_stem.setFixedWidth(28)
+        self.btn_play_stem.setStyleSheet("font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border-radius: 4px;")
         self.btn_play_stem.clicked.connect(self._toggle_stem_playback)
-        stem_layout.addWidget(self.btn_play_stem)
+        metro_layout.addWidget(self.btn_play_stem)
 
-        self.lbl_stem_track = QLabel("No track attached")
-        self.lbl_stem_track.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 600;")
-        stem_layout.addWidget(self.lbl_stem_track)
+        self.lbl_stem_track = QLabel("")
+        self.lbl_stem_track.setVisible(False)
 
         self.stem_slider = QSlider(Qt.Orientation.Horizontal)
         self.stem_slider.setRange(0, 1000)
         self.stem_slider.setEnabled(False)
         self.stem_slider.sliderMoved.connect(self._seek_stem)
-        stem_layout.addWidget(self.stem_slider, stretch=1)
+        metro_layout.addWidget(self.stem_slider, stretch=1)
 
-        self.lbl_stem_time = QLabel("0:00 / 0:00")
-        self.lbl_stem_time.setStyleSheet("font-size: 10px; font-weight: 700; color: #475569;")
-        stem_layout.addWidget(self.lbl_stem_time)
+        self.lbl_stem_time = QLabel("0:00")
+        self.lbl_stem_time.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #475569; border: none; background: transparent;")
+        metro_layout.addWidget(self.lbl_stem_time)
 
         self.btn_remove_stem = QPushButton("✕")
         self.btn_remove_stem.setToolTip("Detach Audio Track")
@@ -407,13 +439,16 @@ class EditorPanel(QWidget):
         self.btn_remove_stem.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_remove_stem.setStyleSheet("color: #dc2626; font-weight: 800; border: none; padding: 2px 4px;")
         self.btn_remove_stem.clicked.connect(self._remove_audio_stem)
-        stem_layout.addWidget(self.btn_remove_stem)
+        metro_layout.addWidget(self.btn_remove_stem)
 
-        layout.addWidget(self.stem_frame)
+        # Compatibility dummy ref if stem_frame is referenced
+        self.stem_frame = self.metro_frame
 
-        # ── 3. Section, Suno Meta-Tag & Inline Chord Studio Bar ──
-        sec_layout = QHBoxLayout()
-        sec_layout.setSpacing(2)
+        # ── Deck Page 0 widget (Section Tags & Chords) ──
+        self.tags_page = QWidget()
+        sec_layout = QHBoxLayout(self.tags_page)
+        sec_layout.setContentsMargins(2, 2, 2, 2)
+        sec_layout.setSpacing(3)
 
         # Khmer Poetic Section Tags Dropdown
         self.btn_khmer_tags = QPushButton("🇰🇭 ខ្មែរ ▾")
@@ -526,33 +561,20 @@ class EditorPanel(QWidget):
         self.btn_trans_up.clicked.connect(lambda: self._on_transpose(1))
         sec_layout.addWidget(self.btn_trans_up)
 
-        self.btn_arranger_jump = QPushButton("🎨 Arranger")
-        self.btn_arranger_jump.setToolTip("Jump to Visual Arranger (DAW Timeline & Chords)")
-        self.btn_arranger_jump.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_arranger_jump.setStyleSheet("background-color: #faf5ff; color: #7c3aed; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid #d8b4fe;")
-        self.btn_arranger_jump.clicked.connect(self.visual_arranger_requested.emit)
-        sec_layout.addWidget(self.btn_arranger_jump)
-
         sec_layout.addStretch()
-        layout.addLayout(sec_layout)
 
-        # ── 3b. Commercial Music Production Studio Strip ──
+        # ── Deck Page 2 widget (Studio Pro Tools) ──
         self.pro_features_frame = QFrame()
         self.pro_features_frame.setObjectName("proFeaturesFrame")
-        self.pro_features_frame.setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 2px 4px;")
         pf_layout = QHBoxLayout(self.pro_features_frame)
-        pf_layout.setContentsMargins(4, 2, 4, 2)
+        pf_layout.setContentsMargins(2, 2, 2, 2)
         pf_layout.setSpacing(6)
-
-        lbl_pro_tag = QLabel("🎛️ Studio Pro:")
-        lbl_pro_tag.setStyleSheet("font-size: 8.5pt; font-weight: 800; color: #8b5cf6;")
-        pf_layout.addWidget(lbl_pro_tag)
 
         # 1. Vocal Melody Guide
         self.btn_pro_melody = QPushButton("🎼 Melody & Sheet")
         self.btn_pro_melody.setToolTip("Generate vocal topline guide, export MIDI & MusicXML sheet music")
         self.btn_pro_melody.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_pro_melody.setStyleSheet("background-color: #ede9fe; color: #6d28d9; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #ddd6fe;")
+        self.btn_pro_melody.setStyleSheet("background-color: #ede9fe; color: #6d28d9; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd6fe;")
         self.btn_pro_melody.clicked.connect(self._open_melody_guide)
         pf_layout.addWidget(self.btn_pro_melody)
 
@@ -560,7 +582,7 @@ class EditorPanel(QWidget):
         self.btn_pro_vocal = QPushButton("🎤 Scratch Vocal")
         self.btn_pro_vocal.setToolTip("Audition lyrics with neural Khmer & international studio singers")
         self.btn_pro_vocal.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_pro_vocal.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #bfdbfe;")
+        self.btn_pro_vocal.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px; border: 1px solid #bfdbfe;")
         self.btn_pro_vocal.clicked.connect(self._open_scratch_vocalist)
         pf_layout.addWidget(self.btn_pro_vocal)
 
@@ -568,7 +590,7 @@ class EditorPanel(QWidget):
         self.btn_pro_chords = QPushButton("🎹 Soundboard")
         self.btn_pro_chords.setToolTip("Interactive Piano/Rhodes/Guitar chord progression player & diatonic pad matrix")
         self.btn_pro_chords.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_pro_chords.setStyleSheet("background-color: #fdf4ff; color: #86198f; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #f0abfc;")
+        self.btn_pro_chords.setStyleSheet("background-color: #fdf4ff; color: #86198f; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px; border: 1px solid #f0abfc;")
         self.btn_pro_chords.clicked.connect(self._open_chord_soundboard)
         pf_layout.addWidget(self.btn_pro_chords)
 
@@ -576,7 +598,7 @@ class EditorPanel(QWidget):
         self.btn_pro_khmer = QPushButton("📜 Khmer Meter")
         self.btn_pro_khmer.setToolTip("Khmer classical poetic meter & rhyme map engine (ពាក្យ៧, ពាក្យ៨, ព្រហ្មគីតិ, កាកគតិ, ភុជង្គលីលា)")
         self.btn_pro_khmer.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_pro_khmer.setStyleSheet("background-color: #f0fdf4; color: #15803d; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #bbf7d0;")
+        self.btn_pro_khmer.setStyleSheet("background-color: #f0fdf4; color: #15803d; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px; border: 1px solid #bbf7d0;")
         self.btn_pro_khmer.clicked.connect(self._open_khmer_poetry_meter)
         pf_layout.addWidget(self.btn_pro_khmer)
 
@@ -584,12 +606,17 @@ class EditorPanel(QWidget):
         self.btn_pro_cover = QPushButton("🖼️ Cover Art")
         self.btn_pro_cover.setToolTip("AI Album Cover & YouTube MV Thumbnail Generator (1:1 & 16:9)")
         self.btn_pro_cover.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_pro_cover.setStyleSheet("background-color: #fff7ed; color: #c2410c; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #fed7aa;")
+        self.btn_pro_cover.setStyleSheet("background-color: #fff7ed; color: #c2410c; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px; border: 1px solid #fed7aa;")
         self.btn_pro_cover.clicked.connect(self._open_cover_art_generator)
         pf_layout.addWidget(self.btn_pro_cover)
 
         pf_layout.addStretch()
-        layout.addWidget(self.pro_features_frame)
+
+        # Mount all 3 compact pages into the Segmented Studio Sub-Bar Deck
+        self.tool_deck_stack.addWidget(self.tags_page)
+        self.tool_deck_stack.addWidget(self.metro_frame)
+        self.tool_deck_stack.addWidget(self.pro_features_frame)
+        self.tool_deck_stack.setCurrentIndex(0)
 
         # ── 3c. Dynamic Song Chord Ribbon ──
         self.chord_ribbon_frame = QFrame()
@@ -609,13 +636,15 @@ class EditorPanel(QWidget):
 
         # ── 5. Floating AI Selection Toolbar ──
         self.selection_bar = QFrame()
-        self.selection_bar.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px;")
+        self.selection_bar.setObjectName("selectionBarFrame")
+        self.selection_bar.setStyleSheet("QFrame#selectionBarFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; } QFrame#selectionBarFrame QLabel { border: none; background: transparent; }")
         sel_layout = QHBoxLayout(self.selection_bar)
         sel_layout.setContentsMargins(8, 4, 8, 4)
         sel_layout.setSpacing(6)
 
-        self.sel_label = QLabel("✨ AI Selection Tools: Select lines to rewrite or refine with Gemini")
-        self.sel_label.setStyleSheet("color: #475569; font-size: 11.5px;")
+        self.sel_label = QLabel("✨ Selection Tools:")
+        self.sel_label.setToolTip("Highlight lyric lines in the editor to rewrite, elevate, or find rhymes with Gemini")
+        self.sel_label.setStyleSheet("color: #475569; font-size: 11px; font-weight: 600;")
         sel_layout.addWidget(self.sel_label, stretch=1)
 
         # Rhyme lookup button for selected text
@@ -662,7 +691,8 @@ class EditorPanel(QWidget):
 
         # ── 6. Bottom Statistics & Rhythm Meter Bar (Zero Trailing Bullet) ──
         self.stats_frame = QFrame()
-        self.stats_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px;")
+        self.stats_frame.setObjectName("editorStatsFrame")
+        self.stats_frame.setStyleSheet("QFrame#editorStatsFrame { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; } QFrame#editorStatsFrame QLabel { border: none; background: transparent; }")
         stats_layout = QHBoxLayout(self.stats_frame)
         stats_layout.setContentsMargins(8, 4, 8, 4)
         stats_layout.setSpacing(6)
@@ -672,15 +702,17 @@ class EditorPanel(QWidget):
         self.stat_syllables = QLabel("Syllables: 0")
         self.stat_avg = QLabel("Avg/Line: 0.0")
         self.flow_label = QLabel("Flow: 100%")
-        self.flow_label.setStyleSheet("color: #2563eb; font-weight: 700; font-size: 11px;")
+        self.flow_label.setStyleSheet("color: #2563eb; font-weight: 700; font-size: 11px; border: none; background: transparent;")
         self.stat_duration = QLabel("⏱️ ~0m 00s")
-        self.stat_duration.setStyleSheet("color: #059669; font-weight: 800; font-size: 11px; background: #ecfdf5; padding: 1px 6px; border-radius: 3px;")
+        self.stat_duration.setStyleSheet("color: #059669; font-weight: 800; font-size: 11px; background: #ecfdf5; padding: 1px 6px; border-radius: 3px; border: none;")
 
         stat_items = [self.stat_lines, self.stat_words, self.stat_syllables, self.stat_avg, self.flow_label, self.stat_duration]
+        self.stat_bullets = []
         for i, item in enumerate(stat_items):
             stats_layout.addWidget(item)
             bullet = QLabel("•")
-            bullet.setStyleSheet("color: #94a3b8; font-size: 10px;")
+            bullet.setStyleSheet("color: #94a3b8; font-size: 10px; border: none; background: transparent; padding: 0px;")
+            self.stat_bullets.append(bullet)
             stats_layout.addWidget(bullet)
 
         self.btn_hit_score = QPushButton("🌟 Hit: 85%")
@@ -701,15 +733,19 @@ class EditorPanel(QWidget):
     def _toggle_metronome(self):
         running = self.metronome.toggle()
         groove_name = self.combo_groove.currentText()
+        t = getattr(self, "theme", get_theme(getattr(self, "is_dark", True)))
         if running:
             self.btn_metro_toggle.setText("⏹ Stop")
-            self.btn_metro_toggle.setStyleSheet("background-color: #fee2e2; color: #dc2626; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 5px;")
+            self.btn_metro_toggle.setStyleSheet("background-color: #7f1d1d; color: #fecaca; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid #ef4444;")
             if groove_name != "Off (Standard Metronome)":
                 RhythmEngine.play_groove(groove_name, self.metro_bpm_spin.value())
         else:
-            self.btn_metro_toggle.setText("▶ Metronome")
-            self.btn_metro_toggle.setStyleSheet("background-color: #f1f5f9; color: #2563eb; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 5px;")
-            self.metro_led.setStyleSheet("color: #64748b; font-size: 16px;")
+            self.btn_metro_toggle.setText("▶ Metro")
+            if getattr(self, "is_dark", True):
+                self.btn_metro_toggle.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid {t['border_accent']};")
+            else:
+                self.btn_metro_toggle.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid #bfdbfe;")
+            self.metro_led.setStyleSheet("color: #64748b; font-size: 14px; border: none; background: transparent;")
             RhythmEngine.stop_groove()
         self.metronome_state_changed.emit(running)
 
@@ -746,12 +782,16 @@ class EditorPanel(QWidget):
 
     def _on_stem_state_changed(self, state):
         from PyQt6.QtMultimedia import QMediaPlayer
+        t = getattr(self, "theme", get_theme(getattr(self, "is_dark", True)))
         if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.btn_play_stem.setText("⏸ Pause")
-            self.btn_play_stem.setStyleSheet("background-color: #fee2e2; color: #dc2626; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px;")
+            self.btn_play_stem.setText("⏸")
+            self.btn_play_stem.setStyleSheet("background-color: #7f1d1d; color: #fecaca; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border-radius: 4px; border: 1px solid #ef4444;")
         else:
-            self.btn_play_stem.setText("▶ Play")
-            self.btn_play_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px;")
+            self.btn_play_stem.setText("▶")
+            if getattr(self, "is_dark", True):
+                self.btn_play_stem.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_primary']}; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border: 1px solid {t['border']}; border-radius: 4px;")
+            else:
+                self.btn_play_stem.setStyleSheet("background-color: #f8fafc; color: #0f172a; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px;")
 
     def _on_stem_position_changed(self, pos: int):
         dur = self.stem_player.duration()
@@ -928,6 +968,7 @@ class EditorPanel(QWidget):
 
     def set_title(self, title: str):
         self.title_input.setText(title)
+        self.title_input.setCursorPosition(0)
 
     def get_lyrics(self) -> str:
         return self.editor.toPlainText()
@@ -1031,6 +1072,8 @@ class EditorPanel(QWidget):
             item = self.chord_ribbon_layout.takeAt(0)
             w = item.widget()
             if w:
+                w.hide()
+                w.setParent(None)
                 w.deleteLater()
 
         if not chords:
@@ -1112,6 +1155,17 @@ class EditorPanel(QWidget):
         except Exception:
             pass
 
+    def _switch_tool_deck(self, index: int):
+        if hasattr(self, "tool_deck_stack"):
+            self.tool_deck_stack.setCurrentIndex(index)
+        for idx, btn in enumerate([
+            getattr(self, "btn_sub_tags", None),
+            getattr(self, "btn_sub_audio", None),
+            getattr(self, "btn_sub_pro", None),
+        ]):
+            if btn:
+                btn.setChecked(idx == index)
+
     def apply_theme(self, theme_or_dark):
         t = get_theme(theme_or_dark)
         self.theme = t
@@ -1121,31 +1175,57 @@ class EditorPanel(QWidget):
         self.editor.set_theme(theme_or_dark)
 
         if is_dark:
-            self.title_input.setStyleSheet(f"font-size: 14px; font-weight: 700; color: {t['text_primary']}; padding: 5px 10px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 6px;")
-            self.take_combo.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 2px 6px; border-radius: 4px; min-width: 110px;")
+            self.title_input.setStyleSheet(f"font-size: 13.5px; font-weight: 700; color: {t['text_primary']}; padding: 4px 8px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 6px;")
+            self.take_combo.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 2px 6px; border-radius: 4px; min-width: 95px;")
             if hasattr(self, "lbl_take"):
                 self.lbl_take.setStyleSheet(f"font-weight: 700; color: {t['text_muted']}; font-size: 11px;")
 
             if hasattr(self, "btn_add_take") and self.btn_add_take:
-                self.btn_add_take.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 3px 8px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_add_take.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
             if hasattr(self, "btn_dup_take") and self.btn_dup_take:
-                self.btn_dup_take.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; border-radius: 4px; padding: 3px 8px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_dup_take.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
             if hasattr(self, "btn_del_take") and self.btn_del_take:
-                self.btn_del_take.setStyleSheet("background-color: #450a0a; color: #f87171; border: 1px solid #991b1b; border-radius: 4px; padding: 3px 8px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_del_take.setStyleSheet("background-color: #450a0a; color: #f87171; border: 1px solid #991b1b; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
 
-            self.metro_frame.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 4px;")
-            self.btn_metro_toggle.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 9pt; padding: 4px 8px; border-radius: 5px; border: 1px solid {t['border_accent']};")
+            if hasattr(self, "tool_deck_frame"):
+                self.tool_deck_frame.setStyleSheet(f"QFrame#toolDeckFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 8px; }} QFrame#toolDeckFrame QLabel {{ border: none; background: transparent; }}")
+            sub_tab_qss = f"""
+                QPushButton {{
+                    background-color: {t['bg_card_alt']};
+                    color: {t['text_secondary']};
+                    border: 1px solid {t['border']};
+                    border-radius: 5px;
+                    font-size: 8.5pt;
+                    font-weight: 700;
+                    padding: 2px 10px;
+                }}
+                QPushButton:hover {{
+                    color: {t['text_primary']};
+                    border-color: {t['accent']};
+                }}
+                QPushButton:checked {{
+                    background-color: {t['accent']};
+                    color: #ffffff;
+                    border-color: {t['border_accent']};
+                }}
+            """
+            for sb in [getattr(self, "btn_sub_tags", None), getattr(self, "btn_sub_audio", None), getattr(self, "btn_sub_pro", None)]:
+                if sb:
+                    sb.setStyleSheet(sub_tab_qss)
+
+            self.metro_frame.setStyleSheet("QFrame#metroFrame { background: transparent; border: none; } QFrame#metroFrame QLabel { border: none; background: transparent; }")
+            self.btn_metro_toggle.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid {t['border_accent']};")
             if hasattr(self, "lbl_bpm_tag"):
-                self.lbl_bpm_tag.setStyleSheet(f"font-weight: 700; color: {t['text_secondary']}; font-size: 9pt; background: transparent; border: none;")
-            self.metro_bpm_spin.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 700; padding: 2px 4px; border-radius: 4px;")
-            self.metro_sig_combo.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 2px 4px; border-radius: 4px;")
-            self.btn_tap.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; font-size: 9pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
+                self.lbl_bpm_tag.setStyleSheet(f"font-weight: 700; color: {t['text_secondary']}; font-size: 8.5pt; background: transparent; border: none;")
+            self.metro_bpm_spin.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 700; padding: 1px 4px; border-radius: 4px;")
+            self.metro_sig_combo.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 1px 4px; border-radius: 4px;")
+            self.btn_tap.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; font-size: 8.5pt; padding: 2px 5px; border-radius: 4px; font-weight: 700;")
             if hasattr(self, "btn_audition_chords"):
-                self.btn_audition_chords.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; font-size: 9pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
+                self.btn_audition_chords.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; font-size: 8.5pt; padding: 2px 8px; border-radius: 4px; font-weight: 700;")
             if hasattr(self, "btn_clean_tags"):
-                self.btn_clean_tags.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; font-weight: 600;")
+                self.btn_clean_tags.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 600;")
             if hasattr(self, "btn_copy_lyrics"):
-                self.btn_copy_lyrics.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
+                self.btn_copy_lyrics.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 700;")
 
             if hasattr(self, "btn_khmer_tags"):
                 self.btn_khmer_tags.setStyleSheet("background-color: #500724; color: #f472b6; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #be185d;")
@@ -1159,10 +1239,23 @@ class EditorPanel(QWidget):
                 if b:
                     b.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; border-radius: 4px; font-size: 8.5pt; font-weight: 700; padding: 3px 6px;")
             if hasattr(self, "btn_arranger_jump"):
-                self.btn_arranger_jump.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 3px 5px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_arranger_jump.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 2px 8px; font-size: 8.5pt; font-weight: 700;")
 
-            self.selection_bar.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 8px; padding: 4px;")
-            self.sel_label.setStyleSheet(f"color: {t['text_accent']}; font-size: 11.5px; background: transparent; border: none;")
+            if hasattr(self, "pro_features_frame"):
+                self.pro_features_frame.setStyleSheet("QFrame#proFeaturesFrame { background: transparent; border: none; }")
+            pro_btn_styles = [
+                (getattr(self, "btn_pro_melody", None), f"background-color: #2e1065; color: #d8b4fe; border: 1px solid #7c3aed;"),
+                (getattr(self, "btn_pro_vocal", None), f"background-color: #172554; color: #93c5fd; border: 1px solid #2563eb;"),
+                (getattr(self, "btn_pro_chords", None), f"background-color: #4a044e; color: #f0abfc; border: 1px solid #c026d3;"),
+                (getattr(self, "btn_pro_khmer", None), f"background-color: #064e3b; color: #6ee7b7; border: 1px solid #059669;"),
+                (getattr(self, "btn_pro_cover", None), f"background-color: #431407; color: #fdba74; border: 1px solid #ea580c;"),
+            ]
+            for pb, style_str in pro_btn_styles:
+                if pb:
+                    pb.setStyleSheet(f"{style_str} font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px;")
+
+            self.selection_bar.setStyleSheet(f"QFrame#selectionBarFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 8px; }} QFrame#selectionBarFrame QLabel {{ border: none; background: transparent; }}")
+            self.sel_label.setStyleSheet(f"color: {t['text_accent']}; font-size: 11px; font-weight: 600; background: transparent; border: none;")
             if hasattr(self, "btn_rhyme_sel"):
                 self.btn_rhyme_sel.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 4px 8px; font-weight: 700; font-size: 9pt;")
             if hasattr(self, "btn_humanize_full"):
@@ -1170,26 +1263,23 @@ class EditorPanel(QWidget):
             if hasattr(self, "btn_clone_meaning"):
                 self.btn_clone_meaning.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 9pt; padding: 4px 10px; border-radius: 5px; border: 1px solid {t['border_accent']};")
 
-            self.stats_frame.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 4px;")
+            self.stats_frame.setStyleSheet(f"QFrame#editorStatsFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; }} QFrame#editorStatsFrame QLabel {{ border: none; background: transparent; }}")
             for stat in [self.stat_lines, self.stat_words, self.stat_syllables, self.stat_avg]:
                 stat.setStyleSheet(f"color: {t['text_secondary']}; font-size: 11px; font-weight: 600; background: transparent; border: none;")
-            self.stat_duration.setStyleSheet("color: #34d399; font-weight: 800; font-size: 11px; background: #064e3b; padding: 1px 6px; border-radius: 3px;")
+            self.flow_label.setStyleSheet(f"color: {t['text_accent']}; font-weight: 700; font-size: 11px; background: transparent; border: none;")
+            self.stat_duration.setStyleSheet("color: #34d399; font-weight: 800; font-size: 11px; background: #064e3b; padding: 1px 6px; border-radius: 3px; border: none;")
             if hasattr(self, "combo_groove"):
-                self.combo_groove.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 2px 4px; border-radius: 4px; min-width: 175px;")
-            if hasattr(self, "stem_frame"):
-                self.stem_frame.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 2px 6px;")
+                self.combo_groove.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 2px 4px; border-radius: 4px;")
             if hasattr(self, "btn_load_stem"):
-                self.btn_load_stem.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border: 1px solid {t['border_accent']}; border-radius: 4px;")
-            if hasattr(self, "lbl_stem_track"):
-                self.lbl_stem_track.setStyleSheet(f"color: {t['text_secondary']}; font-size: 11px; font-weight: 600;")
+                self.btn_load_stem.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid {t['border_accent']}; border-radius: 4px;")
+            if hasattr(self, "btn_play_stem"):
+                self.btn_play_stem.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_primary']}; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border: 1px solid {t['border']}; border-radius: 4px;")
             if hasattr(self, "lbl_stem_time"):
-                self.lbl_stem_time.setStyleSheet(f"font-size: 10px; font-weight: 700; color: {t['text_primary']};")
+                self.lbl_stem_time.setStyleSheet(f"font-size: 9.5px; font-weight: 700; color: {t['text_primary']}; border: none; background: transparent;")
             if hasattr(self, "btn_hit_score"):
                 self.btn_hit_score.setStyleSheet(f"background: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid {t['border_accent']}; border-radius: 4px;")
-            if hasattr(self, "pro_features_frame"):
-                self.pro_features_frame.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 2px 4px;")
             if hasattr(self, "chord_ribbon_frame"):
-                self.chord_ribbon_frame.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 2px;")
+                self.chord_ribbon_frame.setStyleSheet(f"QFrame#chordRibbonFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 2px; }} QFrame#chordRibbonFrame QLabel {{ border: none; background: transparent; }}")
 
             all_menus = [
                 getattr(self, "btn_khmer_tags", None) and self.btn_khmer_tags.menu(),
@@ -1204,31 +1294,57 @@ class EditorPanel(QWidget):
                     m.setStyleSheet(f"background-color: {t['bg_card']}; color: {t['text_primary']}; border: 1px solid {t['border']}; padding: 4px;")
         else:
             # Modern Studio High-Contrast Light Palette
-            self.title_input.setStyleSheet("font-size: 14px; font-weight: 700; color: #0f172a; padding: 5px 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;")
-            self.take_combo.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 2px 6px; border-radius: 4px; min-width: 110px;")
+            self.title_input.setStyleSheet("font-size: 13.5px; font-weight: 700; color: #0f172a; padding: 4px 8px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;")
+            self.take_combo.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 2px 6px; border-radius: 4px; min-width: 95px;")
             if hasattr(self, "lbl_take"):
                 self.lbl_take.setStyleSheet("font-weight: 700; color: #334155; font-size: 11px;")
 
             if hasattr(self, "btn_add_take") and self.btn_add_take:
-                self.btn_add_take.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 3px 8px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_add_take.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
             if hasattr(self, "btn_dup_take") and self.btn_dup_take:
-                self.btn_dup_take.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 4px; padding: 3px 8px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_dup_take.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
             if hasattr(self, "btn_del_take") and self.btn_del_take:
-                self.btn_del_take.setStyleSheet("background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; padding: 3px 8px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_del_take.setStyleSheet("background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
 
-            self.metro_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px;")
-            self.btn_metro_toggle.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 9pt; padding: 4px 8px; border-radius: 5px; border: 1px solid #bfdbfe;")
+            if hasattr(self, "tool_deck_frame"):
+                self.tool_deck_frame.setStyleSheet("QFrame#toolDeckFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; } QFrame#toolDeckFrame QLabel { border: none; background: transparent; }")
+            sub_tab_qss_light = f"""
+                QPushButton {{
+                    background-color: #f1f5f9;
+                    color: #334155;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 5px;
+                    font-size: 8.5pt;
+                    font-weight: 700;
+                    padding: 2px 10px;
+                }}
+                QPushButton:hover {{
+                    background-color: #e2e8f0;
+                    color: #0f172a;
+                }}
+                QPushButton:checked {{
+                    background-color: {t['accent']};
+                    color: #ffffff;
+                    border-color: {t['border_accent']};
+                }}
+            """
+            for sb in [getattr(self, "btn_sub_tags", None), getattr(self, "btn_sub_audio", None), getattr(self, "btn_sub_pro", None)]:
+                if sb:
+                    sb.setStyleSheet(sub_tab_qss_light)
+
+            self.metro_frame.setStyleSheet("QFrame#metroFrame { background: transparent; border: none; } QFrame#metroFrame QLabel { border: none; background: transparent; }")
+            self.btn_metro_toggle.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid #bfdbfe;")
             if hasattr(self, "lbl_bpm_tag"):
-                self.lbl_bpm_tag.setStyleSheet("font-weight: 700; color: #334155; font-size: 9pt; background: transparent; border: none;")
-            self.metro_bpm_spin.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700; padding: 2px 4px; border-radius: 4px;")
-            self.metro_sig_combo.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 2px 4px; border-radius: 4px;")
-            self.btn_tap.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 9pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
+                self.lbl_bpm_tag.setStyleSheet("font-weight: 700; color: #334155; font-size: 8.5pt; background: transparent; border: none;")
+            self.metro_bpm_spin.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700; padding: 1px 4px; border-radius: 4px;")
+            self.metro_sig_combo.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 1px 4px; border-radius: 4px;")
+            self.btn_tap.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 8.5pt; padding: 2px 5px; border-radius: 4px; font-weight: 700;")
             if hasattr(self, "btn_audition_chords"):
-                self.btn_audition_chords.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 9pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
+                self.btn_audition_chords.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 8.5pt; padding: 2px 8px; border-radius: 4px; font-weight: 700;")
             if hasattr(self, "btn_clean_tags"):
-                self.btn_clean_tags.setStyleSheet("background-color: #ffffff; color: #334155; border: 1px solid #cbd5e1; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; font-weight: 600;")
+                self.btn_clean_tags.setStyleSheet("background-color: #ffffff; color: #334155; border: 1px solid #cbd5e1; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 600;")
             if hasattr(self, "btn_copy_lyrics"):
-                self.btn_copy_lyrics.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; font-weight: 700;")
+                self.btn_copy_lyrics.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 700;")
 
             if hasattr(self, "btn_khmer_tags"):
                 self.btn_khmer_tags.setStyleSheet("background-color: #fdf2f8; color: #be185d; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #fbcfe8;")
@@ -1242,10 +1358,23 @@ class EditorPanel(QWidget):
                 if b:
                     b.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 8.5pt; font-weight: 700; padding: 3px 6px;")
             if hasattr(self, "btn_arranger_jump"):
-                self.btn_arranger_jump.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 3px 5px; font-size: 8.5pt; font-weight: 700;")
+                self.btn_arranger_jump.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 8px; font-size: 8.5pt; font-weight: 700;")
 
-            self.selection_bar.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px;")
-            self.sel_label.setStyleSheet("color: #1e293b; font-size: 11.5px; font-weight: 700; background: transparent; border: none;")
+            if hasattr(self, "pro_features_frame"):
+                self.pro_features_frame.setStyleSheet("QFrame#proFeaturesFrame { background: transparent; border: none; }")
+            pro_btn_styles_light = [
+                (getattr(self, "btn_pro_melody", None), "background-color: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe;"),
+                (getattr(self, "btn_pro_vocal", None), "background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;"),
+                (getattr(self, "btn_pro_chords", None), "background-color: #fdf4ff; color: #86198f; border: 1px solid #f0abfc;"),
+                (getattr(self, "btn_pro_khmer", None), "background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;"),
+                (getattr(self, "btn_pro_cover", None), "background-color: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;"),
+            ]
+            for pb, style_str in pro_btn_styles_light:
+                if pb:
+                    pb.setStyleSheet(f"{style_str} font-weight: 700; font-size: 8.5pt; padding: 3px 8px; border-radius: 4px;")
+
+            self.selection_bar.setStyleSheet("QFrame#selectionBarFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; } QFrame#selectionBarFrame QLabel { border: none; background: transparent; }")
+            self.sel_label.setStyleSheet("color: #1e293b; font-size: 11px; font-weight: 700; background: transparent; border: none;")
             if hasattr(self, "btn_rhyme_sel"):
                 self.btn_rhyme_sel.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 9pt; padding: 4px 8px; border-radius: 5px; border: 1px solid #bfdbfe;")
             if hasattr(self, "btn_humanize_full"):
@@ -1253,26 +1382,23 @@ class EditorPanel(QWidget):
             if hasattr(self, "btn_clone_meaning"):
                 self.btn_clone_meaning.setStyleSheet("background-color: #f3e8ff; color: #7e22ce; font-weight: 700; font-size: 9pt; padding: 4px 10px; border-radius: 5px; border: 1px solid #d8b4fe;")
 
-            self.stats_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px;")
+            self.stats_frame.setStyleSheet("QFrame#editorStatsFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; } QFrame#editorStatsFrame QLabel { border: none; background: transparent; }")
             for stat in [self.stat_lines, self.stat_words, self.stat_syllables, self.stat_avg]:
                 stat.setStyleSheet("color: #1e293b; font-size: 11px; font-weight: 700; background: transparent; border: none;")
-            self.stat_duration.setStyleSheet("color: #047857; font-weight: 800; font-size: 11px; background: #d1fae5; border: 1px solid #a7f3d0; padding: 1px 6px; border-radius: 3px;")
+            self.flow_label.setStyleSheet("color: #2563eb; font-weight: 700; font-size: 11px; background: transparent; border: none;")
+            self.stat_duration.setStyleSheet("color: #047857; font-weight: 800; font-size: 11px; background: #d1fae5; border: none; padding: 1px 6px; border-radius: 3px;")
             if hasattr(self, "combo_groove"):
-                self.combo_groove.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 2px 4px; border-radius: 4px; min-width: 175px;")
-            if hasattr(self, "stem_frame"):
-                self.stem_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 6px;")
+                self.combo_groove.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 2px 4px; border-radius: 4px;")
             if hasattr(self, "btn_load_stem"):
-                self.btn_load_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border: 1px solid #bfdbfe; border-radius: 4px;")
-            if hasattr(self, "lbl_stem_track"):
-                self.lbl_stem_track.setStyleSheet("color: #334155; font-size: 11px; font-weight: 600;")
+                self.btn_load_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid #bfdbfe; border-radius: 4px;")
+            if hasattr(self, "btn_play_stem"):
+                self.btn_play_stem.setStyleSheet("background-color: #f8fafc; color: #0f172a; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px;")
             if hasattr(self, "lbl_stem_time"):
-                self.lbl_stem_time.setStyleSheet("font-size: 10px; font-weight: 700; color: #0f172a;")
+                self.lbl_stem_time.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #0f172a; border: none; background: transparent;")
             if hasattr(self, "btn_hit_score"):
                 self.btn_hit_score.setStyleSheet("background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #bfdbfe; border-radius: 4px;")
-            if hasattr(self, "pro_features_frame"):
-                self.pro_features_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 4px;")
             if hasattr(self, "chord_ribbon_frame"):
-                self.chord_ribbon_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px;")
+                self.chord_ribbon_frame.setStyleSheet("QFrame#chordRibbonFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; } QFrame#chordRibbonFrame QLabel { border: none; background: transparent; }")
 
             all_menus = [
                 getattr(self, "btn_khmer_tags", None) and self.btn_khmer_tags.menu(),

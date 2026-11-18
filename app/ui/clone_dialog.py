@@ -524,6 +524,8 @@ class SongDNAClonerView(QWidget):
 
         self.btn_close = QPushButton("Close")
         self.btn_close.clicked.connect(self._on_close_clicked)
+        if not isinstance(self.parent(), QDialog):
+            self.btn_close.hide()
         act_row.addWidget(self.btn_close)
 
         r_layout.addLayout(act_row)
@@ -836,7 +838,7 @@ class SongDNAClonerView(QWidget):
         input_bg = t["bg_input"]
 
         self.setStyleSheet(f"""
-            QDialog {{
+            SongDNAClonerView, QDialog {{
                 background-color: {bg};
                 color: {text_primary};
                 font-family: 'Segoe UI', sans-serif;
@@ -849,6 +851,7 @@ class SongDNAClonerView(QWidget):
             QLabel {{
                 color: {text_primary};
                 background: transparent;
+                border: none;
             }}
             QTextEdit, QLineEdit, QComboBox, QSpinBox {{
                 background-color: {input_bg};
@@ -984,6 +987,86 @@ class SongDNAClonerView(QWidget):
                 self.btn_close.setStyleSheet(f"background: {t['bg_card_alt']}; color: {t['text_muted']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 5px 10px;")
             else:
                 self.btn_close.setStyleSheet("background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; padding: 5px 10px;")
+
+        if hasattr(self, "btn_attach_audio"):
+            if is_dark:
+                self.btn_attach_audio.setStyleSheet("background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 700; font-size: 11px; padding: 5px 10px; border-radius: 5px;")
+            else:
+                self.btn_attach_audio.setStyleSheet("background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; font-weight: 700; font-size: 11px; padding: 5px 10px; border-radius: 5px;")
+
+        if hasattr(self, "lbl_singalong_badge"):
+            if is_dark:
+                self.lbl_singalong_badge.setStyleSheet("font-size: 10px; font-weight: 800; color: #38bdf8; background: #082f49; padding: 2px 6px; border-radius: 4px; border: 1px solid #0284c7;")
+            else:
+                self.lbl_singalong_badge.setStyleSheet("font-size: 10px; font-weight: 800; color: #0369a1; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; border: 1px solid #7dd3fc;")
+
+        if hasattr(self, "lbl_clone_hit"):
+            if is_dark:
+                self.lbl_clone_hit.setStyleSheet("font-size: 10px; font-weight: 800; color: #10b981; background: #064e3b; padding: 2px 6px; border-radius: 4px; border: 1px solid #059669;")
+            else:
+                self.lbl_clone_hit.setStyleSheet("font-size: 10px; font-weight: 800; color: #047857; background: #dcfce7; padding: 2px 6px; border-radius: 4px; border: 1px solid #86efac;")
+
+        if hasattr(self, "btn_copy_style"):
+            if is_dark:
+                self.btn_copy_style.setStyleSheet(f"background: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+            else:
+                self.btn_copy_style.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+
+        if hasattr(self, "btn_clone_vocal"):
+            if is_dark:
+                self.btn_clone_vocal.setStyleSheet("background: #172554; color: #60a5fa; font-weight: 700; font-size: 10px; padding: 5px 8px; border-radius: 4px; border: 1px solid #1d4ed8;")
+            else:
+                self.btn_clone_vocal.setStyleSheet("background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 10px; padding: 5px 8px; border-radius: 4px; border: 1px solid #bfdbfe;")
+
+        if hasattr(self, "btn_clone_chords"):
+            if is_dark:
+                self.btn_clone_chords.setStyleSheet("background: #4a044e; color: #f0abfc; font-weight: 700; font-size: 10px; padding: 5px 8px; border-radius: 4px; border: 1px solid #a21caf;")
+            else:
+                self.btn_clone_chords.setStyleSheet("background: #fdf4ff; color: #86198f; font-weight: 700; font-size: 10px; padding: 5px 8px; border-radius: 4px; border: 1px solid #f0abfc;")
+
+        if hasattr(self, "view_tabs"):
+            if is_dark:
+                self.view_tabs.setStyleSheet(f"""
+                    QTabWidget::pane {{
+                        border: 1px solid {border};
+                        border-radius: 6px;
+                        background-color: {input_bg};
+                    }}
+                    QTabBar::tab {{
+                        background: {t['bg_card_alt']};
+                        color: {t['text_secondary']};
+                        font-weight: 700;
+                        font-size: 10.5px;
+                        padding: 5px 12px;
+                        border-top-left-radius: 5px;
+                        border-top-right-radius: 5px;
+                    }}
+                    QTabBar::tab:selected {{
+                        background: {t['accent']};
+                        color: #ffffff;
+                    }}
+                """)
+            else:
+                self.view_tabs.setStyleSheet(f"""
+                    QTabWidget::pane {{
+                        border: 1px solid {border};
+                        border-radius: 6px;
+                        background-color: #ffffff;
+                    }}
+                    QTabBar::tab {{
+                        background: #f1f5f9;
+                        color: #475569;
+                        font-weight: 700;
+                        font-size: 10.5px;
+                        padding: 5px 12px;
+                        border-top-left-radius: 5px;
+                        border-top-right-radius: 5px;
+                    }}
+                    QTabBar::tab:selected {{
+                        background: {t['accent']};
+                        color: #ffffff;
+                    }}
+                """)
 
 
 class SongDNAClonerDialog(QDialog):

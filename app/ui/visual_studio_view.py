@@ -666,28 +666,43 @@ class VisualStudioView(QWidget):
     # --- Right Panel: Live Song Formula Card (រូបមន្តបទរបស់អ្នក) ---
     def _create_formula_panel(self) -> QFrame:
         self.formula_card = QFrame()
-        self.formula_card.setStyleSheet("background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 8px;")
-        layout = QVBoxLayout(self.formula_card)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
+        self.formula_card.setObjectName("formulaCard")
+        self.formula_card.setStyleSheet("QFrame#formulaCard { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; }")
+        outer_layout = QVBoxLayout(self.formula_card)
+        outer_layout.setContentsMargins(10, 10, 10, 10)
+        outer_layout.setSpacing(6)
 
-        # Header with Pro Auditor Status
+        # Header with Pro Auditor Status (Pinned Top)
         h_row = QHBoxLayout()
         self.lbl_formula_title = QLabel("✨ រូបមន្តបទរបស់អ្នក")
-        self.lbl_formula_title.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #1e293b;")
+        self.lbl_formula_title.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #1e293b; border: none; background: transparent;")
         h_row.addWidget(self.lbl_formula_title)
         h_row.addStretch()
 
         badge_gemini = QLabel("GMIV-C Pro")
         badge_gemini.setStyleSheet("color: #6366f1; font-weight: 800; font-size: 10px; background: #e0e7ff; padding: 2px 6px; border-radius: 4px;")
         h_row.addWidget(badge_gemini)
-        layout.addLayout(h_row)
+        outer_layout.addLayout(h_row)
 
-        # Pro Readiness Score Badge
+        # Pro Readiness Score Badge (Pinned Top)
         self.lbl_pro_status = QLabel("⭐ Pro Ready: Optimal Keyword Density")
         self.lbl_pro_status.setWordWrap(True)
         self.lbl_pro_status.setStyleSheet("background: #ecfdf5; color: #047857; font-weight: 700; font-size: 9.5px; padding: 3px 6px; border-radius: 5px; border: 1px solid #a7f3d0;")
-        layout.addWidget(self.lbl_pro_status)
+        outer_layout.addWidget(self.lbl_pro_status)
+
+        # Scrollable Middle Studio Section so 1366x768 & 1280x720 never cut off bottom action buttons
+        self.formula_scroll = QScrollArea()
+        self.formula_scroll.setWidgetResizable(True)
+        self.formula_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.formula_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.formula_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.formula_scroll.setStyleSheet("background: transparent;")
+
+        scroll_inner = QWidget()
+        scroll_inner.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(scroll_inner)
+        layout.setContentsMargins(0, 0, 2, 0)
+        layout.setSpacing(6)
 
         # ── 1-Click Master Sound Design Presets ──
         self.preset_frame = QFrame()
@@ -757,16 +772,16 @@ class VisualStudioView(QWidget):
         self.btn_trans_down = QPushButton("♭")
         self.btn_trans_down.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_trans_down.setToolTip("Transpose down -1 semitone")
-        self.btn_trans_down.setFixedSize(20, 20)
-        self.btn_trans_down.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; font-weight: 700;")
+        self.btn_trans_down.setFixedSize(26, 24)
+        self.btn_trans_down.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: 800; padding: 0px;")
         self.btn_trans_down.clicked.connect(lambda: self._transpose_chords(-1))
         key_bpm_bar.addWidget(self.btn_trans_down)
 
         self.btn_trans_up = QPushButton("♯")
         self.btn_trans_up.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_trans_up.setToolTip("Transpose up +1 semitone")
-        self.btn_trans_up.setFixedSize(20, 20)
-        self.btn_trans_up.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; font-weight: 700;")
+        self.btn_trans_up.setFixedSize(26, 24)
+        self.btn_trans_up.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: 800; padding: 0px;")
         self.btn_trans_up.clicked.connect(lambda: self._transpose_chords(1))
         key_bpm_bar.addWidget(self.btn_trans_up)
 
@@ -774,19 +789,19 @@ class VisualStudioView(QWidget):
 
         self.btn_bpm_minus = QPushButton("-")
         self.btn_bpm_minus.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_bpm_minus.setFixedSize(18, 20)
-        self.btn_bpm_minus.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; font-weight: 700;")
+        self.btn_bpm_minus.setFixedSize(24, 24)
+        self.btn_bpm_minus.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: 800; padding: 0px;")
         self.btn_bpm_minus.clicked.connect(lambda: self._adjust_bpm(-5))
         key_bpm_bar.addWidget(self.btn_bpm_minus)
 
         self.lbl_bpm_display = QLabel(self.current_bpm)
-        self.lbl_bpm_display.setStyleSheet("font-size: 10.5px; font-weight: 800; color: #2563eb;")
+        self.lbl_bpm_display.setStyleSheet("font-size: 10.5px; font-weight: 800; color: #2563eb; border: none; background: transparent;")
         key_bpm_bar.addWidget(self.lbl_bpm_display)
 
         self.btn_bpm_plus = QPushButton("+")
         self.btn_bpm_plus.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_bpm_plus.setFixedSize(18, 20)
-        self.btn_bpm_plus.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; font-weight: 700;")
+        self.btn_bpm_plus.setFixedSize(24, 24)
+        self.btn_bpm_plus.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; font-weight: 800; padding: 0px;")
         self.btn_bpm_plus.clicked.connect(lambda: self._adjust_bpm(5))
         key_bpm_bar.addWidget(self.btn_bpm_plus)
 
@@ -795,14 +810,15 @@ class VisualStudioView(QWidget):
         self.btn_vs_play_chords = QPushButton("🔊 Chords")
         self.btn_vs_play_chords.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_vs_play_chords.setToolTip("Audition progression with live synth")
-        self.btn_vs_play_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; font-weight: 700; font-size: 10px; border: 1px solid #ddd6fe; border-radius: 4px; padding: 2px 7px;")
+        self.btn_vs_play_chords.setFixedHeight(24)
+        self.btn_vs_play_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; font-weight: 700; font-size: 10px; border: 1px solid #ddd6fe; border-radius: 4px; padding: 0px 8px;")
         self.btn_vs_play_chords.clicked.connect(self._play_vs_chords)
         key_bpm_bar.addWidget(self.btn_vs_play_chords)
 
         self.btn_vs_stop_chords = QPushButton("⏹")
         self.btn_vs_stop_chords.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_vs_stop_chords.setFixedSize(20, 20)
-        self.btn_vs_stop_chords.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; border: 1px solid #cbd5e1; border-radius: 4px;")
+        self.btn_vs_stop_chords.setFixedSize(26, 24)
+        self.btn_vs_stop_chords.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 700; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0px;")
         self.btn_vs_stop_chords.clicked.connect(self._stop_vs_chords)
         key_bpm_bar.addWidget(self.btn_vs_stop_chords)
 
@@ -845,7 +861,8 @@ class VisualStudioView(QWidget):
         self.txt_suno_prompt = QTextEdit()
         self.txt_suno_prompt.setReadOnly(False)
         self.txt_suno_prompt.setStyleSheet("background: transparent; border: none; font-size: 11px; color: #334155;")
-        self.txt_suno_prompt.setMaximumHeight(42)
+        self.txt_suno_prompt.setMinimumHeight(48)
+        self.txt_suno_prompt.setMaximumHeight(64)
         self.txt_suno_prompt.textChanged.connect(self._on_prompt_text_changed)
         p_inner_layout.addWidget(self.txt_suno_prompt)
 
@@ -951,22 +968,27 @@ class VisualStudioView(QWidget):
         m_inner.addWidget(self.btn_copy_template)
 
         layout.addWidget(self.macro_box)
+        layout.addStretch()
 
-        # ── Compact Negative Styles Row ──
+        self.formula_scroll.setWidget(scroll_inner)
+        outer_layout.addWidget(self.formula_scroll, stretch=1)
+
+        # ── Pinned Footer: Negative Styles + Generate + Quick Export (Always Visible) ──
         neg_row = QHBoxLayout()
         neg_row.setSpacing(4)
         self.lbl_neg_head = QLabel("Neg:")
-        self.lbl_neg_head.setStyleSheet("font-weight: 700; font-size: 10px; color: #475569;")
+        self.lbl_neg_head.setStyleSheet("font-weight: 700; font-size: 10px; color: #475569; border: none; background: transparent;")
         neg_row.addWidget(self.lbl_neg_head)
 
         self.txt_negative = QLineEdit("low quality, noisy mixing, distorted, harsh screaming, clipping, muddy bass")
         self.txt_negative.setStyleSheet("background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 10px; color: #64748b; padding: 2px 6px;")
         neg_row.addWidget(self.txt_negative)
-        layout.addLayout(neg_row)
+        outer_layout.addLayout(neg_row)
 
         # Primary Generate Button (dynamically updated text)
         self.btn_generate = QPushButton("✨ បង្កើតបទចម្រៀង (Generate Lyrics)")
         self.btn_generate.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_generate.setFixedHeight(34)
         self.btn_generate.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563eb, stop:1 #3b82f6);
@@ -982,40 +1004,39 @@ class VisualStudioView(QWidget):
             }
         """)
         self.btn_generate.clicked.connect(self._emit_generate)
-        layout.addWidget(self.btn_generate)
+        outer_layout.addWidget(self.btn_generate)
 
         # Secondary Actions (4 items with compact width so zero clipping occurs)
         action_row = QHBoxLayout()
         action_row.setSpacing(4)
 
         self.btn_demo = QPushButton("🎵 បទគំរូ")
-        self.btn_demo.setStyleSheet("background-color: #f1f5f9; color: #2563eb; border: 1px solid #cbd5e1; border-radius: 5px; padding: 6px; font-size: 10.5px; font-weight: 600;")
+        self.btn_demo.setStyleSheet("background-color: #f1f5f9; color: #2563eb; border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px; font-size: 10.5px; font-weight: 600;")
         self.btn_demo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_demo.clicked.connect(self._emit_demo)
         action_row.addWidget(self.btn_demo)
 
         self.btn_editor = QPushButton("📝 Editor")
-        self.btn_editor.setStyleSheet("background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 5px; padding: 6px; font-size: 10.5px; font-weight: 600;")
+        self.btn_editor.setStyleSheet("background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px; font-size: 10.5px; font-weight: 600;")
         self.btn_editor.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_editor.clicked.connect(self._emit_open_editor)
         action_row.addWidget(self.btn_editor)
 
         self.btn_batch = QPushButton("⚡ Batch Pro")
         self.btn_batch.setToolTip("Produce 20 takes from this formula in Batch Studio Pro")
-        self.btn_batch.setStyleSheet("background-color: #faf5ff; color: #7c3aed; border: 1px solid #d8b4fe; border-radius: 5px; padding: 6px; font-size: 10.5px; font-weight: 700;")
+        self.btn_batch.setStyleSheet("background-color: #faf5ff; color: #7c3aed; border: 1px solid #d8b4fe; border-radius: 5px; padding: 5px; font-size: 10.5px; font-weight: 700;")
         self.btn_batch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_batch.clicked.connect(self._emit_open_batch)
         action_row.addWidget(self.btn_batch)
 
         self.btn_pack = QPushButton("📦 Export DAW")
         self.btn_pack.setToolTip("Export Complete DAW Arrangement Project (.zip)")
-        self.btn_pack.setStyleSheet("background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 5px; padding: 6px; font-size: 10.5px; font-weight: 700;")
+        self.btn_pack.setStyleSheet("background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 5px; padding: 5px; font-size: 10.5px; font-weight: 700;")
         self.btn_pack.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_pack.clicked.connect(lambda: self.export_bundle_requested.emit())
         action_row.addWidget(self.btn_pack)
 
-        layout.addLayout(action_row)
-        layout.addStretch()
+        outer_layout.addLayout(action_row)
         return self.formula_card
 
     def _create_gmiv_row(self, parent_layout, letter: str, default_val: str, color: str) -> QLabel:
@@ -1726,7 +1747,7 @@ We only stop when the race is won!
                     """)
 
             if hasattr(self, "formula_card"):
-                self.formula_card.setStyleSheet(f"background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 10px; padding: 8px 10px;")
+                self.formula_card.setStyleSheet(f"QFrame#formulaCard {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 10px; }} QFrame#formulaCard QLabel {{ border: none; background: transparent; }}")
             if hasattr(self, "lbl_formula_title"):
                 self.lbl_formula_title.setStyleSheet(f"font-size: 14px; font-weight: 800; color: {t['text_primary']};")
 
@@ -1766,13 +1787,13 @@ We only stop when the race is won!
                 self.key_combo.setStyleSheet(f"padding: 2px 4px; font-size: 10px; font-weight: 700; background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; border-radius: 4px;")
             for b in [getattr(self, "btn_trans_down", None), getattr(self, "btn_trans_up", None), getattr(self, "btn_bpm_minus", None), getattr(self, "btn_bpm_plus", None)]:
                 if b:
-                    b.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; border-radius: 3px; font-size: 10px; font-weight: 700;")
+                    b.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_primary']}; border: 1px solid {t['border']}; border-radius: 4px; font-size: 11px; font-weight: 800; padding: 0px;")
             if hasattr(self, "lbl_bpm_display"):
                 self.lbl_bpm_display.setStyleSheet(f"font-size: 10.5px; font-weight: 800; color: {t['text_accent']};")
             if hasattr(self, "btn_vs_play_chords"):
-                self.btn_vs_play_chords.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 10px; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 2px 7px;")
+                self.btn_vs_play_chords.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 10px; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 0px 8px;")
             if hasattr(self, "btn_vs_stop_chords"):
-                self.btn_vs_stop_chords.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; font-weight: 600; font-size: 10px; border: 1px solid {t['border']}; border-radius: 4px;")
+                self.btn_vs_stop_chords.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_primary']}; font-weight: 700; font-size: 11px; border: 1px solid {t['border']}; border-radius: 4px; padding: 0px;")
             if hasattr(self, "vs_engine_combo"):
                 self.vs_engine_combo.setStyleSheet(f"padding: 2px 4px; font-size: 10px; font-weight: 600; background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; border-radius: 4px;")
             if hasattr(self, "prompt_box_frame"):
@@ -1981,7 +2002,7 @@ We only stop when the race is won!
                     """)
 
             if hasattr(self, "formula_card"):
-                self.formula_card.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 10px;")
+                self.formula_card.setStyleSheet("QFrame#formulaCard { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; } QFrame#formulaCard QLabel { border: none; background: transparent; }")
             if hasattr(self, "lbl_formula_title"):
                 self.lbl_formula_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #0f172a;")
 
@@ -2021,13 +2042,13 @@ We only stop when the race is won!
                 self.key_combo.setStyleSheet("padding: 2px 4px; font-size: 10px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 4px; background: #ffffff; color: #0f172a;")
             for b in [getattr(self, "btn_trans_down", None), getattr(self, "btn_trans_up", None), getattr(self, "btn_bpm_minus", None), getattr(self, "btn_bpm_plus", None)]:
                 if b:
-                    b.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 3px; font-size: 10px; font-weight: 700;")
+                    b.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; font-weight: 800; padding: 0px;")
             if hasattr(self, "lbl_bpm_display"):
                 self.lbl_bpm_display.setStyleSheet(f"font-size: 10.5px; font-weight: 800; color: {t['accent']};")
             if hasattr(self, "btn_vs_play_chords"):
-                self.btn_vs_play_chords.setStyleSheet(f"background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 10px; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 7px;")
+                self.btn_vs_play_chords.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 10px; border: 1px solid #bfdbfe; border-radius: 4px; padding: 0px 8px;")
             if hasattr(self, "btn_vs_stop_chords"):
-                self.btn_vs_stop_chords.setStyleSheet("background-color: #ffffff; color: #475569; font-weight: 600; font-size: 10px; border: 1px solid #cbd5e1; border-radius: 4px;")
+                self.btn_vs_stop_chords.setStyleSheet("background-color: #ffffff; color: #334155; font-weight: 700; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0px;")
             if hasattr(self, "vs_engine_combo"):
                 self.vs_engine_combo.setStyleSheet("padding: 2px 4px; font-size: 10px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; background: #ffffff; color: #0f172a;")
             if hasattr(self, "prompt_box_frame"):

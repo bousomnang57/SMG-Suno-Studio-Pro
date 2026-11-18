@@ -7,7 +7,7 @@ commercial counterparts across 8 advanced creative clone modes:
 1. 1:1 Parallel Semantic Twin (សមមូលន័យ)
 2. Answer Song / Opposite POV (បទឆ្លើយឆ្លង)
 3. Cross-Genre Mutation (បំប្លែងចង្វាក់)
-4. 10 Years Later / The Sequel (១០ ឆ្នាំក្រោយ)
+4. 10 Years Later / The Sequel (10 ឆ្នាំក្រោយ)
 5. Bilingual Mirror Transcreation (ពីរភាសា)
 6. 🎭 Artist Persona DNA (ស្ទីលសិល្បករល្បីៗ)
 7. 🎯 Strict Syllable Sing-Along Meter (ត្រូវចង្វាក់ ១០០%)
@@ -138,10 +138,10 @@ CLONE_MODES: Dict[str, Dict[str, str]] = {
     },
     "TIME_SHIFT_SEQUEL": {
         "id": "TIME_SHIFT_SEQUEL",
-        "title": "⏳ 10 Years Later (១០ ឆ្នាំក្រោយ)",
+        "title": "⏳ 10 Years Later (10 ឆ្នាំក្រោយ)",
         "subtitle": "The mature continuation of the same story a decade into the future",
         "prompt_instruction": (
-            "Write 'The Sequel: 10 Years Later' (១០ ឆ្នាំក្រោយ). Continue the story from the reference song "
+            "Write 'The Sequel: 10 Years Later' (10 ឆ្នាំក្រោយ). Continue the story from the reference song "
             "a decade into the future. Reflect on the past heartbreak or love with mature wisdom, bittersweet closure, "
             "and the realization of how time heals wounds while leaving enduring memories etched in the heart."
         )

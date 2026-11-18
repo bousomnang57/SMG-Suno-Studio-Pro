@@ -15,6 +15,7 @@ from app.music_data import (
     WORLD_REGIONS, SONG_STRUCTURES, MOODS, THEMES,
     RHYME_SCHEMES, LANGUAGES, ONE_CLICK_PRESETS
 )
+from app.ui.styles import get_theme
 
 class GeneratorPanel(QWidget):
     generate_requested = pyqtSignal(dict)
@@ -35,7 +36,7 @@ class GeneratorPanel(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll.setStyleSheet("background: transparent;")
 
@@ -226,11 +227,13 @@ class GeneratorPanel(QWidget):
         self._on_region_changed(self.region_combo.currentText())
         self.apply_theme(True)
 
-    def apply_theme(self, is_dark: bool):
+    def apply_theme(self, theme_or_dark=True):
+        t = get_theme(theme_or_dark)
+        is_dark = t.get("is_dark", True)
         self.is_dark = is_dark
         if is_dark:
-            self.setStyleSheet("background-color: #0c0e18;")
-            card_qss = "background-color: #111626; border: 1px solid #1f2742; border-radius: 5px; padding: 3px;"
+            self.setStyleSheet(f"background-color: {t['bg_window']};")
+            card_qss = f"QFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 4px; }} QFrame QLabel {{ border: none; background: transparent; }}"
             for gb in [self.preset_group, self.genre_group, self.lang_group, self.concept_group]:
                 gb.setStyleSheet(card_qss)
 
@@ -313,8 +316,8 @@ class GeneratorPanel(QWidget):
             """)
             self.status_label.setStyleSheet("color: #64748b; font-size: 9px; font-style: italic;")
         else:
-            self.setStyleSheet("background-color: #f8fafc;")
-            card_qss = "background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 5px; padding: 3px;"
+            self.setStyleSheet(f"background-color: {t['bg_window']};")
+            card_qss = f"QFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 4px; }} QFrame QLabel {{ border: none; background: transparent; }}"
             for gb in [self.preset_group, self.genre_group, self.lang_group, self.concept_group]:
                 gb.setStyleSheet(card_qss)
 

@@ -157,11 +157,11 @@ class MainWindow(QMainWindow):
     def _create_workflow_ribbon(self) -> QWidget:
         self.workflow_ribbon = QFrame()
         self.workflow_ribbon.setObjectName("workflowRibbon")
-        self.workflow_ribbon.setFixedHeight(34)
+        self.workflow_ribbon.setFixedHeight(30)
 
         r_layout = QHBoxLayout(self.workflow_ribbon)
-        r_layout.setContentsMargins(14, 0, 14, 0)
-        r_layout.setSpacing(12)
+        r_layout.setContentsMargins(12, 0, 12, 0)
+        r_layout.setSpacing(10)
 
         self.lbl_ribbon_info = QLabel("🗺️ Wizard Studio • Step-by-step guided song creation")
         self.lbl_ribbon_info.setObjectName("lblRibbonInfo")
@@ -169,14 +169,14 @@ class MainWindow(QMainWindow):
 
         r_layout.addStretch(1)
 
-        self.lbl_ribbon_hint = QLabel("⌨️ Ctrl+1..5 Modes  •  Ctrl+N New  •  Ctrl+F Focus  •  Ctrl+E Export")
+        self.lbl_ribbon_hint = QLabel("Ctrl+1..5 Switch Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
         self.lbl_ribbon_hint.setObjectName("lblRibbonHint")
         r_layout.addWidget(self.lbl_ribbon_hint)
 
         self.btn_ribbon_action = QPushButton("✍️ Open in Editor ➔")
         self.btn_ribbon_action.setObjectName("btnRibbonAction")
         self.btn_ribbon_action.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_ribbon_action.setFixedHeight(24)
+        self.btn_ribbon_action.setFixedHeight(22)
         self.btn_ribbon_action.clicked.connect(self._on_ribbon_action_clicked)
         r_layout.addWidget(self.btn_ribbon_action)
 
@@ -259,14 +259,15 @@ class MainWindow(QMainWindow):
         self.splitter.setCollapsible(1, False)
         self.splitter.setCollapsible(2, True)
 
-        self.generator_panel.setMinimumWidth(0)
-        self.tools_panel.setMinimumWidth(0)
+        self.generator_panel.setMinimumWidth(245)
+        self.editor_panel.setMinimumWidth(460)
+        self.tools_panel.setMinimumWidth(265)
 
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setStretchFactor(2, 0)
 
-        self._saved_splitter_sizes = [280, 680, 340]
+        self._saved_splitter_sizes = [275, 735, 325]
         self.splitter.setSizes(self._saved_splitter_sizes)
         self.splitter.splitterMoved.connect(self._on_splitter_moved)
 
@@ -289,13 +290,15 @@ class MainWindow(QMainWindow):
         sizes = self.splitter.sizes()
         if self.generator_panel.isVisible() and sizes[0] > 20:
             self._saved_splitter_sizes[0] = sizes[0]
+            self.generator_panel.setMinimumWidth(0)
             self.generator_panel.hide()
             self.splitter.setSizes([0, sizes[1] + sizes[0], sizes[2]])
             self.btn_toggle_generator.setChecked(False)
         else:
+            self.generator_panel.setMinimumWidth(245)
             self.generator_panel.show()
-            restore_w = self._saved_splitter_sizes[0] if self._saved_splitter_sizes[0] > 50 else 280
-            self.splitter.setSizes([restore_w, max(300, sizes[1] - restore_w), sizes[2]])
+            restore_w = self._saved_splitter_sizes[0] if self._saved_splitter_sizes[0] > 50 else 275
+            self.splitter.setSizes([restore_w, max(460, sizes[1] - restore_w), sizes[2]])
             self.btn_toggle_generator.setChecked(True)
         self._update_focus_mode_state()
 
@@ -303,13 +306,15 @@ class MainWindow(QMainWindow):
         sizes = self.splitter.sizes()
         if self.tools_panel.isVisible() and sizes[2] > 20:
             self._saved_splitter_sizes[2] = sizes[2]
+            self.tools_panel.setMinimumWidth(0)
             self.tools_panel.hide()
             self.splitter.setSizes([sizes[0], sizes[1] + sizes[2], 0])
             self.btn_toggle_tools.setChecked(False)
         else:
+            self.tools_panel.setMinimumWidth(265)
             self.tools_panel.show()
-            restore_w = self._saved_splitter_sizes[2] if self._saved_splitter_sizes[2] > 50 else 340
-            self.splitter.setSizes([sizes[0], max(300, sizes[1] - restore_w), restore_w])
+            restore_w = self._saved_splitter_sizes[2] if self._saved_splitter_sizes[2] > 50 else 325
+            self.splitter.setSizes([sizes[0], max(460, sizes[1] - restore_w), restore_w])
             self.btn_toggle_tools.setChecked(True)
         self._update_focus_mode_state()
 
@@ -319,6 +324,8 @@ class MainWindow(QMainWindow):
         if not is_focused:
             if sizes[0] > 20: self._saved_splitter_sizes[0] = sizes[0]
             if sizes[2] > 20: self._saved_splitter_sizes[2] = sizes[2]
+            self.generator_panel.setMinimumWidth(0)
+            self.tools_panel.setMinimumWidth(0)
             self.generator_panel.hide()
             self.tools_panel.hide()
             total_w = sum(sizes)
@@ -329,12 +336,14 @@ class MainWindow(QMainWindow):
             self.btn_focus_mode.setText("🪟 Normal 3-Pane")
             self.status_bar.showMessage("Entered Lyric Focus Mode (Distraction-Free Full Width)", 2500)
         else:
+            self.generator_panel.setMinimumWidth(245)
+            self.tools_panel.setMinimumWidth(265)
             self.generator_panel.show()
             self.tools_panel.show()
-            left_w = self._saved_splitter_sizes[0] if self._saved_splitter_sizes[0] > 50 else 280
-            right_w = self._saved_splitter_sizes[2] if self._saved_splitter_sizes[2] > 50 else 340
+            left_w = self._saved_splitter_sizes[0] if self._saved_splitter_sizes[0] > 50 else 275
+            right_w = self._saved_splitter_sizes[2] if self._saved_splitter_sizes[2] > 50 else 325
             total_w = sum(sizes)
-            mid_w = max(350, total_w - left_w - right_w)
+            mid_w = max(460, total_w - left_w - right_w)
             self.splitter.setSizes([left_w, mid_w, right_w])
             self.btn_toggle_generator.setChecked(True)
             self.btn_toggle_tools.setChecked(True)
@@ -411,37 +420,29 @@ class MainWindow(QMainWindow):
         self.header_frame = QFrame()
         self.header_frame.setObjectName("mainHeaderBar")
         layout = QHBoxLayout(self.header_frame)
-        layout.setContentsMargins(12, 6, 12, 6)
-        layout.setSpacing(12)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
 
-        # ── Zone 1: Brand & Stage Badge (Left) ──
+        # ── Zone 1: Compact Modern Brand Identity (Left) ──
         brand_box = QHBoxLayout()
-        brand_box.setSpacing(10)
+        brand_box.setSpacing(8)
 
         self.avatar_lbl = QLabel()
-        self.avatar_lbl.setFixedSize(36, 36)
+        self.avatar_lbl.setFixedSize(32, 32)
         self.avatar_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._update_brand_logo()
         brand_box.addWidget(self.avatar_lbl)
 
         title_col = QVBoxLayout()
-        title_col.setSpacing(1)
+        title_col.setSpacing(0)
         self.header_title_lbl = QLabel("SMG Suno Studio Pro")
         self.header_title_lbl.setObjectName("headerAppTitle")
         title_col.addWidget(self.header_title_lbl)
 
-        self.header_sub_lbl = QLabel("AI Lyric Writer & Music Production DAW")
+        self.header_sub_lbl = QLabel(f"Studio DAW v{APP_VERSION}")
         self.header_sub_lbl.setObjectName("headerAppSub")
         title_col.addWidget(self.header_sub_lbl)
         brand_box.addLayout(title_col)
-
-        # Dynamic Stage Pill Badge
-        self.header_stage_pill = QLabel("🗺️ WIZARD")
-        self.header_stage_pill.setObjectName("headerStagePill")
-        self.header_stage_pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_stage_pill.setFixedHeight(22)
-        brand_box.addSpacing(6)
-        brand_box.addWidget(self.header_stage_pill)
 
         layout.addLayout(brand_box)
         layout.addStretch(1)
@@ -489,7 +490,7 @@ class MainWindow(QMainWindow):
         self.btn_mode_clone.clicked.connect(lambda: self._set_studio_mode(4))
 
         for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone]:
-            btn.setFixedWidth(74)
+            btn.setFixedWidth(72)
             btn.setFixedHeight(28)
             mb_layout.addWidget(btn)
 
@@ -509,10 +510,10 @@ class MainWindow(QMainWindow):
         cp_layout.setSpacing(3)
         cp_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
-        self.header_btn_new = QPushButton("➕ ថ្មី")
-        self.header_btn_new.setFixedWidth(52)
+        self.header_btn_new = QPushButton("➕ New")
+        self.header_btn_new.setMinimumWidth(62)
         self.header_btn_new.setFixedHeight(28)
-        self.header_btn_new.setToolTip("New Lyric Project [Ctrl+N]")
+        self.header_btn_new.setToolTip("New Lyric Project (បទថ្មី) [Ctrl+N]")
         self.header_btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         self.header_btn_new.clicked.connect(self._new_song)
         cp_layout.addWidget(self.header_btn_new)
@@ -540,7 +541,7 @@ class MainWindow(QMainWindow):
         cp_layout.addWidget(self.btn_export)
         right_box.addWidget(self.capsule_prod)
 
-        # Utilities Capsule (Model, History, Theme, Settings)
+        # Utilities Capsule (Model, History, Theme, Settings, Update, Pro)
         self.capsule_util = QFrame()
         self.capsule_util.setObjectName("headerCapsuleUtil")
         cu_layout = QHBoxLayout(self.capsule_util)
@@ -548,10 +549,10 @@ class MainWindow(QMainWindow):
         cu_layout.setSpacing(3)
         cu_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
 
-        # Quick Model Engine Selector
+        # Quick Model Engine Selector (Clear legible width)
         self.header_model_combo = QComboBox()
         self.header_model_combo.setFixedHeight(28)
-        self.header_model_combo.setMaximumWidth(110)
+        self.header_model_combo.setFixedWidth(134)
         self.header_model_combo.addItems(GEMINI_MODELS)
         current_model = config_manager.get("gemini_model", "gemini-3.5-flash")
         idx = self.header_model_combo.findText(current_model)
@@ -563,9 +564,10 @@ class MainWindow(QMainWindow):
         self.header_model_combo.currentTextChanged.connect(self._on_header_model_changed)
         cu_layout.addWidget(self.header_model_combo)
 
-        self.header_btn_history = QPushButton("📜 ប្រវត្តិ")
+        self.header_btn_history = QPushButton("📜")
+        self.header_btn_history.setFixedWidth(34)
         self.header_btn_history.setFixedHeight(28)
-        self.header_btn_history.setToolTip("Lyric Project History [Ctrl+H]")
+        self.header_btn_history.setToolTip("Lyric Project History (ប្រវត្តិ) [Ctrl+H]")
         self.header_btn_history.setCursor(Qt.CursorShape.PointingHandCursor)
         self.header_btn_history.clicked.connect(self._open_history)
         cu_layout.addWidget(self.header_btn_history)
@@ -588,7 +590,7 @@ class MainWindow(QMainWindow):
         cu_layout.addWidget(self.header_btn_settings)
 
         # In-App Live Auto-Updater Pill Button
-        self.header_btn_update = QPushButton("🚀 Update Ready")
+        self.header_btn_update = QPushButton("🚀 Update")
         self.header_btn_update.setObjectName("headerBtnUpdate")
         self.header_btn_update.setFixedHeight(28)
         self.header_btn_update.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -598,7 +600,7 @@ class MainWindow(QMainWindow):
         cu_layout.addWidget(self.header_btn_update)
 
         # License Status & Activation Pill Button
-        self.header_btn_license = QPushButton("🔑 Activate Pro")
+        self.header_btn_license = QPushButton("🔑 Pro")
         self.header_btn_license.setObjectName("headerBtnLicense")
         self.header_btn_license.setFixedHeight(28)
         self.header_btn_license.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1750,7 +1752,8 @@ class MainWindow(QMainWindow):
         self.latest_update_info = manifest
         new_ver = manifest.get("version", "")
         if hasattr(self, "header_btn_update"):
-            self.header_btn_update.setText(f"🚀 Update Ready (v{new_ver})")
+            self.header_btn_update.setText(f"🚀 v{new_ver}")
+            self.header_btn_update.setToolTip(f"New update v{new_ver} is ready! Click to inspect details, restart, or install")
             self.header_btn_update.show()
             self.capsule_util.adjustSize()
             self.header_frame.adjustSize()
@@ -1817,7 +1820,7 @@ class MainWindow(QMainWindow):
                     }
                 """)
         else:
-            self.header_btn_license.setText("🔑 Activate Pro")
+            self.header_btn_license.setText("🔑 Pro")
             self.header_btn_license.setToolTip("Free Demo Mode • Click to activate Studio Pro License")
             self.header_btn_license.setStyleSheet("""
                 QPushButton {

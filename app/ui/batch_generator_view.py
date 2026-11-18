@@ -190,10 +190,9 @@ class BatchSongCard(QFrame):
             color: #6ee7b7;
             border: 1px solid #059669;
             border-radius: 3px;
-            padding: 1px 4px;
+            padding: 1px 5px;
             font-size: 8.5px;
             font-weight: 800;
-            font-family: 'Cascadia Code', 'Consolas', monospace;
         """)
         self.quality_badge.setToolTip(f"Pro Studio Hit Analysis:\n• Hit Potential: {q_hit}%\n• Rhyme Density: {q_rhyme}%\n• Human Authenticity: {q_human}%\n• Vocal Breath Architecture Certified")
         badge_row.addWidget(self.quality_badge)
@@ -1099,10 +1098,11 @@ class BatchGeneratorView(QWidget):
                     btn.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;")
 
     def _toggle_sidebar(self):
-        if not hasattr(self, "side_scroll"):
+        target = getattr(self, "left_panel_container", getattr(self, "side_scroll", None))
+        if not target:
             return
-        is_visible = self.side_scroll.isVisible()
-        self.side_scroll.setVisible(not is_visible)
+        is_visible = target.isVisible()
+        target.setVisible(not is_visible)
         if not is_visible:
             self.btn_toggle_sidebar.setText("◀ Sidebar")
             self.btn_toggle_sidebar.setToolTip("Hide sidebar to expand grid to 100% full width")
@@ -1153,11 +1153,16 @@ class BatchGeneratorView(QWidget):
         main_layout.setSpacing(12)
 
         # ══════════════════════════════════════════════════════════════════
-        # ── LEFT CONTROLLER SIDEBAR (WIDTH ~ 360px - ZERO CLIPPING FIT) ──
+        # ── LEFT CONTROLLER SIDEBAR (WIDTH ~ 365px - ZERO CLIPPING FIT) ──
         # ══════════════════════════════════════════════════════════════════
+        self.left_panel_container = QWidget()
+        self.left_panel_container.setFixedWidth(365)
+        left_container_layout = QVBoxLayout(self.left_panel_container)
+        left_container_layout.setContentsMargins(0, 0, 0, 0)
+        left_container_layout.setSpacing(6)
+
         self.side_scroll = QScrollArea()
         self.side_scroll.setWidgetResizable(True)
-        self.side_scroll.setFixedWidth(375)
         self.side_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.side_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.side_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -1397,10 +1402,10 @@ class BatchGeneratorView(QWidget):
         arc_mem_row.addWidget(self.lbl_memory_badge)
 
         self.btn_clear_memory = QPushButton("Clear")
-        self.btn_clear_memory.setFixedWidth(42)
+        self.btn_clear_memory.setFixedWidth(52)
         self.btn_clear_memory.setFixedHeight(24)
         self.btn_clear_memory.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clear_memory.setStyleSheet("font-size: 8.5px; font-weight: 700; color: #94a3b8; background: #13172c; border: 1px solid #232c4b; border-radius: 4px;")
+        self.btn_clear_memory.setStyleSheet("font-size: 9px; font-weight: 700; color: #94a3b8; background: #13172c; border: 1px solid #232c4b; border-radius: 4px; padding: 0px;")
         self.btn_clear_memory.setToolTip("Clear session memory cache")
         self.btn_clear_memory.clicked.connect(self._clear_memory_cache)
         arc_mem_row.addWidget(self.btn_clear_memory)
@@ -1440,7 +1445,11 @@ class BatchGeneratorView(QWidget):
         count_row.addLayout(s_box, 2)
 
         side_layout.addLayout(count_row)
+        side_layout.addStretch()
+        self.side_scroll.setWidget(self.sidebar)
+        left_container_layout.addWidget(self.side_scroll, stretch=1)
 
+        # ── PINNED BOTTOM ACTION FOOTER (ALWAYS VISIBLE AT 768p+) ──
         # ── PRIMARY ACTION BUTTON (TURBO) ──
         self.btn_generate_batch = QPushButton("⚡ បង្កើតបទចម្រៀងថ្មី (Turbo Engine)")
         self.btn_generate_batch.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1466,7 +1475,7 @@ class BatchGeneratorView(QWidget):
             }
         """)
         self.btn_generate_batch.clicked.connect(self._start_batch_generation)
-        side_layout.addWidget(self.btn_generate_batch)
+        left_container_layout.addWidget(self.btn_generate_batch)
 
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -1484,9 +1493,9 @@ class BatchGeneratorView(QWidget):
             }
         """)
         self.progress_bar.setVisible(False)
-        side_layout.addWidget(self.progress_bar)
+        left_container_layout.addWidget(self.progress_bar)
 
-        # Secondary Actions (Single row of 4 compact buttons - zero clipping in 345px)
+        # Secondary Actions (Single row of 4 compact buttons - zero clipping in 365px)
         sub_act_row = QHBoxLayout()
         sub_act_row.setSpacing(4)
 
@@ -1522,18 +1531,16 @@ class BatchGeneratorView(QWidget):
         self.btn_clear_sidebar.clicked.connect(self._clear_batch_action)
         sub_act_row.addWidget(self.btn_clear_sidebar, 1)
 
-        side_layout.addLayout(sub_act_row)
+        left_container_layout.addLayout(sub_act_row)
 
         # Bottom Counter / Status
         self.lbl_batch_stat = QLabel("សរុប 20 បទ (Khmer + EN)... ស្អាត Copy បានភ្លាមៗ")
-        self.lbl_batch_stat.setFixedHeight(24)
+        self.lbl_batch_stat.setFixedHeight(22)
         self.lbl_batch_stat.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_batch_stat.setStyleSheet("color: #34d399; font-size: 10.5px; font-weight: 700; background: #064e3b; border-radius: 4px;")
-        side_layout.addWidget(self.lbl_batch_stat)
+        self.lbl_batch_stat.setStyleSheet("color: #34d399; font-size: 10px; font-weight: 700; background: #064e3b; border-radius: 4px;")
+        left_container_layout.addWidget(self.lbl_batch_stat)
 
-        side_layout.addStretch()
-        self.side_scroll.setWidget(self.sidebar)
-        main_layout.addWidget(self.side_scroll)
+        main_layout.addWidget(self.left_panel_container)
 
         # ══════════════════════════════════════════════════════════════════
         # ── CENTER & BOTTOM: MULTI-SONG GRID + INSPECTOR DRAWER ──
@@ -1575,11 +1582,11 @@ class BatchGeneratorView(QWidget):
         self.btn_toggle_sidebar.clicked.connect(self._toggle_sidebar)
         grid_header1.addWidget(self.btn_toggle_sidebar)
 
-        self.lbl_grid_title = QLabel("🎴 Batch Studio Pro Tracks")
-        self.lbl_grid_title.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #f8fafc;")
+        self.lbl_grid_title = QLabel("🎴 Batch Studio")
+        self.lbl_grid_title.setStyleSheet("font-size: 13px; font-weight: 800; color: #f8fafc;")
         grid_header1.addWidget(self.lbl_grid_title)
 
-        self.lbl_grid_badge = QLabel("20 Tracks Ready")
+        self.lbl_grid_badge = QLabel("20 Tracks")
         self.lbl_grid_badge.setStyleSheet("""
             background-color: #1e293b;
             color: #38bdf8;
@@ -1591,7 +1598,7 @@ class BatchGeneratorView(QWidget):
         """)
         grid_header1.addWidget(self.lbl_grid_badge)
 
-        self.lbl_avg_novelty = QLabel("✨ Novelty: 96% Fresh")
+        self.lbl_avg_novelty = QLabel("✨ 96% Fresh")
         self.lbl_avg_novelty.setStyleSheet("""
             background-color: #064e3b;
             color: #6ee7b7;
@@ -1608,39 +1615,39 @@ class BatchGeneratorView(QWidget):
         grid_header1.addStretch()
 
         # Primary Quick Workflow Action: Copy Next Uncopied
-        self.btn_copy_next = QPushButton("🚀 Copy Next Uncopied")
+        self.btn_copy_next = QPushButton("🚀 Copy Next")
         self.btn_copy_next.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_copy_next.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #0284c7);
                 color: #ffffff;
                 font-weight: 800;
-                font-size: 11px;
+                font-size: 10.5px;
                 border: 1px solid #10b981;
                 border-radius: 5px;
-                padding: 4px 12px;
+                padding: 4px 10px;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #38bdf8);
             }
         """)
-        self.btn_copy_next.setToolTip("Instantly copies the next uncopied song to clipboard and marks it [✓ Copied]")
+        self.btn_copy_next.setToolTip("Copy Next Uncopied: Instantly copies the next uncopied song to clipboard and marks it [✓ Copied]")
         self.btn_copy_next.clicked.connect(self._copy_next_uncopied)
         grid_header1.addWidget(self.btn_copy_next)
 
         # AI Authenticity Humanizer Button (Direct 1-Click)
-        self.btn_humanize_all = QPushButton("👤 Humanize All 20")
+        self.btn_humanize_all = QPushButton("👤 Humanize")
         self.btn_humanize_all.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_humanize_all.setToolTip("Elevate all 20 tracks into living human masterpieces: inject breath cues, sensory realism, and live room pocket groove")
+        self.btn_humanize_all.setToolTip("Humanize All 20: Elevate all tracks into living human masterpieces with breath cues, sensory realism, and pocket groove")
         self.btn_humanize_all.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #0369a1);
                 color: #ffffff;
                 font-weight: 800;
-                font-size: 11px;
+                font-size: 10.5px;
                 border: 1px solid #10b981;
                 border-radius: 5px;
-                padding: 4px 10px;
+                padding: 4px 9px;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #0284c7);
@@ -1650,7 +1657,7 @@ class BatchGeneratorView(QWidget):
         grid_header1.addWidget(self.btn_humanize_all)
 
         # Studio Tools Dropdown Menu (Inject v6, Album Arc, 1-Lyric Takes, Export)
-        self.btn_studio_tools = QPushButton("⚡ Studio Tools ▾")
+        self.btn_studio_tools = QPushButton("⚡ Tools ▾")
         self.btn_studio_tools.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_studio_tools.setToolTip("Advanced Studio Generation & Transformation Tools")
         self.btn_studio_tools.setStyleSheet("""
@@ -1726,9 +1733,10 @@ class BatchGeneratorView(QWidget):
 
         # Quick Search Bar for instant filtering by title, genre, bpm, or lyrics
         self.txt_grid_search = QLineEdit()
-        self.txt_grid_search.setPlaceholderText("🔍 ស្វែងរក... (Search tracks)")
+        self.txt_grid_search.setPlaceholderText("🔍 ស្វែងរក... (Search)")
         self.txt_grid_search.setClearButtonEnabled(True)
-        self.txt_grid_search.setFixedWidth(190)
+        self.txt_grid_search.setMinimumWidth(110)
+        self.txt_grid_search.setMaximumWidth(230)
         self.txt_grid_search.setStyleSheet("""
             QLineEdit {
                 background: #0f1426;
@@ -1743,9 +1751,7 @@ class BatchGeneratorView(QWidget):
             }
         """)
         self.txt_grid_search.textChanged.connect(self._on_search_text_changed)
-        grid_filter_bar.addWidget(self.txt_grid_search)
-
-        grid_filter_bar.addStretch()
+        grid_filter_bar.addWidget(self.txt_grid_search, stretch=1)
 
         # Grid Density & View Switchers: [ 🔲 3 Cols ] [ ⊞ 4 Cols ] [ 📋 Table ] [ ◫ Auto ]
         self.btn_cols_3 = QPushButton("🔲 3 Cols")
@@ -1777,10 +1783,6 @@ class BatchGeneratorView(QWidget):
         self.btn_cols_auto.clicked.connect(lambda: self._set_view_mode("auto"))
         grid_filter_bar.addWidget(self.btn_cols_auto)
         self._update_column_toggle_ui()
-
-        self.lbl_queue_hint = QLabel("💡 គន្លឹះ: ចុច [🚀 Copy Next] ដើម្បីយកបទទៅ generate លើ Suno ម្តងមួយៗលឿនបំផុត")
-        self.lbl_queue_hint.setStyleSheet("color: #64748b; font-size: 10px; font-style: italic;")
-        grid_filter_bar.addWidget(self.lbl_queue_hint)
 
         grid_v_layout.addLayout(grid_filter_bar)
 
@@ -2326,7 +2328,7 @@ class BatchGeneratorView(QWidget):
                 s["novelty_badge"] = res["badge"]
             scores.append(score)
         avg = int(sum(scores) / max(1, len(scores)))
-        self.lbl_avg_novelty.setText(f"✨ Novelty: {avg}% Fresh")
+        self.lbl_avg_novelty.setText(f"✨ {avg}% Fresh")
 
     def _on_mutate_card(self, song_data: dict):
         """Mutate a single song in-place using the Anti-Cliché Engine."""
@@ -2777,7 +2779,7 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
         if hasattr(self, "tracklist_table") and self.tracklist_table.isVisible():
             self._populate_table()
         if hasattr(self, "lbl_grid_badge"):
-            self.lbl_grid_badge.setText(f"{len(songs)} Tracks Ready")
+            self.lbl_grid_badge.setText(f"{len(songs)} Tracks")
         self._update_novelty_metrics()
         for s in songs:
             if s.get("title"):
@@ -3112,19 +3114,19 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
         is_en = self.current_lang == "English"
         if is_en:
             self.btn_filter_all.setText(f"All ({total})")
-            self.btn_filter_fav.setText(f"⭐ Favorites ({favs})")
-            self.btn_filter_uncopied.setText(f"⏳ Uncopied ({uncopied})")
-            self.btn_filter_copied.setText(f"✓ Copied ({copied})")
+            self.btn_filter_fav.setText(f"⭐ Fav ({favs})")
+            self.btn_filter_uncopied.setText(f"⏳ Queue ({uncopied})")
+            self.btn_filter_copied.setText(f"✓ Done ({copied})")
         elif is_kh:
             self.btn_filter_all.setText(f"ទាំងអស់ ({total})")
             self.btn_filter_fav.setText(f"⭐ ផ្កាយ ({favs})")
-            self.btn_filter_uncopied.setText(f"⏳ មិនទាន់ Copy ({uncopied})")
-            self.btn_filter_copied.setText(f"✓ បាន Copy ({copied})")
+            self.btn_filter_uncopied.setText(f"⏳ រង់ចាំ ({uncopied})")
+            self.btn_filter_copied.setText(f"✓ រួចរាល់ ({copied})")
         else:
-            self.btn_filter_all.setText(f"All / ទាំងអស់ ({total})")
-            self.btn_filter_fav.setText(f"⭐ Favorites ({favs})")
-            self.btn_filter_uncopied.setText(f"⏳ Uncopied ({uncopied})")
-            self.btn_filter_copied.setText(f"✓ Copied ({copied})")
+            self.btn_filter_all.setText(f"All ({total})")
+            self.btn_filter_fav.setText(f"⭐ Fav ({favs})")
+            self.btn_filter_uncopied.setText(f"⏳ Queue ({uncopied})")
+            self.btn_filter_copied.setText(f"✓ Done ({copied})")
 
     def _on_search_text_changed(self, text: str):
         self.search_query = text.strip().lower()
@@ -3975,7 +3977,7 @@ Stand up for the stories never told!"""
             if hasattr(self, "lbl_memory_badge"):
                 self.lbl_memory_badge.setStyleSheet(f"font-size: 8.5px; font-weight: 700; color: {t['text_secondary']}; background: {t['bg_card_alt']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 1px 5px;")
             if hasattr(self, "btn_clear_memory"):
-                self.btn_clear_memory.setStyleSheet(f"font-size: 8.5px; font-weight: 700; color: {t['text_muted']}; background: {t['bg_card_alt']}; border: 1px solid {t['border']}; border-radius: 4px;")
+                self.btn_clear_memory.setStyleSheet(f"font-size: 9px; font-weight: 700; color: {t['text_muted']}; background: {t['bg_card_alt']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 0px;")
             if hasattr(self, "btn_toggle_sidebar"):
                 self.btn_toggle_sidebar.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 10.5px; border: 1px solid {t['border']}; border-radius: 4px; padding: 4px 8px;")
             if hasattr(self, "btn_studio_tools"):
@@ -4068,7 +4070,7 @@ Stand up for the stories never told!"""
             if hasattr(self, "lbl_memory_badge"):
                 self.lbl_memory_badge.setStyleSheet("font-size: 8.5px; font-weight: 700; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; padding: 1px 5px;")
             if hasattr(self, "btn_clear_memory"):
-                self.btn_clear_memory.setStyleSheet("font-size: 8.5px; font-weight: 700; color: #475569; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px;")
+                self.btn_clear_memory.setStyleSheet("font-size: 9px; font-weight: 700; color: #475569; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0px;")
             if hasattr(self, "btn_toggle_sidebar"):
                 self.btn_toggle_sidebar.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 10.5px; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 8px;")
             if hasattr(self, "btn_studio_tools"):
