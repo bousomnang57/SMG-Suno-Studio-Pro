@@ -3,3 +3,6 @@ google-genai>=2.0.0
 fpdf2>=2.7.0
 pywin32>=306
 edge-tts>=6.1.0
+Pillow>=10.0.0
+numpy>=1.26.0
+certifi>=2024.2.2

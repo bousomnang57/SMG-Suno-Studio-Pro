@@ -64,9 +64,9 @@ Every stage shares live **Song Project State** (Title, Lyrics, Multi-Takes, Suno
 ```
 Lyric AI Writer/
 ├── main.py                          # High-DPI PyQt6 launcher, Khmer font loader & theme bootstrap
-├── build_installer.py               # Automated PyInstaller + Inno Setup installer builder
-├── installer.iss                    # Inno Setup Windows installer script
-├── SMG_Suno_AI_Lyric_Writer.spec    # PyInstaller bundle specification
+├── build_dist.bat                   # Automated PyInstaller + smoke-test + Inno Setup release builder
+├── installer.iss                    # Inno Setup Windows installer script (.smgsong & Khmer fonts)
+├── SMG_Suno_Studio_Pro.spec         # Portable PyInstaller bundle specification (DLLs, SSL, QtMultimedia)
 ├── requirements.txt                 # Python dependencies
 ├── assets/                          # Studio icons, logo, and bundled Khmer/UI fonts
 └── app/
@@ -148,10 +148,11 @@ python main.py
 3. Click **Test Connection** and **Save Settings**. *(Demo & offline songwriting tools also work without an API key.)*
 
 ### 3. Build Standalone Windows Executable & Installer
+Build both the portable `.exe` (with automated frozen smoke-test) and the Windows Inno Setup installer (`dist_installer/SMG_Suno_Studio_Pro_v2.2.0_Setup.exe`):
 ```bash
-pyinstaller --noconfirm SMG_Suno_AI_Lyric_Writer.spec
+build_dist.bat
 ```
-Or build the complete Windows Setup installer via Inno Setup:
+Or run PyInstaller directly:
 ```bash
-python build_installer.py
+python -m PyInstaller --noconfirm --clean SMG_Suno_Studio_Pro.spec
 ```

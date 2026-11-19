@@ -1,24 +1,23 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "name": "SMG Suno Studio Pro",
-  "title_kh": "SMG Suno Studio Pro v2.1.0 — កំណែអាប់ដេតថ្មី បង្កើនល្បឿន និងបន្ថែមមុខងារពិសេស",
-  "title_en": "SMG Suno Studio Pro v2.1.0 — Major Performance & Feature Release",
-  "release_date": "2026-11-05",
+  "title_kh": "SMG Suno Studio Pro v2.2.0 — ស្ទូឌីយោនិពន្ធចម្រៀងអាជីព ៥ ផ្នែក និងប្រព័ន្ធគ្មានទំនុកស្ទួន",
+  "title_en": "SMG Suno Studio Pro v2.2.0 — Complete 5-Stage Pro DAW Studio & Zero-Repeat Human Lyric Engine",
+  "release_date": "2026-11-19",
   "min_os_version": "Windows 10 / 11 (64-bit)",
-  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_v2.0_Setup.exe",
-  "installer_name": "SMG_Suno_Studio_Pro_v2.0_Setup.exe",
-  "file_size_mb": 68.8,
+  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_v2.2.0_Setup.exe",
+  "installer_name": "SMG_Suno_Studio_Pro_v2.2.0_Setup.exe",
+  "file_size_mb": 64.8,
   "changelog_kh": [
-    "🚀 បន្ថែមមុខងារ Live Auto-Updater៖ ជូនដំណឹង និង Restart ដំឡើងភ្លាមៗដោយស្វ័យប្រវត្តិ",
-    "🎨 គាំទ្រ Studio Themes ទាំង 5 ជាមួយកម្រិត Contrast ច្បាស់ និង Font ខ្មែរស្អាតឥតខ្ចោះ",
-    "⚡ បង្កើនល្បឿន Batch Generation និង Song DNA Cloner ឲ្យកាន់តែលឿន",
-    "🛠️ ជួសជុលបញ្ហា Font Glyph លើ Windows មួយចំនួន និងរក្សាទម្រង់ស្អាតគ្រប់ Window Resolution"
+    "💾 បន្ថែមប្រព័ន្ធរក្សាទុកឯកសារគម្រោង .smgsong (Ctrl+S / Ctrl+O) ភ្ជាប់ទំនុកច្រៀង, Multi-Takes, BPM, Key និង Style Prompt",
+    "🧠 ប្រព័ន្ធ Batch Pro គ្មានបទស្ទួន (Persistent Memory Vault) និងរបៀបនិពន្ធបែបមនុស្សពិត (Auto-Humanize + Anti-Cliché)",
+    "✍️ ធ្វើទំនើបកម្ម Wizard, Visual Arranger, Editor និង Clone ជាមួយ DAW Section Jump, A/B Compare, Custom Presets និង Originality Meter",
+    "🛡️ បញ្ចូល Runtime DLLs, SSL Certificates និង Khmer Fonts ពេញលេញ ដើម្បីដំណើរការរលូនគ្មាន Error លើគ្រប់កុំព្យូទ័រ Windows"
   ],
   "changelog_en": [
-    "🚀 Added In-App Live Auto-Updater: Instant update notifications & one-click restart install",
-    "🎨 Enhanced all 5 Studio Themes with high-contrast text and crisp DirectWrite Khmer fonts",
-    "⚡ Accelerated Batch Generation and Song DNA Cloner algorithms",
-    "🛠️ Resolved font glyph rendering across diverse Windows versions and screen resolutions"
+    "💾 Native .smgsong Studio Project Save/Open (Ctrl+S / Ctrl+O) with Windows Explorer file association & cross-stage state sync",
+    "🧠 Batch Studio Pro Zero-Repeat Memory Vault, Human Story DNA slots, strict AI-cliché banlist & Auto-Humanize engine",
+    "✍️ Upgraded Wizard, Visual Arranger, Editor & Song DNA Cloner with DAW Section Jump Bar, A/B Take Compare, Custom User Presets, Energy Curve & Originality Meter",
+    "🛡️ Hardened Windows x64 standalone build with bundled VC++ runtime DLLs, SSL certifi bundle, QtMultimedia/PIL/NumPy & Khmer fonts for zero-error execution on any PC"
   ]
 }
-

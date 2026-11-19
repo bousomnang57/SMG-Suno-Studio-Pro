@@ -2055,12 +2055,24 @@ STUDIO_THEMES = {
     },
 }
 
-# Map QSS strings to theme dict
-STUDIO_THEMES["obsidian"]["qss"] = DARK_STUDIO_QSS
-STUDIO_THEMES["cyber_blue"]["qss"] = CYBER_BLUE_STUDIO_QSS
-STUDIO_THEMES["emerald"]["qss"] = EMERALD_STUDIO_QSS
-STUDIO_THEMES["sunset_amber"]["qss"] = SUNSET_AMBER_STUDIO_QSS
-STUDIO_THEMES["canvas_light"]["qss"] = LIGHT_STUDIO_QSS
+# Map QSS strings to theme dict with absolute forward-slash asset paths (safe for frozen .exe & file associations)
+def _resolve_qss_assets(qss: str) -> str:
+    try:
+        from app.config import get_asset_path
+        dark_svg = str(get_asset_path("chevron_down_dark.svg")).replace("\\", "/")
+        light_svg = str(get_asset_path("chevron_down_light.svg")).replace("\\", "/")
+        return (
+            qss.replace('url("assets/chevron_down_dark.svg")', f'url("{dark_svg}")')
+               .replace('url("assets/chevron_down_light.svg")', f'url("{light_svg}")')
+        )
+    except Exception:
+        return qss
+
+STUDIO_THEMES["obsidian"]["qss"] = _resolve_qss_assets(DARK_STUDIO_QSS)
+STUDIO_THEMES["cyber_blue"]["qss"] = _resolve_qss_assets(CYBER_BLUE_STUDIO_QSS)
+STUDIO_THEMES["emerald"]["qss"] = _resolve_qss_assets(EMERALD_STUDIO_QSS)
+STUDIO_THEMES["sunset_amber"]["qss"] = _resolve_qss_assets(SUNSET_AMBER_STUDIO_QSS)
+STUDIO_THEMES["canvas_light"]["qss"] = _resolve_qss_assets(LIGHT_STUDIO_QSS)
 
 def get_theme(theme_id_or_dark=None) -> dict:
     """Resolves theme dictionary with backward-compatible aliases and bool/dict support."""

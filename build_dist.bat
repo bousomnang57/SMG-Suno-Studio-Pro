@@ -1,9 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
+set "APP_VERSION=2.2.0"
+
 echo =====================================================================
-echo    SMG Suno Studio Pro - Production Release Builder
-echo    Builds Standalone Executable and Inno Setup Windows Installer
+echo    SMG Suno Studio Pro v%APP_VERSION% - Production Release Builder
+echo    Builds Portable Standalone EXE + Inno Setup Windows Installer
 echo =====================================================================
 echo.
 
@@ -15,26 +17,31 @@ if not exist "dist_installer" mkdir "dist_installer"
 
 :: 2. Run PyInstaller
 echo [*] Compiling Application with PyInstaller...
-python -m PyInstaller --clean SMG_Suno_Studio_Pro.spec
+python -m PyInstaller --noconfirm --clean SMG_Suno_Studio_Pro.spec
 if %ERRORLEVEL% NEQ 0 (
     echo [!] PyInstaller build failed with error code %ERRORLEVEL%.
-    pause
     exit /b %ERRORLEVEL%
 )
 
-echo.
-echo [*] PyInstaller build successful! Application bundled in:
-echo     dist\SMG Suno Studio Pro\SMG Suno Studio Pro.exe
-echo.
-
-:: Ensure assets directory is also at root of dist bundle for direct shortcut/stylesheet resolution
+:: 3. Mirror assets & version.json at root of dist bundle for icon/shortcut/fallback resolution
 if not exist "dist\SMG Suno Studio Pro\assets" (
     echo [*] Mirroring assets directory to dist bundle root...
     xcopy /E /I /Y "assets" "dist\SMG Suno Studio Pro\assets" >nul
 )
+copy /Y "version.json" "dist\SMG Suno Studio Pro\version.json" >nul
 
+:: 4. Smoke-Test the compiled frozen EXE (verifies zero missing DLLs/imports on clean startup)
+echo [*] Running frozen EXE smoke test...
+set "QT_QPA_PLATFORM=offscreen"
+"dist\SMG Suno Studio Pro\SMG Suno Studio Pro.exe" --smoke-test
+if %ERRORLEVEL% NEQ 0 (
+    echo [!] Frozen EXE smoke test failed with error code %ERRORLEVEL%!
+    exit /b %ERRORLEVEL%
+)
+echo [OK] Frozen EXE booted cleanly across all 5 Studio Modes!
+echo.
 
-:: 3. Detect Inno Setup Compiler
+:: 5. Detect Inno Setup Compiler
 set "ISCC_PATH="
 if exist "C:\Program Files\Inno Setup 7\ISCC.exe" set "ISCC_PATH=C:\Program Files\Inno Setup 7\ISCC.exe"
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC_PATH=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
@@ -46,29 +53,25 @@ if "%ISCC_PATH%"=="" (
 )
 
 if "%ISCC_PATH%"=="" (
-    echo [!] Inno Setup compiler (ISCC.exe) not found in standard paths.
+    echo [!] Inno Setup compiler ISCC.exe not found in standard paths.
     echo     Please compile 'installer.iss' manually via Inno Setup Compiler GUI.
-    pause
     exit /b 0
 )
 
-:: 4. Compile Installer
+:: 6. Compile Installer
 echo [*] Compiling Inno Setup Windows Installer using:
 echo     "%ISCC_PATH%"
 "%ISCC_PATH%" installer.iss
-
 if %ERRORLEVEL% NEQ 0 (
     echo [!] Inno Setup compilation failed with error code %ERRORLEVEL%.
-    pause
     exit /b %ERRORLEVEL%
 )
 
 echo.
 echo =====================================================================
 echo    BUILD COMPLETE!
-echo    Windows Installer created at:
-echo    dist_installer\SMG_Suno_Studio_Pro_v2.0_Setup.exe
+echo    Portable EXE : dist\SMG Suno Studio Pro\SMG Suno Studio Pro.exe
+echo    Setup File   : dist_installer\SMG_Suno_Studio_Pro_v%APP_VERSION%_Setup.exe
 echo =====================================================================
 echo.
-pause
-
+exit /b 0

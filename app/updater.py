@@ -7,6 +7,7 @@ and seamless detached restart & install on Windows.
 import os
 import sys
 import re
+import ssl
 import json
 import time
 import tempfile
@@ -19,6 +20,18 @@ from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QApplication
 
 from app.config import APP_VERSION, DEFAULT_UPDATE_URL
+
+
+def _get_ssl_context():
+    """Build an SSL context backed by bundled certifi CA certs so HTTPS works on all Windows PCs."""
+    try:
+        import certifi
+        cafile = certifi.where()
+        if cafile and os.path.exists(cafile):
+            return ssl.create_default_context(cafile=cafile)
+    except Exception:
+        pass
+    return ssl.create_default_context()
 
 def parse_version(ver_str: str) -> tuple[int, ...]:
     """
@@ -75,7 +88,7 @@ def resolve_github_asset_url(download_url: str) -> str:
                 "Accept": "application/vnd.github.v3+json"
             }
         )
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=8, context=_get_ssl_context()) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             assets = data.get("assets", [])
             for asset in assets:
@@ -116,7 +129,7 @@ class UpdateCheckWorker(QThread):
                     "Pragma": "no-cache"
                 }
             )
-            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+            with urllib.request.urlopen(req, timeout=self.timeout, context=_get_ssl_context()) as response:
                 if response.status != 200:
                     self.check_failed.emit(f"HTTP Error {response.status}: Failed to reach update server")
                     return
@@ -180,7 +193,7 @@ class UpdateDownloadWorker(QThread):
             start_time = time.time()
             bytes_read = 0
 
-            with urllib.request.urlopen(req, timeout=20) as response:
+            with urllib.request.urlopen(req, timeout=20, context=_get_ssl_context()) as response:
                 total_bytes = int(response.headers.get("Content-Length", 0))
                 chunk_size = 64 * 1024  # 64 KB chunks
 
