@@ -223,10 +223,16 @@ class MainWindow(QMainWindow):
         self.lbl_editor_status.setObjectName("lblEditorWorkbenchStatus")
         wb_layout.addWidget(self.lbl_editor_status)
 
-        # Quick Copy Suno Button
-        self.btn_suno_copy_quick = QPushButton("📋 Quick Copy for Suno")
+        # Dual Suno Quick-Copy Capsule (1. Style + 2. Lyrics)
+        self.btn_suno_copy_style = QPushButton("1. Copy Style")
+        self.btn_suno_copy_style.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_suno_copy_style.setToolTip("Copy active Suno/Udio Style Prompt to clipboard")
+        self.btn_suno_copy_style.clicked.connect(self._quick_copy_suno_style)
+        wb_layout.addWidget(self.btn_suno_copy_style)
+
+        self.btn_suno_copy_quick = QPushButton("2. Copy Lyrics")
         self.btn_suno_copy_quick.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_suno_copy_quick.setToolTip("Copy formatted lyrics directly to clipboard for Suno AI prompt [Ctrl+Shift+C]")
+        self.btn_suno_copy_quick.setToolTip("Copy formatted lyrics directly to clipboard for Suno AI [Ctrl+Shift+C]")
         self.btn_suno_copy_quick.clicked.connect(self._quick_copy_suno)
         wb_layout.addWidget(self.btn_suno_copy_quick)
 
@@ -378,6 +384,23 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _quick_copy_suno_style(self):
+        style = ""
+        if hasattr(self, "tools_panel") and hasattr(self.tools_panel, "suno_output"):
+            style = self.tools_panel.suno_output.toPlainText().strip()
+        if not style and hasattr(self, "visual_studio") and hasattr(self.visual_studio, "txt_suno_prompt"):
+            style = self.visual_studio.txt_suno_prompt.toPlainText().strip()
+        if not style:
+            params = self.generator_panel.get_generation_parameters() if hasattr(self, "generator_panel") else {}
+            style = f"{params.get('genre', 'Pop')}, {params.get('mood', 'Euphoric')}, {params.get('bpm', '120 BPM')}"
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(style)
+            self.status_bar.showMessage(f"✓ Style Prompt copied for Suno AI ({len(style)} chars)!", 3500)
+            if hasattr(self, "btn_suno_copy_style"):
+                self.btn_suno_copy_style.setText("✓ Style Copied!")
+                QTimer.singleShot(1500, lambda: self.btn_suno_copy_style.setText("1. Copy Style") if hasattr(self, "btn_suno_copy_style") else None)
+
     def _quick_copy_suno(self):
         lyrics = self.editor_panel.get_lyrics().strip()
         if not lyrics:
@@ -388,9 +411,8 @@ class MainWindow(QMainWindow):
             clipboard.setText(lyrics)
             self.status_bar.showMessage("✓ Lyrics copied to clipboard for Suno AI! Ready to paste.", 3500)
             if hasattr(self, "btn_suno_copy_quick"):
-                orig = self.btn_suno_copy_quick.text()
-                self.btn_suno_copy_quick.setText("✓ Copied!")
-                QTimer.singleShot(1500, lambda: self.btn_suno_copy_quick.setText(orig))
+                self.btn_suno_copy_quick.setText("✓ Lyrics Copied!")
+                QTimer.singleShot(1500, lambda: self.btn_suno_copy_quick.setText("2. Copy Lyrics") if hasattr(self, "btn_suno_copy_quick") else None)
 
     def _on_ribbon_action_clicked(self):
         mode = self.stack.currentIndex()
@@ -895,6 +917,21 @@ class MainWindow(QMainWindow):
                         border-color: #38bdf8;
                     }}
                 """)
+                if hasattr(self, "btn_suno_copy_style"):
+                    self.btn_suno_copy_style.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {btn_bg};
+                            color: {accent};
+                            border: 1px solid {accent_sec};
+                            font-weight: 700;
+                            font-size: 11px;
+                            padding: 4px 10px;
+                            border-radius: 6px;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {btn_hover};
+                        }}
+                    """)
                 self.btn_suno_copy_quick.setStyleSheet(f"""
                     QPushButton {{
                         background-color: {btn_bg};
@@ -1105,6 +1142,22 @@ class MainWindow(QMainWindow):
                         border-color: #0369a1;
                     }
                 """)
+                if hasattr(self, "btn_suno_copy_style"):
+                    self.btn_suno_copy_style.setStyleSheet("""
+                        QPushButton {
+                            background-color: #f5f3ff;
+                            color: #6d28d9;
+                            border: 1px solid #c4b5fd;
+                            font-weight: 700;
+                            font-size: 11px;
+                            padding: 4px 10px;
+                            border-radius: 6px;
+                        }
+                        QPushButton:hover {
+                            background-color: #ede9fe;
+                            border-color: #7c3aed;
+                        }
+                    """)
                 self.btn_suno_copy_quick.setStyleSheet("""
                     QPushButton {
                         background-color: #f0fdf4;
@@ -1453,6 +1506,15 @@ class MainWindow(QMainWindow):
     def _start_generation(self, params: dict):
         if self.current_worker and self.current_worker.isRunning():
             self.current_worker.wait(1000)
+
+        # Sync any style_prompt / bpm provided by Wizard or Visual Studio into studio state
+        if params.get("style_prompt") or params.get("bpm"):
+            self._sync_style_and_production_state(
+                style_prompt=params.get("style_prompt", ""),
+                bpm=params.get("bpm"),
+                key=params.get("key", ""),
+                genre=params.get("genre", ""),
+            )
 
         self.generator_panel.set_loading(True)
         self.status_bar.showMessage(f"Composing {params.get('genre')} lyrics with Gemini...")

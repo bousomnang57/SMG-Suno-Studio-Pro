@@ -175,7 +175,9 @@ class SongCreationWizardView(QWidget):
         self.current_step = step_idx
         self.step_stack.setCurrentIndex(step_idx)
         self._update_stepper()
-        if step_idx == 3:
+        if step_idx == 2:
+            self._refresh_step3_summary()
+        elif step_idx == 3:
             # Sync teleprompter when opening step 4
             self._sync_teleprompter()
         elif step_idx == 4:
@@ -300,8 +302,83 @@ class SongCreationWizardView(QWidget):
         input_row.addWidget(self.combo_lang, stretch=1)
 
         layout.addLayout(input_row)
+
+        # Human Story DNA & Vocal Persona Row
+        dna_row = QHBoxLayout()
+        dna_row.setSpacing(8)
+
+        self.lbl_w_vocal_tag = QLabel("🎤 Vocal:")
+        self.lbl_w_vocal_tag.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b;")
+        dna_row.addWidget(self.lbl_w_vocal_tag)
+
+        self.combo_w_vocal = QComboBox()
+        self.combo_w_vocal.addItems([
+            "Auto Vocal",
+            "Male Lead Vocal",
+            "Female Lead Vocal",
+            "Duet (Male + Female)",
+            "Soft Intimate Whisper",
+            "Raspy Soulful Belt",
+        ])
+        self.combo_w_vocal.setStyleSheet("padding: 5px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        dna_row.addWidget(self.combo_w_vocal, stretch=1)
+
+        self.lbl_w_pov_tag = QLabel("👁️ POV:")
+        self.lbl_w_pov_tag.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b;")
+        dna_row.addWidget(self.lbl_w_pov_tag)
+
+        self.combo_w_pov = QComboBox()
+        self.combo_w_pov.addItems([
+            "1st Person (I / Me)",
+            "2nd Person (You / Direct)",
+            "Storyteller (3rd Person)",
+            "Dialogue / Call & Response",
+        ])
+        self.combo_w_pov.setStyleSheet("padding: 5px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        dna_row.addWidget(self.combo_w_pov, stretch=1)
+
+        self.btn_w_human_mode = QPushButton("👤 Anti-Cliché Human: ON")
+        self.btn_w_human_mode.setCheckable(True)
+        self.btn_w_human_mode.setChecked(True)
+        self.btn_w_human_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_human_mode.setToolTip("Enforce concrete sensory details and ban repetitive AI lyric clichés")
+        self.btn_w_human_mode.toggled.connect(self._on_human_mode_toggled)
+        self.btn_w_human_mode.setStyleSheet("background: #065f46; color: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+        dna_row.addWidget(self.btn_w_human_mode)
+
+        self.btn_w_surprise = QPushButton("🎲 Surprise Concept")
+        self.btn_w_surprise.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_surprise.setToolTip("Roll a brand-new, non-repeating human story concept & mood")
+        self.btn_w_surprise.clicked.connect(self._roll_surprise_concept)
+        self.btn_w_surprise.setStyleSheet("background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+        dna_row.addWidget(self.btn_w_surprise)
+
+        layout.addLayout(dna_row)
         layout.addStretch()
         return widget
+
+    def _on_human_mode_toggled(self, checked: bool):
+        if checked:
+            self.btn_w_human_mode.setText("👤 Anti-Cliché Human: ON")
+            self.btn_w_human_mode.setStyleSheet("background: #065f46; color: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+        else:
+            self.btn_w_human_mode.setText("👤 Anti-Cliché Human: OFF")
+            self.btn_w_human_mode.setStyleSheet("background: #334155; color: #cbd5e1; border: 1px solid #475569; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+
+    def _roll_surprise_concept(self):
+        from app.anti_cliche_engine import AntiClicheEngine
+        import random
+        lang = "Khmer" if ("Khmer" in self.state_language or "ខ្មែរ" in self.state_language) else ("Both" if "Both" in self.state_language else "English")
+        concept = AntiClicheEngine.roll_fresh_concept(lang)
+        fresh_text = f"{concept.get('theme', '')} — {concept.get('seed', '')}".strip(" —")
+        if fresh_text:
+            self.input_theme.setText(fresh_text)
+        if self.combo_mood.count() > 0:
+            self.combo_mood.setCurrentIndex(random.randrange(self.combo_mood.count()))
+        if self.combo_w_pov.count() > 0:
+            self.combo_w_pov.setCurrentIndex(random.randrange(self.combo_w_pov.count()))
+        self.btn_w_surprise.setText("✨ Fresh Idea Rolled!")
+        QTimer.singleShot(1400, lambda: self.btn_w_surprise.setText("🎲 Surprise Concept") if hasattr(self, "btn_w_surprise") else None)
 
     def _select_genre_card(self, genre_key: str, active_btn: QPushButton):
         self.state_genre = genre_key
@@ -579,8 +656,9 @@ class SongCreationWizardView(QWidget):
         lbl_h_title.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #64748b;")
         h_layout.addWidget(lbl_h_title)
 
-        self.lbl_w_hit_score = QLabel("Hit Score: 92% | AI Vocal Safety: 100%\n✓ Studio Ready (Zero Slur Risk)")
-        self.lbl_w_hit_score.setStyleSheet("font-weight: 800; font-size: 11px; color: #10b981;")
+        self.lbl_w_hit_score = QLabel("⏳ Awaiting lyrics — generate or type to run live studio scan")
+        self.lbl_w_hit_score.setWordWrap(True)
+        self.lbl_w_hit_score.setStyleSheet("font-weight: 700; font-size: 11px; color: #64748b;")
         h_layout.addWidget(self.lbl_w_hit_score)
 
         self.btn_w_open_hit_inspector = QPushButton("🔍 ពិនិត្យ Hit Potential & Vocal Safety លម្អិត")
@@ -618,6 +696,22 @@ class SongCreationWizardView(QWidget):
 
         right_col.addLayout(t_row)
 
+        # Live 2-Step Suno Style Strip right inside Step 3
+        s3_style_row = QHBoxLayout()
+        s3_style_row.setSpacing(6)
+        self.txt_w_step3_style = QLineEdit()
+        self.txt_w_step3_style.setPlaceholderText("Live Suno Style Prompt auto-built from Steps 1 & 2...")
+        self.txt_w_step3_style.setStyleSheet("background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 5px; padding: 4px 8px; font-size: 10.5px;")
+        s3_style_row.addWidget(self.txt_w_step3_style, stretch=1)
+
+        self.btn_w_step3_copy_style = QPushButton("1. Copy Style")
+        self.btn_w_step3_copy_style.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_step3_copy_style.setStyleSheet("background: #7c3aed; color: #ffffff; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+        self.btn_w_step3_copy_style.clicked.connect(self._copy_step3_style_prompt)
+        s3_style_row.addWidget(self.btn_w_step3_copy_style)
+
+        right_col.addLayout(s3_style_row)
+
         self.txt_preview = QTextEdit()
         self.txt_preview.setPlaceholderText("ទំនុកច្រៀងពេញលេញ (Intro, វគ្គ ១, វគ្គ ២, បន្ទរ, Outro) នឹងបង្ហាញនៅទីនេះបន្ទាប់ពីចុច Generate...")
         self.txt_preview.setFont(QFont("Segoe UI", 11))
@@ -643,14 +737,47 @@ class SongCreationWizardView(QWidget):
         cleaned = "\n".join(l.strip() for l in cleaned.split("\n") if l.strip())
         self.txt_preview.setPlainText(cleaned)
 
+    def _build_wizard_style_prompt(self) -> str:
+        mood_clean = self.combo_mood.currentText().split("(")[-1].strip(")") if hasattr(self, "combo_mood") else self.state_mood
+        vocal = self.combo_w_vocal.currentText() if hasattr(self, "combo_w_vocal") else "Auto Vocal"
+        vocal_tag = "" if vocal.startswith("Auto") else f", {vocal.lower()}"
+        style = f"{self.state_genre.lower()}, {self.state_bpm} bpm, {mood_clean.lower()}{vocal_tag}, organic studio mix"
+        return style[:180]
+
+    def _refresh_step3_summary(self):
+        vocal = self.combo_w_vocal.currentText() if hasattr(self, "combo_w_vocal") else "Auto"
+        pov = self.combo_w_pov.currentText().split("(")[0].strip() if hasattr(self, "combo_w_pov") else "1st Person"
+        if hasattr(self, "lbl_gen_summary"):
+            self.lbl_gen_summary.setText(f"គំនិតបទ: {self.state_genre} • {self.state_bpm} BPM • {vocal} • {pov}")
+        if hasattr(self, "txt_w_step3_style"):
+            self.txt_w_step3_style.setText(self._build_wizard_style_prompt())
+
+    def _copy_step3_style_prompt(self):
+        style = self.txt_w_step3_style.text().strip() if hasattr(self, "txt_w_step3_style") else self._build_wizard_style_prompt()
+        if style:
+            QApplication.clipboard().setText(style)
+            self.btn_w_step3_copy_style.setText("✓ Style Copied!")
+            QTimer.singleShot(1500, lambda: self.btn_w_step3_copy_style.setText("1. Copy Style") if hasattr(self, "btn_w_step3_copy_style") else None)
+
     def _on_lyrics_edited(self):
         lyrics = self.txt_preview.toPlainText()
         self.current_lyrics = lyrics
-        if len(lyrics) > 50:
+        if len(lyrics.strip()) > 30:
+            from app.anti_cliche_engine import AntiClicheEngine
             analysis = HitAnalyzer.analyze(lyrics, self.state_bpm)
-            score = analysis.get("hit_score", 90)
+            score = analysis.get("hit_score", 85)
             safety = analysis.get("safety_score", 100)
-            self.lbl_w_hit_score.setText(f"Hit Score: {score}% | AI Vocal Safety: {safety}%\n✓ Studio Ready (Zero Slur Risk)")
+            nov = AntiClicheEngine.calculate_novelty_score(self.current_title or "", lyrics, self.state_language)
+            cliche_cnt = len(nov.get("cliche_hits", []))
+            cliche_msg = "✓ 0 Clichés (Human Authentic)" if cliche_cnt == 0 else f"⚠️ {cliche_cnt} AI Cliché(s) Found"
+            self.lbl_w_hit_score.setText(
+                f"Hit: {score}% | Vocal Safety: {safety}% | Novelty: {nov.get('score', 90)}%\n{cliche_msg}"
+            )
+            color = "#10b981" if cliche_cnt == 0 else "#f59e0b"
+            self.lbl_w_hit_score.setStyleSheet(f"font-weight: 800; font-size: 10.5px; color: {color};")
+        else:
+            self.lbl_w_hit_score.setText("⏳ Awaiting lyrics — generate or type to run live studio scan")
+            self.lbl_w_hit_score.setStyleSheet("font-weight: 700; font-size: 11px; color: #64748b;")
 
     def _open_hit_dialog(self):
         lyrics = self.txt_preview.toPlainText().strip()
@@ -674,6 +801,18 @@ class SongCreationWizardView(QWidget):
         theme = self.input_theme.text().strip() or "A bittersweet love story"
         mood = self.combo_mood.currentText()
         structure = self.combo_w_structure.currentText() if hasattr(self, "combo_w_structure") else self.state_structure
+        vocal = self.combo_w_vocal.currentText() if hasattr(self, "combo_w_vocal") else "Auto Vocal"
+        pov = self.combo_w_pov.currentText() if hasattr(self, "combo_w_pov") else "1st Person (I / Me)"
+        human_on = self.btn_w_human_mode.isChecked() if hasattr(self, "btn_w_human_mode") else True
+        style_prompt = self._build_wizard_style_prompt()
+        if hasattr(self, "txt_w_step3_style"):
+            self.txt_w_step3_style.setText(style_prompt)
+
+        human_rule = (
+            " STRICT HUMAN SONGWRITING: Use concrete everyday sensory details, conversational phrasing, "
+            "natural singer breath pauses, and ZERO generic AI clichés."
+            if human_on else ""
+        )
 
         params = {
             "genre": self.state_genre,
@@ -684,7 +823,11 @@ class SongCreationWizardView(QWidget):
             "structure": structure,
             "rhyme": self.state_rhyme,
             "bpm": f"{self.state_bpm} BPM",
-            "user_notes": f"Write authentic professional lyrics with vivid poetic metaphors, chords: {self.state_chords}, tempo {self.state_bpm} BPM"
+            "style_prompt": style_prompt,
+            "user_notes": (
+                f"Vocal delivery: {vocal}. Perspective: {pov}. Chords: {self.state_chords}, tempo {self.state_bpm} BPM."
+                f"{human_rule}"
+            )
         }
         self.btn_wizard_generate.setText("⏳ កំពុងបង្កើតជាមួយ Gemini...")
         self.btn_wizard_generate.setEnabled(False)
@@ -941,8 +1084,12 @@ class SongCreationWizardView(QWidget):
         return widget
 
     def _sync_export_step(self):
-        style = f"{self.state_genre.lower()}, {self.state_bpm} bpm, {self.state_mood.split('(')[-1].strip(')')}, acoustic guitar, emotive strings, studio mix"
-        self.txt_suno_style.setText(style[:120])
+        style = (
+            self.txt_w_step3_style.text().strip()
+            if hasattr(self, "txt_w_step3_style") and self.txt_w_step3_style.text().strip()
+            else self._build_wizard_style_prompt()
+        )
+        self.txt_suno_style.setText(style)
 
     def _copy_style_prompt(self):
         style = self.txt_suno_style.text().strip()
@@ -1094,6 +1241,16 @@ class SongCreationWizardView(QWidget):
                 self.combo_mood.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 6px; font-size: 11.5px;")
             if hasattr(self, 'combo_lang'):
                 self.combo_lang.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 6px; font-size: 11.5px;")
+            for w_cb in [getattr(self, 'combo_w_vocal', None), getattr(self, 'combo_w_pov', None)]:
+                if w_cb:
+                    w_cb.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 5px 6px; font-size: 11px;")
+            for w_lbl in [getattr(self, 'lbl_w_vocal_tag', None), getattr(self, 'lbl_w_pov_tag', None)]:
+                if w_lbl:
+                    w_lbl.setStyleSheet(f"font-size: 11px; font-weight: 700; color: {text_sec};")
+            if hasattr(self, 'btn_w_surprise'):
+                self.btn_w_surprise.setStyleSheet(f"background: {btn_bg}; color: {accent}; border: 1px solid {accent_sec}; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+            if hasattr(self, 'txt_w_step3_style'):
+                self.txt_w_step3_style.setStyleSheet(f"background: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 5px; padding: 4px 8px; font-size: 10.5px;")
 
             # Step 2 Group Boxes & Inputs
             gb_qss_dark = f"""
@@ -1247,6 +1404,16 @@ class SongCreationWizardView(QWidget):
                 self.combo_mood.setStyleSheet("background: #ffffff; color: #0f172a; padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
             if hasattr(self, 'combo_lang'):
                 self.combo_lang.setStyleSheet("background: #ffffff; color: #0f172a; padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
+            for w_cb in [getattr(self, 'combo_w_vocal', None), getattr(self, 'combo_w_pov', None)]:
+                if w_cb:
+                    w_cb.setStyleSheet("background: #ffffff; color: #0f172a; padding: 5px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px;")
+            for w_lbl in [getattr(self, 'lbl_w_vocal_tag', None), getattr(self, 'lbl_w_pov_tag', None)]:
+                if w_lbl:
+                    w_lbl.setStyleSheet("font-size: 11px; font-weight: 700; color: #1e293b;")
+            if hasattr(self, 'btn_w_surprise'):
+                self.btn_w_surprise.setStyleSheet("background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+            if hasattr(self, 'txt_w_step3_style'):
+                self.txt_w_step3_style.setStyleSheet("background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 5px; padding: 4px 8px; font-size: 10.5px;")
 
             # Step 2 Group Boxes & Inputs
             gb_qss_light = """

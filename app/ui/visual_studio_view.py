@@ -4,10 +4,12 @@ Provides dynamic clickable pills for 30+ World Genres, Khmer Storylines,
 Khmer Traditional Instruments, Master Sound Presets, and a Live Suno Formula Card.
 """
 
+import json
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QScrollArea, QFrame, QGridLayout,
-    QComboBox, QApplication
+    QComboBox, QApplication, QInputDialog, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from app.music_data import VISUAL_GENRE_PILLS, KHMER_STUDIO_TAGS, LANGUAGES, ENGLISH_STUDIO_TAGS
@@ -745,6 +747,35 @@ class VisualStudioView(QWidget):
             preset_grid.addWidget(p_btn, row, col)
 
         p_layout.addLayout(preset_grid)
+
+        # Custom User Presets Bar (Save / Recall / Delete)
+        my_p_row = QHBoxLayout()
+        my_p_row.setSpacing(3)
+        self.combo_user_presets = QComboBox()
+        self.combo_user_presets.setFixedHeight(22)
+        self.combo_user_presets.setStyleSheet("padding: 1px 4px; font-size: 9.5px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px;")
+        self.combo_user_presets.currentIndexChanged.connect(self._on_user_preset_selected)
+        my_p_row.addWidget(self.combo_user_presets, stretch=1)
+
+        self.btn_save_user_preset = QPushButton("⭐ Save")
+        self.btn_save_user_preset.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_user_preset.setToolTip("Save current Genre, Mood, Key, BPM & Suno Style as a reusable custom preset")
+        self.btn_save_user_preset.setFixedHeight(22)
+        self.btn_save_user_preset.setStyleSheet("background-color: #fefce8; color: #854d0e; border: 1px solid #fde047; border-radius: 4px; padding: 1px 6px; font-size: 9px; font-weight: 700;")
+        self.btn_save_user_preset.clicked.connect(self._save_custom_preset)
+        my_p_row.addWidget(self.btn_save_user_preset)
+
+        self.btn_del_user_preset = QPushButton("🗑")
+        self.btn_del_user_preset.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_del_user_preset.setToolTip("Delete selected custom preset")
+        self.btn_del_user_preset.setFixedSize(22, 22)
+        self.btn_del_user_preset.setStyleSheet("background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; font-size: 9px; font-weight: 700; padding: 0px;")
+        self.btn_del_user_preset.clicked.connect(self._delete_custom_preset)
+        my_p_row.addWidget(self.btn_del_user_preset)
+
+        p_layout.addLayout(my_p_row)
+        self._load_user_presets_list()
+
         layout.addWidget(self.preset_frame)
 
         # G, M, I, V, C rows
@@ -968,6 +999,41 @@ class VisualStudioView(QWidget):
         m_inner.addWidget(self.btn_copy_template)
 
         layout.addWidget(self.macro_box)
+
+        # ── Interactive 6-Stage Song Energy Curve Strip ──
+        self.energy_frame = QFrame()
+        self.energy_frame.setStyleSheet("background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 3px;")
+        e_outer = QVBoxLayout(self.energy_frame)
+        e_outer.setContentsMargins(4, 3, 4, 3)
+        e_outer.setSpacing(3)
+
+        self.lbl_energy_head = QLabel("📊 Song Energy Curve (Click section to cycle Soft ➔ Build ➔ Peak ➔ Drop):")
+        self.lbl_energy_head.setStyleSheet("font-weight: 700; font-size: 9px; color: #475569; border: none; background: transparent;")
+        e_outer.addWidget(self.lbl_energy_head)
+
+        e_row = QHBoxLayout()
+        e_row.setSpacing(3)
+        self.energy_levels = ["Soft", "Build", "Peak", "Drop"]
+        self.section_energy = {
+            "Intro": "Soft",
+            "Verse": "Build",
+            "Pre": "Build",
+            "Chorus": "Peak",
+            "Bridge": "Soft",
+            "Outro": "Drop",
+        }
+        self.energy_btns = {}
+        for sec_name, init_lvl in self.section_energy.items():
+            eb = QPushButton(f"{sec_name}\n{init_lvl}")
+            eb.setCursor(Qt.CursorShape.PointingHandCursor)
+            eb.setFixedHeight(32)
+            eb.clicked.connect(lambda _, s=sec_name: self._cycle_section_energy(s))
+            self.energy_btns[sec_name] = eb
+            e_row.addWidget(eb, stretch=1)
+        e_outer.addLayout(e_row)
+        self._refresh_energy_buttons()
+        layout.addWidget(self.energy_frame)
+
         layout.addStretch()
 
         self.formula_scroll.setWidget(scroll_inner)
@@ -1295,10 +1361,11 @@ class VisualStudioView(QWidget):
             if len(optimized) > 195:
                 optimized = optimized[:192] + "..."
 
+        optimized = self._dedupe_and_trim_tags(optimized, limit)
         self.txt_suno_prompt.setText(optimized)
         self._on_prompt_text_changed()
         if hasattr(self, "lbl_macro_status"):
-            self.lbl_macro_status.setText(f"✨ Optimized for {limit} Chars ({len(optimized)} chars)!")
+            self.lbl_macro_status.setText(f"✨ Deduplicated & Fit to {limit}c ({len(optimized)} chars)!")
 
     def _inject_studio_cues(self):
         """Inject Suno v6 / Udio production bracket cues into the prompt."""
@@ -1548,9 +1615,159 @@ We only stop when the race is won!
             if hasattr(self, "lbl_macro_status"):
                 self.lbl_macro_status.setText("📋 Copied Style Prompt to Clipboard!")
 
+    def _dedupe_and_trim_tags(self, prompt_text: str, limit: int) -> str:
+        """Deduplicate comma-separated tags and cleanly fit within engine limit without '...' truncation."""
+        seen = set()
+        parts = []
+        for raw in prompt_text.split(","):
+            tok = raw.strip()
+            if not tok:
+                continue
+            key = tok.lower()
+            if key not in seen:
+                seen.add(key)
+                parts.append(tok)
+        out = []
+        for tok in parts:
+            cand = ", ".join(out + [tok])
+            if len(cand) <= limit:
+                out.append(tok)
+            else:
+                break
+        return ", ".join(out) if out else prompt_text[:limit].rstrip(", ")
+
+    def _user_presets_path(self) -> Path:
+        return Path.home() / ".lyric_ai_writer" / "visual_presets.json"
+
+    def _read_user_presets(self) -> dict:
+        p = self._user_presets_path()
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
+        return {}
+
+    def _write_user_presets(self, presets: dict):
+        p = self._user_presets_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(presets, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def _load_user_presets_list(self):
+        if not hasattr(self, "combo_user_presets"):
+            return
+        presets = self._read_user_presets()
+        self.combo_user_presets.blockSignals(True)
+        self.combo_user_presets.clear()
+        self.combo_user_presets.addItem("⭐ My Custom Presets...", None)
+        for name in sorted(presets.keys()):
+            self.combo_user_presets.addItem(f"★ {name}", name)
+        self.combo_user_presets.blockSignals(False)
+
+    def _save_custom_preset(self):
+        default_name = f"{self.current_genre[:18]} ({self.current_key})"
+        name, ok = QInputDialog.getText(self, "Save Custom Visual Preset", "Preset name:", text=default_name)
+        if not ok or not name.strip():
+            return
+        clean_name = name.strip()
+        presets = self._read_user_presets()
+        presets[clean_name] = {
+            "genre": self.current_genre,
+            "bpm": self.current_bpm,
+            "key": self.current_key,
+            "chords": list(self.current_chords),
+            "prog_name": getattr(self, "current_prog_name", ""),
+            "mood": self.current_mood,
+            "instruments": self.current_instruments,
+            "vocals": self.current_vocals,
+            "story": self.current_story,
+            "language": self.current_language,
+            "prompt": self.txt_suno_prompt.toPlainText().strip(),
+            "negative": self.txt_negative.text().strip() if hasattr(self, "txt_negative") else "",
+            "energy": dict(getattr(self, "section_energy", {})),
+        }
+        self._write_user_presets(presets)
+        self._load_user_presets_list()
+        idx = self.combo_user_presets.findData(clean_name)
+        if idx >= 0:
+            self.combo_user_presets.blockSignals(True)
+            self.combo_user_presets.setCurrentIndex(idx)
+            self.combo_user_presets.blockSignals(False)
+        if hasattr(self, "lbl_macro_status"):
+            self.lbl_macro_status.setText(f"⭐ Saved preset '{clean_name}'!")
+
+    def _on_user_preset_selected(self, idx: int):
+        name = self.combo_user_presets.itemData(idx)
+        if not name:
+            return
+        presets = self._read_user_presets()
+        p = presets.get(name)
+        if not p:
+            return
+        self.current_genre = p.get("genre", self.current_genre)
+        self.current_bpm = p.get("bpm", self.current_bpm)
+        self.current_key = p.get("key", self.current_key)
+        self.current_chords = p.get("chords", self.current_chords)
+        self.current_prog_name = p.get("prog_name", "")
+        self.current_mood = p.get("mood", self.current_mood)
+        self.current_instruments = p.get("instruments", self.current_instruments)
+        self.current_vocals = p.get("vocals", self.current_vocals)
+        self.current_story = p.get("story", self.current_story)
+        self.current_language = p.get("language", self.current_language)
+        if p.get("negative") and hasattr(self, "txt_negative"):
+            self.txt_negative.setText(p["negative"])
+        if isinstance(p.get("energy"), dict) and p["energy"]:
+            self.section_energy.update(p["energy"])
+            self._refresh_energy_buttons()
+        self._update_formula_card()
+        if p.get("prompt"):
+            self.txt_suno_prompt.setPlainText(p["prompt"])
+            self._on_prompt_text_changed()
+        if hasattr(self, "lbl_macro_status"):
+            self.lbl_macro_status.setText(f"★ Loaded custom preset '{name}'")
+
+    def _delete_custom_preset(self):
+        name = self.combo_user_presets.currentData()
+        if not name:
+            return
+        presets = self._read_user_presets()
+        if name in presets:
+            del presets[name]
+            self._write_user_presets(presets)
+            self._load_user_presets_list()
+            if hasattr(self, "lbl_macro_status"):
+                self.lbl_macro_status.setText(f"🗑 Deleted preset '{name}'")
+
+    def _cycle_section_energy(self, section: str):
+        cur = self.section_energy.get(section, "Build")
+        idx = self.energy_levels.index(cur) if cur in self.energy_levels else 0
+        self.section_energy[section] = self.energy_levels[(idx + 1) % len(self.energy_levels)]
+        self._refresh_energy_buttons()
+
+    def _refresh_energy_buttons(self):
+        if not hasattr(self, "energy_btns"):
+            return
+        palette = {
+            "Soft": ("#0f172a", "#38bdf8", "#0284c7") if getattr(self, "is_dark", False) else ("#eff6ff", "#0369a1", "#7dd3fc"),
+            "Build": ("#1e1b4b", "#c084fc", "#7c3aed") if getattr(self, "is_dark", False) else ("#faf5ff", "#7c3aed", "#d8b4fe"),
+            "Peak": ("#450a0a", "#fca5a5", "#ef4444") if getattr(self, "is_dark", False) else ("#fef2f2", "#dc2626", "#fca5a5"),
+            "Drop": ("#064e3b", "#34d399", "#10b981") if getattr(self, "is_dark", False) else ("#ecfdf5", "#047857", "#6ee7b7"),
+        }
+        for sec, btn in self.energy_btns.items():
+            lvl = self.section_energy.get(sec, "Build")
+            bg, fg, bd = palette.get(lvl, palette["Build"])
+            btn.setText(f"{sec}\n{lvl}")
+            btn.setStyleSheet(
+                f"background: {bg}; color: {fg}; border: 1px solid {bd}; "
+                f"border-radius: 4px; font-size: 8px; font-weight: 800; padding: 1px;"
+            )
+
     def get_generation_parameters(self) -> dict:
         style_text = self.txt_suno_prompt.toPlainText().strip()
         neg_text = self.txt_negative.text().strip() if hasattr(self, "txt_negative") else ""
+        energy_map = " ➔ ".join(f"{k}:{v}" for k, v in getattr(self, "section_energy", {}).items())
         return {
             "genre": self.current_genre,
             "region": "Southeast Asia" if "Khmer" in self.current_genre else "Global",
@@ -1563,7 +1780,11 @@ We only stop when the race is won!
             "negative_prompt": neg_text,
             "structure": "Standard Pop / Global Radio (3-Minute Hit)",
             "rhyme": "AABB (Classic Couplets)",
-            "user_notes": f"Style: {style_text}\nKey: {self.current_key}\nChords: {' - '.join(self.current_chords)}\nStoryline: {self.current_story}"
+            "user_notes": (
+                f"Style: {style_text}\nKey: {self.current_key}\n"
+                f"Chords: {' - '.join(self.current_chords)}\n"
+                f"Energy Curve: {energy_map}\nStoryline: {self.current_story}"
+            )
         }
 
     def _emit_generate(self):
@@ -1817,6 +2038,16 @@ We only stop when the race is won!
                 self.btn_copy.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 3px 5px; font-size: 9.5px; font-weight: 600;")
             if hasattr(self, "macro_box"):
                 self.macro_box.setStyleSheet(f"background-color: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 4px;")
+            if hasattr(self, "energy_frame"):
+                self.energy_frame.setStyleSheet(f"background-color: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 6px; padding: 3px;")
+            if hasattr(self, "lbl_energy_head"):
+                self.lbl_energy_head.setStyleSheet(f"font-weight: 700; font-size: 9px; color: {t['text_secondary']}; border: none; background: transparent;")
+            if hasattr(self, "combo_user_presets"):
+                self.combo_user_presets.setStyleSheet(f"padding: 1px 4px; font-size: 9.5px; font-weight: 600; border: 1px solid {t['border']}; border-radius: 4px; background: {t['bg_input']}; color: {t['text_primary']};")
+            if hasattr(self, "btn_save_user_preset"):
+                self.btn_save_user_preset.setStyleSheet("background-color: #422006; color: #fde047; border: 1px solid #a16207; border-radius: 4px; padding: 1px 6px; font-size: 9px; font-weight: 700;")
+            if hasattr(self, "btn_del_user_preset"):
+                self.btn_del_user_preset.setStyleSheet("background-color: #450a0a; color: #fca5a5; border: 1px solid #b91c1c; border-radius: 4px; font-size: 9px; font-weight: 700; padding: 0px;")
             if hasattr(self, "macro_btns"):
                 for b in self.macro_btns:
                     b.setStyleSheet(f"""
@@ -2072,6 +2303,16 @@ We only stop when the race is won!
                 self.btn_copy.setStyleSheet("background-color: #ffffff; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; font-size: 9.5px; font-weight: 600;")
             if hasattr(self, "macro_box"):
                 self.macro_box.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px;")
+            if hasattr(self, "energy_frame"):
+                self.energy_frame.setStyleSheet("background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 3px;")
+            if hasattr(self, "lbl_energy_head"):
+                self.lbl_energy_head.setStyleSheet("font-weight: 700; font-size: 9px; color: #475569; border: none; background: transparent;")
+            if hasattr(self, "combo_user_presets"):
+                self.combo_user_presets.setStyleSheet("padding: 1px 4px; font-size: 9.5px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; background: #ffffff; color: #0f172a;")
+            if hasattr(self, "btn_save_user_preset"):
+                self.btn_save_user_preset.setStyleSheet("background-color: #fefce8; color: #854d0e; border: 1px solid #fde047; border-radius: 4px; padding: 1px 6px; font-size: 9px; font-weight: 700;")
+            if hasattr(self, "btn_del_user_preset"):
+                self.btn_del_user_preset.setStyleSheet("background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 4px; font-size: 9px; font-weight: 700; padding: 0px;")
             if hasattr(self, "macro_btns"):
                 for b in self.macro_btns:
                     b.setStyleSheet("""
@@ -2102,3 +2343,4 @@ We only stop when the race is won!
                 self.btn_batch.setStyleSheet(f"background: {t['accent_gradient']}; color: #ffffff; border: 1px solid {t['border_accent']}; border-radius: 5px; padding: 6px; font-size: 10.5px; font-weight: 700;")
             if hasattr(self, "btn_pack"):
                 self.btn_pack.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 5px; padding: 6px; font-size: 10.5px; font-weight: 700;")
+        self._refresh_energy_buttons()

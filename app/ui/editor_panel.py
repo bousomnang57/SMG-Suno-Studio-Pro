@@ -273,6 +273,13 @@ class EditorPanel(QWidget):
         self.btn_del_take.clicked.connect(self._on_del_take)
         take_box.addWidget(self.btn_del_take)
 
+        self.btn_compare_takes = QPushButton("🔀 A/B")
+        self.btn_compare_takes.setToolTip("Compare two takes side-by-side (A/B Diff & Promote)")
+        self.btn_compare_takes.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_compare_takes.setStyleSheet("background-color: #faf5ff; color: #7c3aed; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border: 1px solid #d8b4fe; border-radius: 4px;")
+        self.btn_compare_takes.clicked.connect(self._open_take_compare_dialog)
+        take_box.addWidget(self.btn_compare_takes)
+
         # Quick Copy & Clean Actions right in top bar for instant access
         self.btn_clean_tags = QPushButton("🧹 Clean")
         self.btn_clean_tags.setToolTip("Strip all [bracket] tags and copy clean lyrics for singers")
@@ -628,6 +635,15 @@ class EditorPanel(QWidget):
         self.chord_ribbon_layout.setSpacing(4)
         layout.addWidget(self.chord_ribbon_frame)
 
+        # ── 3d. DAW Section Jump Marker Bar ([Intro], [Verse], [Chorus], [Bridge], [Outro]) ──
+        self.section_jump_frame = QFrame()
+        self.section_jump_frame.setObjectName("sectionJumpFrame")
+        self.section_jump_frame.setVisible(False)
+        self.section_jump_layout = QHBoxLayout(self.section_jump_frame)
+        self.section_jump_layout.setContentsMargins(4, 1, 4, 1)
+        self.section_jump_layout.setSpacing(4)
+        layout.addWidget(self.section_jump_frame)
+
         # ── 4. Main Code Editor with Syllable Gutter ──
         self.editor = LyricCodeEditor()
         self.editor.text_analyzed.connect(self._on_analysis_updated)
@@ -721,6 +737,14 @@ class EditorPanel(QWidget):
         self.btn_hit_score.setStyleSheet("background: #fdf4ff; color: #9333ea; font-weight: 800; font-size: 11px; padding: 2px 7px; border: 1px solid #e9d5ff; border-radius: 4px;")
         self.btn_hit_score.clicked.connect(self._open_hit_inspector)
         stats_layout.addWidget(self.btn_hit_score)
+
+        self._detected_cliches = []
+        self.btn_cliche_check = QPushButton("✅ Fresh")
+        self.btn_cliche_check.setToolTip("Live AI-Cliché & Novelty Scanner — click to jump to or clean cliché phrases")
+        self.btn_cliche_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cliche_check.setStyleSheet("background: #ecfdf5; color: #059669; font-weight: 800; font-size: 11px; padding: 2px 7px; border: 1px solid #a7f3d0; border-radius: 4px;")
+        self.btn_cliche_check.clicked.connect(self._on_cliche_badge_clicked)
+        stats_layout.addWidget(self.btn_cliche_check)
 
         stats_layout.addStretch()
         layout.addWidget(self.stats_frame)
@@ -1082,8 +1106,214 @@ class EditorPanel(QWidget):
             hit_data = HitAnalyzer.analyze(text, bpm)
             self.btn_hit_score.setText(f"🌟 Hit: {hit_data['hit_score']}%")
 
+        # Live AI-Cliché & Novelty Scan
+        self._update_cliche_badge(text)
+
+        # Update DAW Section Jump Marker Bar
+        self._update_section_jump_bar(text)
+
         # Update Live Song Chord Ribbon
         self._update_song_chord_ribbon(text)
+
+    def _update_cliche_badge(self, lyrics_text: str):
+        if not hasattr(self, "btn_cliche_check"):
+            return
+        if len(lyrics_text.strip()) < 20:
+            self._detected_cliches = []
+            self.btn_cliche_check.setText("✅ Fresh")
+            self.btn_cliche_check.setToolTip("Live AI-Cliché Scanner (write lyrics to scan)")
+            if getattr(self, "is_dark", True):
+                self.btn_cliche_check.setStyleSheet("background: #064e3b; color: #34d399; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #059669; border-radius: 4px;")
+            else:
+                self.btn_cliche_check.setStyleSheet("background: #ecfdf5; color: #047857; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #a7f3d0; border-radius: 4px;")
+            return
+
+        from app.anti_cliche_engine import AntiClicheEngine
+        nov = AntiClicheEngine.calculate_novelty_score(self.get_title(), lyrics_text)
+        hits = nov.get("cliche_hits", [])
+        self._detected_cliches = hits
+        if not hits:
+            self.btn_cliche_check.setText(f"✅ Fresh {nov.get('score', 95)}%")
+            self.btn_cliche_check.setToolTip("Zero AI clichés detected! Authentic human phrasing.")
+            if getattr(self, "is_dark", True):
+                self.btn_cliche_check.setStyleSheet("background: #064e3b; color: #34d399; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #059669; border-radius: 4px;")
+            else:
+                self.btn_cliche_check.setStyleSheet("background: #ecfdf5; color: #047857; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #a7f3d0; border-radius: 4px;")
+        else:
+            self.btn_cliche_check.setText(f"🚨 {len(hits)} Cliché{'s' if len(hits) != 1 else ''}")
+            self.btn_cliche_check.setToolTip(f"Detected AI clichés: {', '.join(hits[:6])}\nClick to highlight in editor or clean")
+            if getattr(self, "is_dark", True):
+                self.btn_cliche_check.setStyleSheet("background: #451a03; color: #fbbf24; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #d97706; border-radius: 4px;")
+            else:
+                self.btn_cliche_check.setStyleSheet("background: #fef3c7; color: #b45309; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #f59e0b; border-radius: 4px;")
+
+    def _on_cliche_badge_clicked(self):
+        hits = getattr(self, "_detected_cliches", [])
+        if not hits:
+            QMessageBox.information(self, "Authentic Human Lyrics", "✅ Zero overused AI clichés detected! Your lyrics read clean and original.")
+            return
+        # Jump to and highlight the first cliché phrase in the editor
+        first = hits[0]
+        full = self.editor.toPlainText()
+        pos = full.lower().find(first.lower())
+        if pos >= 0:
+            cursor = self.editor.textCursor()
+            cursor.setPosition(pos)
+            cursor.setPosition(pos + len(first), cursor.MoveMode.KeepAnchor)
+            self.editor.setTextCursor(cursor)
+            self.editor.centerCursor()
+            self.editor.setFocus()
+        reply = QMessageBox.question(
+            self,
+            "AI-Cliché Inspector",
+            f"Detected {len(hits)} overused AI phrase(s):\n• " + "\n• ".join(hits[:8]) +
+            "\n\nThe first phrase is now highlighted in the editor.\nWould you like to run Humanize Lyrics now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._humanize_entire_lyrics()
+
+    def _update_section_jump_bar(self, lyrics_text: str):
+        if not hasattr(self, "section_jump_layout"):
+            return
+        chord_re = re.compile(r'^[A-G][#b]?(?:m|maj|min|dim|aug|sus[24]?|[0-9])*(?:/[A-G][#b]?)?$')
+        markers = []
+        for idx, raw_line in enumerate(lyrics_text.split("\n")):
+            stripped = raw_line.strip()
+            m = re.match(r'^\[([^\]]{2,36})\]$', stripped)
+            if m:
+                label = m.group(1).strip()
+                if not chord_re.match(label):
+                    markers.append((idx, label))
+
+        # Avoid unnecessary widget churn if markers are unchanged
+        sig = [(i, lbl) for i, lbl in markers]
+        if getattr(self, "_last_section_markers", None) == sig:
+            return
+        self._last_section_markers = sig
+
+        while self.section_jump_layout.count():
+            item = self.section_jump_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.hide()
+                w.setParent(None)
+                w.deleteLater()
+
+        if not markers:
+            self.section_jump_frame.setVisible(False)
+            return
+
+        self.section_jump_frame.setVisible(True)
+        lbl_nav = QLabel("🧭 Sections:")
+        lbl_nav.setStyleSheet("font-size: 8pt; font-weight: 700; color: #64748b; border: none; background: transparent;")
+        self.section_jump_layout.addWidget(lbl_nav)
+
+        is_dark = getattr(self, "is_dark", True)
+        for line_idx, sec_label in markers[:10]:
+            short_lbl = sec_label.split(":")[0].strip()[:14]
+            btn = QPushButton(short_lbl)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setToolTip(f"Jump to [{sec_label}] (Line {line_idx + 1})")
+            low = short_lbl.lower()
+            if "chorus" in low or "បន្ទរ" in low:
+                st = "background: #581c87; color: #e9d5ff; border: 1px solid #9333ea;" if is_dark else "background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe;"
+            elif "bridge" in low or "ស្ពាន" in low:
+                st = "background: #422006; color: #fde047; border: 1px solid #ca8a04;" if is_dark else "background: #fef9c3; color: #a16207; border: 1px solid #fde047;"
+            else:
+                st = "background: #1e293b; color: #93c5fd; border: 1px solid #334155;" if is_dark else "background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;"
+            btn.setStyleSheet(f"{st} font-size: 7.5pt; font-weight: 700; border-radius: 3px; padding: 1px 6px;")
+            btn.clicked.connect(lambda _, ln=line_idx: self._jump_to_line(ln))
+            self.section_jump_layout.addWidget(btn)
+
+        self.section_jump_layout.addStretch()
+
+    def _jump_to_line(self, line_index: int):
+        block = self.editor.document().findBlockByNumber(line_index)
+        if block.isValid():
+            cursor = self.editor.textCursor()
+            cursor.setPosition(block.position())
+            self.editor.setTextCursor(cursor)
+            self.editor.centerCursor()
+            self.editor.setFocus()
+
+    def _open_take_compare_dialog(self):
+        from PyQt6.QtWidgets import QDialog, QPlainTextEdit
+        takes, active = self.get_takes_state()
+        take_names = list(takes.keys())
+        if len(take_names) < 2:
+            QMessageBox.information(self, "Compare Takes", "Create or duplicate at least 2 takes first using '+ Take' or 'Dup' to compare A/B drafts.")
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("🔀 A/B Multi-Take Comparison Studio")
+        dlg.resize(920, 560)
+        t = getattr(self, "theme", get_theme(getattr(self, "is_dark", True)))
+        dlg.setStyleSheet(f"QDialog {{ background: {t['bg_window']}; color: {t['text_primary']}; }}")
+
+        root = QVBoxLayout(dlg)
+        root.setSpacing(8)
+
+        ctrl = QHBoxLayout()
+        ctrl.addWidget(QLabel("Take A (Left):"))
+        cb_a = QComboBox()
+        cb_a.addItems(take_names)
+        cb_a.setCurrentText(active)
+        ctrl.addWidget(cb_a, stretch=1)
+
+        ctrl.addWidget(QLabel("Take B (Right):"))
+        cb_b = QComboBox()
+        cb_b.addItems(take_names)
+        other_idx = 1 if take_names[0] == active else 0
+        cb_b.setCurrentIndex(other_idx)
+        ctrl.addWidget(cb_b, stretch=1)
+        root.addLayout(ctrl)
+
+        panes = QHBoxLayout()
+        panes.setSpacing(10)
+        txt_a = QPlainTextEdit()
+        txt_a.setReadOnly(True)
+        txt_b = QPlainTextEdit()
+        txt_b.setReadOnly(True)
+        panes.addWidget(txt_a, stretch=1)
+        panes.addWidget(txt_b, stretch=1)
+        root.addLayout(panes, stretch=1)
+
+        lbl_diff = QLabel("")
+        lbl_diff.setStyleSheet("font-weight: 700; font-size: 11px;")
+        root.addWidget(lbl_diff)
+
+        def _refresh_ab():
+            a_text = takes.get(cb_a.currentText(), "")
+            b_text = takes.get(cb_b.currentText(), "")
+            txt_a.setPlainText(a_text)
+            txt_b.setPlainText(b_text)
+            a_lines = [l for l in a_text.splitlines() if l.strip()]
+            b_lines = [l for l in b_text.splitlines() if l.strip()]
+            diff_lines = sum(1 for i in range(max(len(a_lines), len(b_lines))) if (a_lines[i] if i < len(a_lines) else "") != (b_lines[i] if i < len(b_lines) else ""))
+            lbl_diff.setText(f"Take A: {len(a_lines)} lines ({len(a_text.split())} words)  •  Take B: {len(b_lines)} lines ({len(b_text.split())} words)  •  {diff_lines} line(s) differ")
+
+        cb_a.currentTextChanged.connect(lambda _: _refresh_ab())
+        cb_b.currentTextChanged.connect(lambda _: _refresh_ab())
+        _refresh_ab()
+
+        btns = QHBoxLayout()
+        btns.addStretch()
+        btn_promote = QPushButton("✓ Use Take B as Active")
+        btn_promote.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_promote.setStyleSheet("background: #2563eb; color: #ffffff; font-weight: 700; padding: 6px 14px; border-radius: 5px;")
+        def _promote_b():
+            target_b = cb_b.currentText()
+            self.take_combo.setCurrentText(target_b)
+            dlg.accept()
+        btn_promote.clicked.connect(_promote_b)
+        btns.addWidget(btn_promote)
+
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(dlg.reject)
+        btns.addWidget(btn_close)
+        root.addLayout(btns)
+        dlg.exec()
 
     def _update_song_chord_ribbon(self, lyrics_text: str):
         if not hasattr(self, "chord_ribbon_layout"):
@@ -1303,6 +1533,10 @@ class EditorPanel(QWidget):
                 self.btn_hit_score.setStyleSheet(f"background: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid {t['border_accent']}; border-radius: 4px;")
             if hasattr(self, "chord_ribbon_frame"):
                 self.chord_ribbon_frame.setStyleSheet(f"QFrame#chordRibbonFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 2px; }} QFrame#chordRibbonFrame QLabel {{ border: none; background: transparent; }}")
+            if hasattr(self, "section_jump_frame"):
+                self.section_jump_frame.setStyleSheet(f"QFrame#sectionJumpFrame {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 2px; }} QFrame#sectionJumpFrame QLabel {{ border: none; background: transparent; }}")
+            if hasattr(self, "btn_compare_takes") and self.btn_compare_takes:
+                self.btn_compare_takes.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
 
             all_menus = [
                 getattr(self, "btn_khmer_tags", None) and self.btn_khmer_tags.menu(),
@@ -1422,6 +1656,10 @@ class EditorPanel(QWidget):
                 self.btn_hit_score.setStyleSheet("background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 11px; padding: 1px 7px; border: 1px solid #bfdbfe; border-radius: 4px;")
             if hasattr(self, "chord_ribbon_frame"):
                 self.chord_ribbon_frame.setStyleSheet("QFrame#chordRibbonFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; } QFrame#chordRibbonFrame QLabel { border: none; background: transparent; }")
+            if hasattr(self, "section_jump_frame"):
+                self.section_jump_frame.setStyleSheet("QFrame#sectionJumpFrame { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; } QFrame#sectionJumpFrame QLabel { border: none; background: transparent; }")
+            if hasattr(self, "btn_compare_takes") and self.btn_compare_takes:
+                self.btn_compare_takes.setStyleSheet("background-color: #faf5ff; color: #7c3aed; border: 1px solid #d8b4fe; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
 
             all_menus = [
                 getattr(self, "btn_khmer_tags", None) and self.btn_khmer_tags.menu(),

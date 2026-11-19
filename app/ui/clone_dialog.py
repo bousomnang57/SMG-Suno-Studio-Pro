@@ -163,6 +163,15 @@ class SongDNAClonerView(QWidget):
         self.combo_presets.currentTextChanged.connect(self._on_preset_changed)
         header_box.addWidget(self.combo_presets)
 
+        self.btn_toggle_setup = QPushButton("▲ Compact")
+        self.btn_toggle_setup.setCheckable(True)
+        self.btn_toggle_setup.setChecked(False)
+        self.btn_toggle_setup.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_toggle_setup.setToolTip("Collapse or expand mode/settings bars to maximize lyric comparison space")
+        self.btn_toggle_setup.setStyleSheet("padding: 4px 8px; font-weight: 700; font-size: 10.5px; border-radius: 5px;")
+        self.btn_toggle_setup.toggled.connect(self._toggle_compact_setup)
+        header_box.addWidget(self.btn_toggle_setup)
+
         main_layout.addLayout(header_box)
 
         # 2. 8 Creative Clone Mode Selector Pills (2 Rows x 4 Columns)
@@ -209,9 +218,9 @@ class SongDNAClonerView(QWidget):
         main_layout.addWidget(self.mode_frame)
 
         # 3. Target Clone Settings Row
-        settings_frame = QFrame()
-        settings_frame.setObjectName("card")
-        s_layout = QVBoxLayout(settings_frame)
+        self.settings_frame = QFrame()
+        self.settings_frame.setObjectName("card")
+        s_layout = QVBoxLayout(self.settings_frame)
         s_layout.setContentsMargins(12, 8, 12, 8)
         s_layout.setSpacing(6)
 
@@ -322,9 +331,19 @@ class SongDNAClonerView(QWidget):
         self.input_notes.setPlaceholderText("Optional notes: e.g. female lead, emotive Tro Ou, intimate acoustic vibe, 808 slides...")
         self.input_notes.setStyleSheet("padding: 4px 8px; font-size: 11px;")
         row2.addWidget(self.input_notes, stretch=1)
+
+        self.btn_auto_humanize = QPushButton("👤 Auto-Humanize: ON")
+        self.btn_auto_humanize.setCheckable(True)
+        self.btn_auto_humanize.setChecked(True)
+        self.btn_auto_humanize.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_auto_humanize.setToolTip("Automatically polish cloned output with human breath cues & anti-cliché realism")
+        self.btn_auto_humanize.setStyleSheet("background: #065f46; color: #ecfdf5; border: 1px solid #10b981; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 5px;")
+        self.btn_auto_humanize.toggled.connect(self._on_auto_humanize_toggled)
+        row2.addWidget(self.btn_auto_humanize)
+
         s_layout.addLayout(row2)
 
-        main_layout.addWidget(settings_frame)
+        main_layout.addWidget(self.settings_frame)
 
         # 4. Side-by-Side Dual Studio Comparison
         split_layout = QHBoxLayout()
@@ -382,11 +401,16 @@ class SongDNAClonerView(QWidget):
         r_header_row.addWidget(self.lbl_r_title)
         r_header_row.addStretch()
 
-        self.lbl_singalong_badge = QLabel("🎯 Sing-Along: 93%")
+        self.lbl_singalong_badge = QLabel("🎯 Sing-Along: —")
         self.lbl_singalong_badge.setStyleSheet("font-size: 10px; font-weight: 800; color: #38bdf8; background: #082f49; padding: 2px 6px; border-radius: 4px; border: 1px solid #0284c7;")
         r_header_row.addWidget(self.lbl_singalong_badge)
 
-        self.lbl_clone_hit = QLabel("🌟 Hit: 95% | Vocal Safety: 100%")
+        self.lbl_originality_badge = QLabel("🛡️ Original: —")
+        self.lbl_originality_badge.setToolTip("Live Copyright Safety & Originality Meter (word/n-gram independence from reference)")
+        self.lbl_originality_badge.setStyleSheet("font-size: 10px; font-weight: 800; color: #34d399; background: #064e3b; padding: 2px 6px; border-radius: 4px; border: 1px solid #059669;")
+        r_header_row.addWidget(self.lbl_originality_badge)
+
+        self.lbl_clone_hit = QLabel("🌟 Hit: — | Vocal Safety: —")
         self.lbl_clone_hit.setStyleSheet("font-size: 10px; font-weight: 800; color: #10b981; background: #064e3b; padding: 2px 6px; border-radius: 4px; border: 1px solid #059669;")
         r_header_row.addWidget(self.lbl_clone_hit)
         r_layout.addLayout(r_header_row)
@@ -467,12 +491,13 @@ class SongDNAClonerView(QWidget):
 
         # Tab 2: Twin Prompter & Syllable Cadence Table
         self.table_twin = QTableWidget()
-        self.table_twin.setColumnCount(4)
-        self.table_twin.setHorizontalHeaderLabels(["Line", "Reference Song (Syllables)", "Cloned Lyric (Matched)", "Sing-Along Fit"])
+        self.table_twin.setColumnCount(5)
+        self.table_twin.setHorizontalHeaderLabels(["Line", "Reference Song (Syllables)", "Cloned Lyric (Matched)", "Sing-Along Fit", "Action"])
         self.table_twin.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table_twin.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_twin.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table_twin.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_twin.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.table_twin.verticalHeader().setVisible(False)
         self.view_tabs.addTab(self.table_twin, "🪞 Twin Prompter & Cadence")
 
@@ -640,9 +665,53 @@ class SongDNAClonerView(QWidget):
         self.worker.finished_error.connect(self._on_clone_error)
         self.worker.start()
 
+    def _toggle_compact_setup(self, compact: bool):
+        if hasattr(self, "mode_frame"):
+            self.mode_frame.setVisible(not compact)
+        if hasattr(self, "settings_frame"):
+            self.settings_frame.setVisible(not compact)
+        self.btn_toggle_setup.setText("▼ Expand Setup" if compact else "▲ Compact")
+
+    def _on_auto_humanize_toggled(self, checked: bool):
+        if checked:
+            self.btn_auto_humanize.setText("👤 Auto-Humanize: ON")
+            self.btn_auto_humanize.setStyleSheet("background: #065f46; color: #ecfdf5; border: 1px solid #10b981; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 5px;")
+        else:
+            self.btn_auto_humanize.setText("👤 Auto-Humanize: OFF")
+            self.btn_auto_humanize.setStyleSheet("background: #334155; color: #cbd5e1; border: 1px solid #475569; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 5px;")
+
+    @staticmethod
+    def _compute_originality_pct(ref_text: str, clone_text: str) -> int:
+        """Compute copyright-safety originality percentage (100% = zero phrase overlap)."""
+        def _clean_tokens(txt: str):
+            no_tags = re.sub(r'\[[^\]]*\]', ' ', txt).lower()
+            return re.findall(r'[a-z0-9]+|[\u1780-\u17ff]{2,}', no_tags)
+
+        ref_toks = _clean_tokens(ref_text)
+        clone_toks = _clean_tokens(clone_text)
+        if not ref_toks or not clone_toks:
+            return 100
+
+        ref_set = set(ref_toks)
+        clone_set = set(clone_toks)
+        uni_overlap = len(ref_set & clone_set) / max(1, len(clone_set))
+
+        ref_bi = set(zip(ref_toks, ref_toks[1:])) if len(ref_toks) > 1 else set()
+        clone_bi = set(zip(clone_toks, clone_toks[1:])) if len(clone_toks) > 1 else set()
+        bi_overlap = (len(ref_bi & clone_bi) / max(1, len(clone_bi))) if clone_bi else 0.0
+
+        combined_overlap = (0.45 * uni_overlap) + (0.55 * bi_overlap)
+        return max(0, min(100, int(round((1.0 - combined_overlap) * 100))))
+
     def _on_clone_success(self, title: str, style: str, lyrics: str):
         self.btn_generate_clone.setText("⚡ បង្កើតបទក្លូនស្របន័យ (Clone Song)")
         self.btn_generate_clone.setEnabled(True)
+
+        if hasattr(self, "btn_auto_humanize") and self.btn_auto_humanize.isChecked() and lyrics.strip():
+            from app.humanizer_engine import HumanizerEngine
+            lang_txt = self.combo_target_lang.currentText()
+            lang = "Khmer" if ("Khmer" in lang_txt or "ខ្មែរ" in lang_txt) else "English"
+            lyrics = HumanizerEngine.humanize_lyrics_locally(lyrics, lang)
 
         self.generated_title = title
         self.generated_style = style
@@ -686,6 +755,21 @@ class SongDNAClonerView(QWidget):
         comp = CloneEngine.analyze_singalong_compatibility(ref, clone)
         self.lbl_singalong_badge.setText(comp.get("badge", f"🎯 Sing-Along: {comp.get('score', 90)}%"))
 
+        # Update Originality & Copyright Safety Badge
+        if hasattr(self, "lbl_originality_badge"):
+            orig_pct = self._compute_originality_pct(ref, clone)
+            if orig_pct >= 85:
+                tag = f"🛡️ Original: {orig_pct}% Safe"
+                st = "font-size: 10px; font-weight: 800; color: #34d399; background: #064e3b; padding: 2px 6px; border-radius: 4px; border: 1px solid #059669;" if self.is_dark else "font-size: 10px; font-weight: 800; color: #047857; background: #dcfce7; padding: 2px 6px; border-radius: 4px; border: 1px solid #86efac;"
+            elif orig_pct >= 70:
+                tag = f"🛡️ Original: {orig_pct}% Check"
+                st = "font-size: 10px; font-weight: 800; color: #fbbf24; background: #451a03; padding: 2px 6px; border-radius: 4px; border: 1px solid #d97706;" if self.is_dark else "font-size: 10px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 2px 6px; border-radius: 4px; border: 1px solid #f59e0b;"
+            else:
+                tag = f"⚠️ Original: {orig_pct}% Close"
+                st = "font-size: 10px; font-weight: 800; color: #fca5a5; background: #450a0a; padding: 2px 6px; border-radius: 4px; border: 1px solid #dc2626;" if self.is_dark else "font-size: 10px; font-weight: 800; color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; border: 1px solid #fca5a5;"
+            self.lbl_originality_badge.setText(tag)
+            self.lbl_originality_badge.setStyleSheet(st)
+
         details = comp.get("details", [])
         self.table_twin.setRowCount(len(details))
 
@@ -712,8 +796,76 @@ class SongDNAClonerView(QWidget):
                 it_stat.setForeground(QColor("#38bdf8" if self.is_dark else "#0284c7"))
             else:
                 it_stat.setForeground(QColor("#fbbf24" if self.is_dark else "#b45309"))
-
             self.table_twin.setItem(row, 3, it_stat)
+
+            # Action cell: Click-to-Fix button for mismatched lines
+            if d["diff"] > 1 and d["clone_line"]:
+                btn_fix = QPushButton("🔄 Fix Fit")
+                btn_fix.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn_fix.setToolTip(f"Adjust this line toward {d['ref_syllables']} syllables to lock sing-along rhythm")
+                btn_fix.setStyleSheet(
+                    "background: #1e1b4b; color: #c4b5fd; border: 1px solid #6366f1; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;"
+                    if self.is_dark else
+                    "background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;"
+                )
+                btn_fix.clicked.connect(
+                    lambda _, cl=d["clone_line"], rl=d["ref_line"], tgt=d["ref_syllables"]: self._reroll_twin_line(cl, rl, tgt)
+                )
+                self.table_twin.setCellWidget(row, 4, btn_fix)
+            else:
+                self.table_twin.removeCellWidget(row, 4)
+                it_ok = QTableWidgetItem("✓")
+                it_ok.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                it_ok.setForeground(QColor("#34d399" if self.is_dark else "#059669"))
+                self.table_twin.setItem(row, 4, it_ok)
+
+    def _reroll_twin_line(self, clone_line: str, ref_line: str, target_syllables: int):
+        """Re-roll a single mismatched line in the Twin Prompter to lock into target syllable count."""
+        from app.syllable_meter import count_line_syllables
+        full_text = self.txt_clone_lyrics.toPlainText()
+        if clone_line not in full_text:
+            return
+
+        new_line = None
+        keys = config_manager.get_api_keys()
+        if keys:
+            try:
+                from app.gemini_client import generate_with_gemini
+                model = config_manager.get("gemini_model", "gemini-3.5-flash")
+                prompt = (
+                    f"Rewrite ONLY this single song lyric line so it has EXACTLY {target_syllables} syllables "
+                    f"and keeps the same emotional meaning and language (do NOT copy words from reference).\n"
+                    f"Current line: {clone_line}\n"
+                    f"Reference cadence (for rhythm only): {ref_line}\n"
+                    f"Return ONLY the single rewritten lyric line with no quotes or explanation."
+                )
+                raw = generate_with_gemini(prompt, model_name=model)
+                if raw:
+                    cand = raw.strip().splitlines()[0].strip().strip('"').strip("'")
+                    if cand:
+                        new_line = cand
+            except Exception:
+                new_line = None
+
+        # Instant smart offline syllable-fit fallback if no API key or error
+        if not new_line:
+            words = clone_line.split()
+            cur_syl = count_line_syllables(clone_line)
+            if cur_syl > target_syllables and len(words) > 2:
+                # Trim trailing filler words until close to target
+                trimmed = list(words)
+                while len(trimmed) > 2 and count_line_syllables(" ".join(trimmed)) > target_syllables:
+                    trimmed.pop()
+                new_line = " ".join(trimmed)
+            elif cur_syl < target_syllables:
+                is_khmer = any('\u1780' <= c <= '\u17ff' for c in clone_line)
+                pad = " ណាអូនអើយ" if is_khmer else ", yeah tonight"
+                new_line = f"{clone_line.rstrip(',.')}{pad}"
+            else:
+                return
+
+        updated = full_text.replace(clone_line, new_line, 1)
+        self.txt_clone_lyrics.setPlainText(updated)
 
     def _on_clone_error(self, err_msg: str):
         self.btn_generate_clone.setText("⚡ បង្កើតបទក្លូនស្របន័យ (Clone Song)")
@@ -993,6 +1145,12 @@ class SongDNAClonerView(QWidget):
                 self.btn_attach_audio.setStyleSheet("background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 700; font-size: 11px; padding: 5px 10px; border-radius: 5px;")
             else:
                 self.btn_attach_audio.setStyleSheet("background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; font-weight: 700; font-size: 11px; padding: 5px 10px; border-radius: 5px;")
+
+        if hasattr(self, "btn_toggle_setup"):
+            if is_dark:
+                self.btn_toggle_setup.setStyleSheet(f"background: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; font-weight: 700; font-size: 10.5px; padding: 4px 8px; border-radius: 5px;")
+            else:
+                self.btn_toggle_setup.setStyleSheet("background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; font-weight: 700; font-size: 10.5px; padding: 4px 8px; border-radius: 5px;")
 
         if hasattr(self, "lbl_singalong_badge"):
             if is_dark:
