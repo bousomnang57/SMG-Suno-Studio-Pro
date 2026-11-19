@@ -1022,7 +1022,16 @@ class BatchGeneratorView(QWidget):
         self.metatag_pills = []
         self.inspector_dialog = None
         self.current_sort_mode = "default"
+        self.auto_humanize_enabled = True
         self._suppress_autosave = True
+
+        # Load Cross-Session Persistent Lyric Fingerprint Vault into memory
+        try:
+            from app.anti_cliche_engine import BatchMemoryVault
+            vault_titles, _ = BatchMemoryVault.get_banned_titles_and_hooks(max_titles=300)
+            self.session_memory_titles.update(vault_titles)
+        except Exception:
+            pass
 
         self._init_ui()
         self._update_dynamic_language_presets(self.current_lang)
@@ -1472,9 +1481,9 @@ class BatchGeneratorView(QWidget):
         div_dup_row.addWidget(self.btn_anti_dup)
         pro_layout.addLayout(div_dup_row)
 
-        # 💿 Concept Album Story Arc & 🧠 Cross-Batch Semantic Memory Tracker
-        arc_mem_row = QHBoxLayout()
-        arc_mem_row.setSpacing(4)
+        # 💿 Concept Album Story Arc & 👤 Auto-Humanize Pro Row
+        arc_hum_row = QHBoxLayout()
+        arc_hum_row.setSpacing(4)
 
         self.btn_album_arc_toggle = QPushButton("💿 Album Arc (EP/LP)")
         self.btn_album_arc_toggle.setCheckable(True)
@@ -1484,23 +1493,38 @@ class BatchGeneratorView(QWidget):
         self.btn_album_arc_toggle.setToolTip("1-Click Concept Album / EP Story Arc:\nMaps tracks across a dramatic narrative progression instead of isolated songs!")
         self._update_album_arc_style()
         self.btn_album_arc_toggle.clicked.connect(self._toggle_album_arc)
-        arc_mem_row.addWidget(self.btn_album_arc_toggle, 1)
+        arc_hum_row.addWidget(self.btn_album_arc_toggle, 1)
 
-        self.lbl_memory_badge = QLabel("🧠 Memory: 0")
+        self.btn_auto_humanize = QPushButton("👤 Auto-Humanize: ON")
+        self.btn_auto_humanize.setCheckable(True)
+        self.btn_auto_humanize.setChecked(True)
+        self.btn_auto_humanize.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_auto_humanize.setFixedHeight(25)
+        self.btn_auto_humanize.setToolTip("Automatically strip AI clichés and inject natural human vocal phrasing & breath realism into every newly generated batch")
+        self.btn_auto_humanize.clicked.connect(self._toggle_auto_humanize)
+        arc_hum_row.addWidget(self.btn_auto_humanize, 1)
+        pro_layout.addLayout(arc_hum_row)
+
+        # 🧠 Persistent Cross-Session Zero-Repeat Vault Tracker
+        arc_mem_row = QHBoxLayout()
+        arc_mem_row.setSpacing(4)
+
+        self.lbl_memory_badge = QLabel("🧠 Vault: 0")
         self.lbl_memory_badge.setFixedHeight(25)
-        self.lbl_memory_badge.setStyleSheet("font-size: 8.5px; font-weight: 700; color: #a5b4fc; background: #1e1b4b; border: 1px solid #4338ca; border-radius: 4px; padding: 1px 5px;")
-        self.lbl_memory_badge.setToolTip("Session-persistent zero-repeat memory cache: Tracks all generated song titles to ensure subsequent batches never repeat previous concepts.")
-        arc_mem_row.addWidget(self.lbl_memory_badge)
+        self.lbl_memory_badge.setStyleSheet("font-size: 9px; font-weight: 700; color: #a5b4fc; background: #1e1b4b; border: 1px solid #4338ca; border-radius: 4px; padding: 1px 6px;")
+        self.lbl_memory_badge.setToolTip("Persistent cross-session Lyric Fingerprint Vault (~/.lyric_ai_writer/batch_memory_vault.json):\nRemembers up to 300 previously generated titles & chorus hooks across restarts so new batches NEVER duplicate old songs.")
+        arc_mem_row.addWidget(self.lbl_memory_badge, 1)
 
         self.btn_clear_memory = QPushButton("Clear")
-        self.btn_clear_memory.setFixedWidth(52)
+        self.btn_clear_memory.setFixedWidth(54)
         self.btn_clear_memory.setFixedHeight(25)
         self.btn_clear_memory.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear_memory.setStyleSheet("font-size: 9px; font-weight: 700; color: #94a3b8; background: #13172c; border: 1px solid #232c4b; border-radius: 4px; padding: 0px;")
-        self.btn_clear_memory.setToolTip("Clear session memory cache")
+        self.btn_clear_memory.setToolTip("Reset persistent zero-repeat vault")
         self.btn_clear_memory.clicked.connect(self._clear_memory_cache)
         arc_mem_row.addWidget(self.btn_clear_memory)
         pro_layout.addLayout(arc_mem_row)
+        self._update_auto_humanize_style()
 
         # ── SESSION PERSISTENCE & ALBUM EXPORT PACK ──
         self.lbl_autosave_status = QLabel("💾 Auto-Save Active: Batch auto-saved locally")
@@ -2446,18 +2470,50 @@ class BatchGeneratorView(QWidget):
                     }
                 """)
 
+    def _toggle_auto_humanize(self):
+        self.auto_humanize_enabled = self.btn_auto_humanize.isChecked()
+        self._update_auto_humanize_style()
+
+    def _update_auto_humanize_style(self):
+        if not hasattr(self, "btn_auto_humanize"):
+            return
+        is_on = getattr(self, "auto_humanize_enabled", True)
+        is_dark = getattr(self, "is_dark", True)
+        self.btn_auto_humanize.setText("👤 Auto-Humanize: ON" if is_on else "👤 Auto-Humanize: OFF")
+        if is_dark:
+            if is_on:
+                self.btn_auto_humanize.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; border-radius: 4px; font-weight: 800; font-size: 9px; padding: 2px 4px;")
+            else:
+                self.btn_auto_humanize.setStyleSheet("background-color: #13172c; color: #94a3b8; border: 1px solid #232c4b; border-radius: 4px; font-weight: 600; font-size: 9px; padding: 2px 4px;")
+        else:
+            if is_on:
+                self.btn_auto_humanize.setStyleSheet("background-color: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; border-radius: 4px; font-weight: 800; font-size: 9px; padding: 2px 4px;")
+            else:
+                self.btn_auto_humanize.setStyleSheet("background-color: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; font-size: 9px; padding: 2px 4px;")
+
     def _clear_memory_cache(self):
-        """Clears the session-persistent zero-repeat memory cache."""
+        """Clears both in-memory and persistent disk zero-repeat vault."""
         self.session_memory_titles.clear()
+        try:
+            from app.anti_cliche_engine import BatchMemoryVault
+            BatchMemoryVault.clear()
+        except Exception:
+            pass
         self._update_memory_ui()
         if hasattr(self, "lbl_batch_stat"):
-            self.lbl_batch_stat.setText("🧠 Zero-Repeat Memory Cache Cleared.")
+            self.lbl_batch_stat.setText("🧠 Persistent Zero-Repeat Vault Cleared.")
 
     def _update_memory_ui(self):
-        cnt = len(self.session_memory_titles)
+        vault_n = 0
+        try:
+            from app.anti_cliche_engine import BatchMemoryVault
+            vault_n = BatchMemoryVault.count()
+        except Exception:
+            pass
+        cnt = max(len(self.session_memory_titles), vault_n)
         if hasattr(self, "lbl_memory_badge"):
-            self.lbl_memory_badge.setText(f"🧠 Memory: {cnt}")
-            self.lbl_memory_badge.setToolTip(f"Session-persistent memory tracking {cnt} song titles across batches to guarantee zero repetition.")
+            self.lbl_memory_badge.setText(f"🧠 Zero-Repeat Vault: {cnt} Songs")
+            self.lbl_memory_badge.setToolTip(f"Persistent cross-session vault tracking {cnt} song titles & chorus hooks across restarts to guarantee zero repetition.")
 
     def _update_novelty_metrics(self):
         """Calculates and renders the average batch novelty freshness score."""
@@ -2610,7 +2666,8 @@ class BatchGeneratorView(QWidget):
             anti_duplication=self.anti_duplication,
             existing_titles=list(self.session_memory_titles),
             vocal_persona=getattr(self, "current_persona", ""),
-            album_arc=getattr(self, "album_arc_enabled", False)
+            album_arc=getattr(self, "album_arc_enabled", False),
+            auto_humanize=getattr(self, "auto_humanize_enabled", True)
         )
         demo_songs = worker._get_demo_batch(
             "sad song",
@@ -3827,7 +3884,8 @@ Genre: {next_song.get('genre', '')} ({next_song.get('bpm', '')}, Key: {next_song
             offset=0,
             existing_titles=list(self.session_memory_titles),
             vocal_persona=getattr(self, "current_persona", ""),
-            album_arc=getattr(self, "album_arc_enabled", False)
+            album_arc=getattr(self, "album_arc_enabled", False),
+            auto_humanize=getattr(self, "auto_humanize_enabled", True)
         )
         self.worker.status_update.connect(self.lbl_batch_stat.setText)
         self.worker.song_ready.connect(self._on_worker_progress)
@@ -3864,7 +3922,8 @@ Genre: {next_song.get('genre', '')} ({next_song.get('bpm', '')}, Key: {next_song
             offset=offset_idx,
             existing_titles=list(self.session_memory_titles.union(set(existing_titles))),
             vocal_persona=getattr(self, "current_persona", ""),
-            album_arc=getattr(self, "album_arc_enabled", False)
+            album_arc=getattr(self, "album_arc_enabled", False),
+            auto_humanize=getattr(self, "auto_humanize_enabled", True)
         )
         self.worker.status_update.connect(self.lbl_batch_stat.setText)
         self.worker.song_ready.connect(self._on_worker_progress)
@@ -4304,9 +4363,10 @@ Stand up for the stories never told!"""
         for code, btn in self.vocal_buttons.items():
             btn.setStyleSheet(self._pill_style(code == self.current_vocal))
 
-        # 4. Anti-duplication toggle & Album Arc
+        # 4. Anti-duplication toggle, Album Arc & Auto-Humanize
         self._update_anti_dup_style(self.anti_duplication)
         self._update_album_arc_style()
+        self._update_auto_humanize_style()
 
         # Update Main Turbo Button
         if hasattr(self, "btn_generate_batch"):

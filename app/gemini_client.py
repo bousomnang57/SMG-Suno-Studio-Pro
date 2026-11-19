@@ -340,7 +340,7 @@ Title: <Song Title>
 Followed by a blank line, then the full formatted lyrics. Do not wrap in markdown code blocks.
 {english_standards}"""
 
-def call_gemini_generate(client, model_name: str, prompt: str) -> str:
+def call_gemini_generate(client, model_name: str, prompt: str, temperature: float = None) -> str:
     """
     Executes content generation configured for Google Gemini models.
     Supports thinking budget for Pro models and provides automatic graceful fallback
@@ -358,8 +358,9 @@ def call_gemini_generate(client, model_name: str, prompt: str) -> str:
     last_err = None
     for candidate in candidates:
         try:
+            temp_val = temperature if temperature is not None else (0.85 if "pro" in candidate else 0.78)
             cfg_kwargs = {
-                "temperature": 0.85 if "pro" in candidate else 0.75,
+                "temperature": temp_val,
                 "top_p": 0.95,
                 "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True)
             }
@@ -390,7 +391,7 @@ def call_gemini_generate(client, model_name: str, prompt: str) -> str:
     raise RuntimeError("Failed to generate content from Gemini API.")
 
 
-def generate_with_gemini(prompt: str, model_name: str = None, on_retry=None) -> str:
+def generate_with_gemini(prompt: str, model_name: str = None, on_retry=None, temperature: float = None, timeout_ms: int = 25000) -> str:
     """
     Executes content generation using the configured multi-API key rotation pool.
     Balances load across active keys and automatically switches to the next available key
@@ -417,9 +418,9 @@ def generate_with_gemini(prompt: str, model_name: str = None, on_retry=None) -> 
     last_err = None
     for idx, key in enumerate(ordered_keys):
         try:
-            http_opts = types.HttpOptions(timeout=15000)
+            http_opts = types.HttpOptions(timeout=timeout_ms)
             client = genai.Client(api_key=key, http_options=http_opts)
-            return call_gemini_generate(client, model_name, prompt)
+            return call_gemini_generate(client, model_name, prompt, temperature=temperature)
         except Exception as e:
             last_err = e
             err_msg = str(e)
@@ -893,7 +894,8 @@ class BatchGenerateWorker(QThread):
         offset: int = 0,
         existing_titles: list = None,
         vocal_persona: str = "",
-        album_arc: bool = False
+        album_arc: bool = False,
+        auto_humanize: bool = True
     ):
         super().__init__()
         self.theme = theme
@@ -909,6 +911,7 @@ class BatchGenerateWorker(QThread):
         self.existing_titles = existing_titles or []
         self.vocal_persona = vocal_persona
         self.album_arc = album_arc
+        self.auto_humanize = auto_humanize
 
     def run(self):
         import json
@@ -918,15 +921,91 @@ class BatchGenerateWorker(QThread):
         model_name = config_manager.get("gemini_model", "gemini-3.5-flash")
         real_keys = [k for k in keys if k and not any(d in k.lower() for d in ["demo", "sample", "xyz123"]) and len(k) >= 25]
 
+        # Load Cross-Session Persistent Memory Vault (last 300 titles & chorus hooks)
+        from app.anti_cliche_engine import AntiClicheEngine, BatchMemoryVault
+        from app.humanizer_engine import HumanizerEngine
+        from app.hit_analyzer import HitAnalyzer
+
+        vault_titles, vault_hooks = BatchMemoryVault.get_banned_titles_and_hooks(max_titles=60, max_hooks=25)
+        all_banned_titles = list(dict.fromkeys(list(self.existing_titles) + vault_titles))
+        all_banned_hooks = list(vault_hooks)
+
+        def _finalize_and_score(song_obj: dict, used_bpm_keys: set, accepted_list: list) -> dict:
+            t_val = str(song_obj.get("title", "Untitled")).strip()
+            l_val = str(song_obj.get("lyrics", "")).strip()
+            sp_val = str(song_obj.get("style_prompt", "")).strip()
+            t_lang = song_obj.get("language", "English")
+
+            # Enforce unique BPM + Key pair across the batch
+            bpm_str = str(song_obj.get("bpm", "120 BPM"))
+            key_str = str(song_obj.get("key", "C"))
+            pair = (bpm_str, key_str)
+            if pair in used_bpm_keys:
+                rot_keys = ["Am", "Dm", "G", "F#m", "C", "Eb", "Bm", "E", "Bb", "C#m", "F", "Gm"]
+                for rk in rot_keys:
+                    if (bpm_str, rk) not in used_bpm_keys:
+                        key_str = rk
+                        song_obj["key"] = key_str
+                        pair = (bpm_str, key_str)
+                        break
+            used_bpm_keys.add(pair)
+
+            # Post-Generation Similarity Guard (vs Vault + same-batch tracks)
+            if self.anti_duplication:
+                is_dup = False
+                for prev in accepted_list:
+                    if AntiClicheEngine.compute_similarity(t_val, l_val, prev.get("title", ""), prev.get("lyrics", "")) >= 0.45:
+                        is_dup = True
+                        break
+                if not is_dup and any(t_val.lower() == bt.lower() for bt in all_banned_titles):
+                    is_dup = True
+                if is_dup:
+                    song_obj = AntiClicheEngine.mutate_single_song_locally(song_obj, t_lang)
+                    t_val = song_obj["title"]
+
+            # Automatic Humanizer Pass (strips AI stiffness + injects subtle vocal breath realism)
+            if self.auto_humanize:
+                l_val = HumanizerEngine.humanize_lyrics_locally(l_val, t_lang)
+                sp_val = HumanizerEngine.humanize_style_prompt_locally(sp_val, t_lang)
+                song_obj["lyrics"] = l_val
+                song_obj["style_prompt"] = sp_val[:self.style_limit]
+
+            # Real Honest Scoring (HitAnalyzer + HumanizerEngine + AntiClicheEngine)
+            try:
+                bpm_num = int("".join(filter(str.isdigit, bpm_str[:4])) or "120")
+                hit_res = HitAnalyzer.analyze(l_val, bpm=bpm_num)
+                song_obj["quality_score"] = int(hit_res.get("overall_score", 90))
+                song_obj["rhyme_score"] = int(hit_res.get("hook_density", 90))
+            except Exception:
+                song_obj["quality_score"] = int(song_obj.get("quality_score", 92))
+                song_obj["rhyme_score"] = int(song_obj.get("rhyme_score", 90))
+
+            try:
+                h_scores = HumanizerEngine.score_human_authenticity(l_val, sp_val, t_lang)
+                song_obj["human_score"] = int(h_scores.get("authenticity_score", 93))
+                song_obj["human_certified"] = bool(self.auto_humanize and song_obj["human_score"] >= 88)
+            except Exception:
+                song_obj["human_score"] = 92
+
+            novelty_res = AntiClicheEngine.calculate_novelty_score(t_val, l_val, t_lang)
+            song_obj["novelty_score"] = novelty_res["score"]
+            song_obj["novelty_badge"] = novelty_res["badge"]
+            return song_obj
+
         # ── 1. Fast Offline Engine Fallback (If no valid API Key) ──
         if not real_keys:
-            self.status_update.emit(f"⚡ កំពុងបង្កើត {self.count} បទភ្លាមៗ (Anti-Duplication Engine)...")
-            time.sleep(0.3)
-            songs = self._get_demo_batch(self.theme, self.language, self.count, self.diversity_mode, offset=self.offset, existing_titles=self.existing_titles, depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc)
+            self.status_update.emit(f"⚡ កំពុងបង្កើត {self.count} បទភ្លាមៗ (Anti-Duplication Vault Engine)...")
+            time.sleep(0.25)
+            songs = self._get_demo_batch(self.theme, self.language, self.count, self.diversity_mode, offset=self.offset, existing_titles=all_banned_titles, depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc)
+            used_pairs = set()
+            final_offline = []
             for idx, s in enumerate(songs):
+                s = _finalize_and_score(s, used_pairs, final_offline)
+                final_offline.append(s)
                 self.song_ready.emit(s, idx + 1, len(songs))
                 time.sleep(0.015)
-            self.batch_finished.emit(songs)
+            BatchMemoryVault.record_songs(final_offline)
+            self.batch_finished.emit(final_offline)
             return
 
         # ── 2. Live Gemini API Batch Generation with Anti-Duplication Engine ──
@@ -1052,16 +1131,6 @@ LANGUAGE MANDATE: 100% ENGLISH:
 All songs must feature modern, radio-ready English lyrics, English titles, and global chart-topping production descriptors with Berklee sensory imagery.
 """
 
-            existing_guidance = ""
-            if self.existing_titles:
-                titles_sample = ", ".join([f'"{t}"' for t in self.existing_titles[:15]])
-                existing_guidance = f"""
-CROSS-BATCH ZERO-REPEAT MEMORY MANDATE:
-The user already generated the following songs during this session:
-[{titles_sample}]
-DO NOT duplicate, copy, or slightly rephrase any of these titles or concepts. Every song in this batch must explore brand new metaphorical territory!
-"""
-
             persona_guidance = ""
             if self.vocal_persona and not any(k in self.vocal_persona for k in ["Natural", "ធម្មជាតិ", "Standard", "Studio"]):
                 persona_guidance = f"""
@@ -1074,20 +1143,52 @@ Reflect this in `style_prompt` with authentic microphone type, room acoustics, v
             if self.album_arc:
                 album_arc_guidance = f"""
 ALBUM CONCEPT ARC MANDATE:
-The batch of {self.count} songs MUST form a cohesive concept album arc:
-- Track 1: Ambient Overture / Cinematic Intro
-- Track 2: Upbeat Radio Lead Single
-- Track 3: Driving Mid-Tempo Groove
-- Track 4: Vulnerable Deep Cut Ballad
-- Track 5: Fast Crossover Anthem
-- Mid-Album Tracks: Narrative development & stylistic exploration
-- Track {max(1, self.count - 1)}: Epic Emotional Climax & High Stakes
-- Track {self.count}: Cathartic Epilogue / Piano Outro
+The batch of {self.count} songs MUST form a cohesive concept album arc across progressive emotional chapters.
 Each song object MUST include an "album_role" field describing its position in the story.
 """
 
-            prompt = f"""You are an elite Grammy-winning music producer, master lyricist, and prompt engineer for Suno AI (v3.5, v4, and v6).
-Generate a batch of exactly {self.count} completely UNIQUE, non-duplicate, deeply meaningful, radio-ready songs based on this theme/mood: "{self.theme}".
+            # Pre-assign unique per-track Human Story DNA slots (unique setting, real-life object, POV, BPM, key, structure)
+            dna_slots = AntiClicheEngine.generate_unique_track_dna_slots(
+                count=self.count,
+                language=self.language,
+                offset=self.offset
+            )
+
+            # Chunked Micro-Batch Generation (5 songs/call for full human depth & zero cross-track cloning)
+            chunk_size = 5
+            final_songs = []
+            used_bpm_keys = set()
+            rolling_banned_titles = list(all_banned_titles)
+            rolling_banned_hooks = list(all_banned_hooks)
+            is_both_mode = self.language in ["Both", "both"] or "Both" in self.language
+
+            total_chunks = (self.count + chunk_size - 1) // chunk_size
+            for chunk_idx in range(total_chunks):
+                start_i = chunk_idx * chunk_size
+                end_i = min(self.count, start_i + chunk_size)
+                chunk_slots = dna_slots[start_i:end_i]
+                chunk_len = len(chunk_slots)
+
+                # Build unique slot assignment instructions for this micro-batch
+                slot_lines = []
+                for sl in chunk_slots:
+                    slot_lines.append(
+                        f"  • Track #{sl['slot_num']:02d} [{sl['lang']}] | Target: {sl['bpm']}, Key: {sl['key']} | "
+                        f"Real-World Scene: {sl['setting']} | Tangible Anchor: {sl['object']} | "
+                        f"Human POV: {sl['pov']} | Structure: {sl['structure']}"
+                    )
+                slots_block = "\n".join(slot_lines)
+
+                existing_guidance = ""
+                if rolling_banned_titles:
+                    titles_sample = ", ".join([f'"{t}"' for t in rolling_banned_titles[-45:]])
+                    existing_guidance += f"\nBANNED ALREADY-USED TITLES (NEVER REPEAT OR REPHRASE):\n[{titles_sample}]\n"
+                if rolling_banned_hooks:
+                    hooks_sample = " | ".join([f'"{h}"' for h in rolling_banned_hooks[-18:]])
+                    existing_guidance += f"\nBANNED ALREADY-USED CHORUS HOOKS (WRITE BRAND NEW MELODIC IDEAS):\n[{hooks_sample}]\n"
+
+                prompt = f"""You are an acclaimed human hit songwriter (like Taylor Swift, Max Martin, Sinn Sisamouth, and VannDa) writing completely original, deeply human lyrics and Suno AI style prompts.
+Generate exactly {chunk_len} completely UNIQUE songs (Batch Chunk {chunk_idx + 1}/{total_chunks}) based on theme/mood: "{self.theme}".
 {lang_instruction}
 {vocal_instruction}
 {persona_guidance}
@@ -1098,154 +1199,166 @@ Generate a batch of exactly {self.count} completely UNIQUE, non-duplicate, deepl
 {existing_guidance}
 
 ==================================================
-CRITICAL ANTI-DUPLICATION & LYRICAL DEPTH RULES:
+ASSIGNED UNIQUE HUMAN STORY DNA PER TRACK (FOLLOW STRICTLY):
 ==================================================
-1. STRICT ZERO-CLONE MANDATE:
-   - Every single track MUST belong to a distinct genre/sub-genre.
-   - Every single track MUST have a distinct BPM across varied tempo tiers (<75 slow ballad, 82-96 mid-groove, 112-126 driving pop/dance, 136-160 high energy, 3/4 waltz).
-   - Every single track MUST rotate to a different musical key (Am, Dm, G, F#m, C, Eb, Bm, E, Bb, C#m, F, Gm).
-   - NO TWO TRACKS may share the same BPM + Musical Key combination.
+{slots_block}
 
-2. BERKLEE SENSORY OBJECT WRITING & ANTI-CLICHE MANDATE:
-   - SENSORY OBJECTS: Anchor verses with vivid, tangible physical objects (e.g. coffee steam, rain on vinyl jackets, wool cardigans, humming neon signs, rusted padlocks) instead of generic abstractions. "Show, don't tell."
-   - BEHAVIORAL SUBTEXT: Express emotion through observable human behavior (setting two plates out of habit, leaving a porch light on).
-   - POWER BRIDGE REVELATION: The bridge MUST provide an emotional epiphany or twist that recontextualizes the whole song.
-   - FORBIDDEN rhymes: night/light, heart/apart, rain/pain, fire/desire, eyes/lies, hold/cold, tears/fears. Use modern slant rhymes.
-   - If language is Khmer: Infuse authentic cultural imagery (ស្ទឹងសង្កែ, ផ្កាចំប៉ី, គុណឪពុកម្តាយ, ឈាមជ័រខ្មែរ), Chbap poetic rhymes, and emotional weight.
+==================================================
+AUTHENTIC HUMAN SONGWRITING CRAFT (ZERO AI-SLOP):
+==================================================
+1. STRICT AI-SLOP BLACKLIST — NEVER USE THESE OVERUSED AI WORDS:
+   - BANNED English words: neon, labyrinth, tapestry, symphony, kaleidoscope, abyss, shattered, embers, echoes, whispers, shadows, velvet, crimson, bittersweet, celestial, oasis, reverie, silhouette, phantom, 3 AM.
+   - BANNED clichés & nursery rhymes: night/light, heart/apart, rain/pain, fire/desire, eyes/lies, tears/fears, "broken heart in pieces", "ទឹកភ្នែកហូរដូចស្ទឹង", "ស្រមោលអតីតកាល", "ពន្លឺភ្លើងនេអុង", "មេឃខ្មៅងងឹត".
+   - NEVER recycle the same metaphor or opening line across tracks.
 
-3. SUNO V3.5/V4/V6 MICRO-GENRE PROMPT FORMAT:
-   - For `style_prompt`, produce comma-separated professional descriptors under {self.style_limit} characters.
-   - Include: [micro-genre, mood, exact BPM, musical key, specific instruments (e.g. Rhodes piano, Martin acoustic, Moog bass, LinnDrum, cello), vocal timbre, audio engineering aesthetic (e.g. analog tape flutter, spatial reverb, crisp master)].
-   - NEVER use generic tags like "good music" or "sad song".
+2. WRITE LIKE A REAL LIVING HUMAN SONGWRITER:
+   - CONVERSATIONAL REALISM: Use real spoken phrasing, natural contractions (didn't, ain't, wanna, 'cause), quiet pauses, and imperfect human honesty — NOT stiff robotic poetry.
+   - FOR KHMER SONGS: Write warm, natural, emotionally grounded Khmer used by real Khmer singers and everyday people (e.g. អូនហ្អើយ, បងមិនដឹងថា, ម៉េចក៏ស្ងាត់ម្ល៉េះ, រឿងតូចៗក្នុងជីវិតពិត) paired with smooth Khmer rhyme cadence (ចាប់ចុងចួនពាក្យ៧ ឬ ពាក្យ៨). Never sound like literal Google Translate.
+   - SHOW, DON'T TELL: Build each verse around the assigned Tangible Anchor and Human POV above. Use concrete everyday actions instead of saying "I am sad".
+   - FULL SONG ARCHITECTURE: Include rich Verse 1 (4-6 lines), Pre-Chorus, memorable sing-along Chorus (4-6 lines), Verse 2 (new story detail), emotional Bridge twist, and Outro.
 
-4. STRUCTURAL BLUEPRINT VARIATION:
-   - Vary lyric structures across tracks (some with [Intro] -> [Verse] -> [Pre-Chorus] -> [Chorus]; some starting immediately with [Chorus Hook]; some with [Spoken Intro]; some with [Bridge Guitar Solo]; some with [Drop]).
+3. SUNO V3.5/V4/V6 MICRO-GENRE STYLE PROMPT:
+   - Keep `style_prompt` strictly under {self.style_limit} characters.
+   - Include: specific sub-genre, mood, exact assigned BPM, assigned musical key, 2-3 real studio instruments, authentic vocal texture, and organic mix tone (warm room acoustics, natural breath).
 
-Return ONLY a valid JSON array of {self.count} song objects, with no markdown code blocks or conversational text.
-Format for each object:
+Return ONLY a valid JSON array of {chunk_len} song objects, with no markdown fences or commentary.
+Format:
 {{
   "id": 1,
-  "title": "Evocative 2-4 Word Song Title",
+  "title": "Natural Evocative 2-4 Word Title",
   "genre": "Precise Sub-genre",
   "bpm": "74 BPM",
   "key": "F#m",
-  "style_prompt": "micro-genre, mood, 74 BPM, Key: F#m, instruments, vocal timbre, production aesthetic (STRICTLY under {self.style_limit} characters)",
-  "lyrics": "[Section 1]\n...\n[Section 2]\n...\n[Section 3]\n...\n[Outro]"
+  "style_prompt": "comma-separated descriptors strictly under {self.style_limit} chars",
+  "lyrics": "[Verse 1]\\n...\\n[Chorus]\\n...\\n[Verse 2]\\n...\\n[Bridge]\\n...\\n[Outro]"
 }}
 """
-            self.status_update.emit(f"AI Anti-Duplication Engine generating {self.count} unique song architectures with {model_name}...")
-            result = generate_with_gemini(prompt, model_name, on_retry=lambda msg: self.status_update.emit(msg))
+                self.status_update.emit(
+                    f"✍️ Composing Human Batch Chunk {chunk_idx + 1}/{total_chunks} "
+                    f"(Tracks #{start_i + 1}–#{end_i} via {model_name})..."
+                )
+                result = generate_with_gemini(
+                    prompt,
+                    model_name,
+                    on_retry=lambda msg: self.status_update.emit(msg),
+                    temperature=0.95,
+                    timeout_ms=30000
+                )
 
-            # Clean and parse JSON response
-            clean_json = result.strip()
-            if clean_json.startswith("```json"):
-                clean_json = clean_json[7:]
-            elif clean_json.startswith("```"):
-                clean_json = clean_json[3:]
-            if clean_json.endswith("```"):
-                clean_json = clean_json[:-3]
-            clean_json = clean_json.strip()
+                # Clean and parse JSON response
+                clean_json = result.strip()
+                if clean_json.startswith("```json"):
+                    clean_json = clean_json[7:]
+                elif clean_json.startswith("```"):
+                    clean_json = clean_json[3:]
+                if clean_json.endswith("```"):
+                    clean_json = clean_json[:-3]
+                clean_json = clean_json.strip()
 
-            songs_data = []
-            try:
-                songs_data = json.loads(clean_json)
-                if isinstance(songs_data, dict):
-                    for k in ["songs", "tracks", "data", "list"]:
-                        if k in songs_data and isinstance(songs_data[k], list):
-                            songs_data = songs_data[k]
-                            break
-            except Exception:
-                m = re.search(r'\[\s*\{.*\}\s*\]', clean_json, re.DOTALL)
-                if m:
-                    try:
-                        songs_data = json.loads(m.group(0))
-                    except Exception:
-                        pass
+                chunk_data = []
+                try:
+                    chunk_data = json.loads(clean_json)
+                    if isinstance(chunk_data, dict):
+                        for k in ["songs", "tracks", "data", "list"]:
+                            if k in chunk_data and isinstance(chunk_data[k], list):
+                                chunk_data = chunk_data[k]
+                                break
+                except Exception:
+                    m = re.search(r'\[\s*\{.*\}\s*\]', clean_json, re.DOTALL)
+                    if m:
+                        try:
+                            chunk_data = json.loads(m.group(0))
+                        except Exception:
+                            pass
 
-            if not songs_data or not isinstance(songs_data, list):
-                self.status_update.emit("Formatting professional grid...")
-                songs_data = self._get_demo_batch(self.theme, self.language, self.count, self.diversity_mode, offset=self.offset, depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc)
+                if not chunk_data or not isinstance(chunk_data, list):
+                    chunk_data = self._get_demo_batch(
+                        self.theme, self.language, chunk_len, self.diversity_mode,
+                        offset=self.offset + start_i, existing_titles=rolling_banned_titles,
+                        depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc
+                    )
 
-            # Ensure all songs have required fields and proper length
-            final_songs = []
-            is_both_mode = self.language in ["Both", "both"] or "Both" in self.language
-            for i, s in enumerate(songs_data[:self.count]):
-                t_val = s.get("title", f"Track {self.offset + i + 1}")
-                l_val = s.get("lyrics", "[Verse 1]\nWalking down the road...")
-                has_kh = any('\u1780' <= c <= '\u17ff' for c in t_val + l_val)
-                track_lang = "Khmer" if has_kh else ("Khmer" if (is_both_mode and i % 2 == 0) else "English")
-                # Determine poetic meter
-                m_val = s.get("meter", "")
-                if not m_val:
-                    if "Bilingual" in self.depth_mode or "Fusion" in track_lang:
-                        m_val = "Bilingual Fusion (ខ្មែរ + EN Hook)"
-                    elif track_lang == "Khmer":
-                        if "ពាក្យ ៧" in self.depth_mode:
-                            m_val = "បទពាក្យ ៧ (Pathya Vat)"
-                        elif "ពាក្យ ៨" in self.depth_mode:
-                            m_val = "បទពាក្យ ៨ (Prom Git)"
-                        elif "ពាក្យ ៤" in self.depth_mode:
-                            m_val = "បទពាក្យ ៤ (Kkak Gatei)"
+                for local_idx, s in enumerate(chunk_data[:chunk_len]):
+                    global_i = start_i + local_idx
+                    slot_info = chunk_slots[local_idx]
+                    t_val = s.get("title", f"Track {self.offset + global_i + 1}")
+                    l_val = s.get("lyrics", "[Verse 1]\n...")
+                    has_kh = any('\u1780' <= c <= '\u17ff' for c in t_val + l_val)
+                    track_lang = "Khmer" if has_kh else ("Khmer" if (is_both_mode and global_i % 2 == 0) else "English")
+
+                    m_val = s.get("meter", "")
+                    if not m_val:
+                        if "Bilingual" in self.depth_mode or "Fusion" in track_lang:
+                            m_val = "Bilingual Fusion (ខ្មែរ + EN Hook)"
+                        elif track_lang == "Khmer":
+                            if "ពាក្យ ៧" in self.depth_mode:
+                                m_val = "បទពាក្យ ៧ (Pathya Vat)"
+                            elif "ពាក្យ ៨" in self.depth_mode:
+                                m_val = "បទពាក្យ ៨ (Prom Git)"
+                            elif "ពាក្យ ៤" in self.depth_mode:
+                                m_val = "បទពាក្យ ៤ (Kkak Gatei)"
+                            else:
+                                m_val = "កាព្យខ្មែរ (Khmer Meter)"
                         else:
-                            m_val = "កាព្យខ្មែរ (Khmer Meter)"
-                    else:
-                        m_val = "AABB / Modern Prosody"
+                            m_val = "Modern Human Prosody"
 
-                # Album Arc Role Assignment
-                album_roles_10 = [
-                    "💿 Track 01: Overture / Ambient Intro",
-                    "💿 Track 02: Lead Radio Single",
-                    "💿 Track 03: Driving Mid-Tempo Groove",
-                    "💿 Track 04: Vulnerable Deep Cut Ballad",
-                    "💿 Track 05: Fast Crossover Anthem",
-                    "💿 Track 06: Acoustic Interlude",
-                    "💿 Track 07: Dark Turning Point",
-                    "💿 Track 08: Epic Emotional Climax",
-                    "💿 Track 09: Anthemic Reprise & Drop",
-                    "💿 Track 10: Epilogue & Piano Outro"
-                ]
-                assigned_role = s.get("album_role", "")
-                if not assigned_role and self.album_arc:
-                    assigned_role = album_roles_10[(self.offset + i) % len(album_roles_10)]
+                    album_roles_10 = [
+                        "💿 Track 01: Overture / Ambient Intro",
+                        "💿 Track 02: Lead Radio Single",
+                        "💿 Track 03: Driving Mid-Tempo Groove",
+                        "💿 Track 04: Vulnerable Deep Cut Ballad",
+                        "💿 Track 05: Fast Crossover Anthem",
+                        "💿 Track 06: Acoustic Interlude",
+                        "💿 Track 07: Dark Turning Point",
+                        "💿 Track 08: Epic Emotional Climax",
+                        "💿 Track 09: Anthemic Reprise & Drop",
+                        "💿 Track 10: Epilogue & Piano Outro"
+                    ]
+                    assigned_role = s.get("album_role", "")
+                    if not assigned_role and self.album_arc:
+                        assigned_role = album_roles_10[(self.offset + global_i) % len(album_roles_10)]
 
-                # Hit Quality & Rhyme Density Scorer
-                q_hit = int(s.get("quality_score", 92 + ((self.offset + i * 3) % 7)))
-                q_rhyme = int(s.get("rhyme_score", 90 + ((self.offset + i * 5) % 8)))
+                    song_obj = {
+                        "id": self.offset + global_i + 1,
+                        "title": t_val,
+                        "album_role": assigned_role,
+                        "genre": s.get("genre", "Modern Pop"),
+                        "bpm": s.get("bpm", slot_info["bpm"]),
+                        "key": s.get("key", slot_info["key"]),
+                        "meter": m_val,
+                        "style_prompt": s.get("style_prompt", f"{s.get('genre', 'pop')}, {slot_info['bpm']}, clean studio mix")[:self.style_limit],
+                        "lyrics": l_val,
+                        "language": track_lang
+                    }
+                    song_obj = _finalize_and_score(song_obj, used_bpm_keys, final_songs)
+                    final_songs.append(song_obj)
 
-                # Novelty Scorer via Anti-Cliché Engine
-                from app.anti_cliche_engine import AntiClicheEngine
-                novelty_res = AntiClicheEngine.calculate_novelty_score(t_val, l_val, track_lang)
+                    # Feed newly created title & hook immediately into next chunk's ban list
+                    rolling_banned_titles.append(song_obj["title"])
+                    new_hook = AntiClicheEngine.extract_chorus_hook(song_obj["lyrics"])
+                    if new_hook:
+                        rolling_banned_hooks.append(new_hook)
 
-                song_obj = {
-                    "id": self.offset + i + 1,
-                    "title": t_val,
-                    "album_role": assigned_role,
-                    "genre": s.get("genre", "Modern Pop"),
-                    "bpm": s.get("bpm", "120 BPM"),
-                    "key": s.get("key", "C"),
-                    "meter": m_val,
-                    "quality_score": q_hit,
-                    "rhyme_score": q_rhyme,
-                    "novelty_score": novelty_res["score"],
-                    "novelty_badge": novelty_res["badge"],
-                    "style_prompt": s.get("style_prompt", f"{s.get('genre', 'pop')}, 120 BPM, clean studio mix")[:self.style_limit],
-                    "lyrics": l_val,
-                    "language": track_lang
-                }
-                final_songs.append(song_obj)
-                self.song_ready.emit(song_obj, i + 1, len(songs_data[:self.count]))
-                time.sleep(0.015)
+                    self.song_ready.emit(song_obj, len(final_songs), self.count)
+                    time.sleep(0.015)
 
+            # Persist all generated songs to Cross-Session Memory Vault on disk
+            BatchMemoryVault.record_songs(final_songs)
             self.batch_finished.emit(final_songs)
 
         except Exception as e:
-            # Seamless fallback to demo batch with offset so user is never blocked
+            # Seamless fallback to demo batch with offset & persistent vault awareness
             self.status_update.emit(f"⚠️ Live API Offline ({str(e)[:35]}...) - បង្កើតបទ Demo ជំនួស")
-            songs = self._get_demo_batch(self.theme, self.language, self.count, self.diversity_mode, offset=self.offset, existing_titles=self.existing_titles, depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc)
+            songs = self._get_demo_batch(self.theme, self.language, self.count, self.diversity_mode, offset=self.offset, existing_titles=all_banned_titles, depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc)
+            used_pairs = set()
+            final_fallback = []
             for idx, s in enumerate(songs):
+                s = _finalize_and_score(s, used_pairs, final_fallback)
+                final_fallback.append(s)
                 self.song_ready.emit(s, idx + 1, len(songs))
                 time.sleep(0.015)
-            self.batch_finished.emit(songs)
+            BatchMemoryVault.record_songs(final_fallback)
+            self.batch_finished.emit(final_fallback)
 
     def _get_demo_batch(self, theme: str, language: str, count: int, diversity_mode: str = "Wide Spectrum", offset: int = 0, existing_titles: list = None, depth_mode: str = "", vocal_persona: str = "", album_arc: bool = False) -> list:
         bilingual_templates = [

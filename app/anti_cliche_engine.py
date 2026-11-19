@@ -10,9 +10,12 @@ Features:
 - Album Concept Arc Narratives (5-Track EP & 10-Track LP)
 """
 
+import json
 import random
 import re
-from typing import Dict, List, Tuple
+from pathlib import Path
+from typing import Dict, List, Set, Tuple
+from app.config import CONFIG_DIR
 
 # ── 1. UNEXPECTED SETTINGS & ATMOSPHERES ──
 KHMER_UNEXPECTED_SETTINGS = [
@@ -103,6 +106,73 @@ ENGLISH_CLICHE_BLACKLIST = [
     "love is a battlefield", "you tore my world apart"
 ]
 
+# Single-word / short AI-slop giveaways that make lyrics sound machine-generated
+AI_SLOP_WORDS_EN = [
+    "neon", "labyrinth", "tapestry", "symphony", "kaleidoscope", "abyss",
+    "shattered", "embers", "echoes", "whispers", "shadows", "velvet",
+    "crimson", "bittersweet", "enigma", "celestial", "reverie", "oasis",
+    "silhouette", "phantom", "luminescent"
+]
+
+AI_SLOP_PHRASES_KH = [
+    "ស្រមោលអតីតកាល", "បេះដូងបែកជាបំណែក", "ទឹកភ្នែកហូរដូចស្ទឹង",
+    "រាត្រីដ៏សែនស្ងាត់", "ពន្លឺភ្លើងនេអុង", "ដួងចិត្តរងកម្ម",
+    "មេឃខ្មៅងងឹត", "ស្នេហាអមតៈ"
+]
+
+# Authentic everyday human POV / narrative angles (rotated per track)
+HUMAN_POV_ANGLES_EN = [
+    "2 AM voice memo you almost deleted before sending",
+    "Talking quietly to a close friend over cheap street food after a long week",
+    "Driving home alone with one window cracked open after a late shift",
+    "Cleaning out a drawer and finding an ordinary receipt or spare key",
+    "Sitting on the front steps watching the neighbor's porch light turn off",
+    "Overhearing a familiar laugh in a grocery store aisle and freezing",
+    "Packing a suitcase for a new city while pretending not to look back",
+    "Typing a 3-line text message, erasing it twice, and putting the phone face down",
+    "Riding the last bus home with fog on the window and headphones at half volume",
+    "Waking up early on a Sunday before anyone else in the house is awake",
+    "Sitting in a parked car outside someone's house for five minutes then driving off",
+    "Cooking dinner for one and accidentally setting two bowls on the counter",
+]
+
+HUMAN_POV_ANGLES_KH = [
+    "សារសំឡេងពេលយប់ដែលចុចថតហើយ តែមិនហ៊ានចុចផ្ញើ (Unsent voice memo)",
+    "អង្គុយជជែកលេងជាមួយមិត្តភក្តិនៅតុជ័រក្បែរផ្លូវ ក្រោយចេញពីធ្វើការហត់នឿយ",
+    "ជិះម៉ូតូត្រឡប់ទៅផ្ទះម្នាក់ឯងក្រោមភ្លៀងរលឹម មើលភ្លើងស្តុបផ្លាស់ប្តូរពណ៌",
+    "រៀបចំបន្ទប់ចាស់ ហើយប្រទះឃើញរបស់តូចមួយដែលធ្លាប់ប្រើជាមួយគ្នា",
+    "អង្គុយមុខផ្ទះពេលល្ងាច ស្តាប់សំឡេងទឹកភ្លៀងធ្លាក់លើដំបូលស័ង្កសី",
+    "ឃើញមនុស្សមុខដូចគេដើរកាត់ផ្សារ ហើយភ្លេចខ្លួនងាកមើលតាម",
+    "រៀបចំវ៉ាលីឡើងភ្នំពេញរកការងារ ទាំងអាល័យឪពុកម្តាយនៅស្រុកកំណើត",
+    "សរសេរសារចង់សួរសុខទុក្ខ តែលុបចោលវិញហើយបិទអេក្រង់ទូរស័ព្ទ",
+    "ភ្ញាក់ពីព្រលឹមឆុងកាហ្វេទឹកដោះគោទឹកកក តែភ្លេចថាគ្មានអ្នកផឹកជាមួយទៀតទេ",
+    "អង្គុយលើស្ពានមើលទឹកហូរពេលថ្ងៃជិតលិច នឹកឃើញសម្តីធ្លាប់សន្យា",
+    "ដើរទិញឥវ៉ាន់ម្នាក់ឯង ហើយនៅតែភ្លេចខ្លួនរើសរសជាតិដែលគេចូលចិត្ត",
+    "លួចមើលរូបភាពចាស់ក្នុងទូរស័ព្ទ ហើយញញឹមទាំងមិនដឹងខ្លួន",
+]
+
+EVERYDAY_REAL_OBJECTS_EN = [
+    "a faded gas station receipt", "a half-charged phone on the nightstand",
+    "an oversized hoodie on the back of a chair", "a chipped ceramic mug",
+    "raindrops streaking a windshield", "two mismatched coffee cups",
+    "a bent spare house key", "a dusty pair of sneakers by the door",
+    "cold takeout noodles on the stove", "a scratched sunglasses lens",
+    "a tangled pair of wired earbuds", "a laundry basket left on the stairs",
+    "headlights sweeping across the bedroom ceiling", "a handwritten grocery list",
+    "a cracked screen protector", "an empty passenger seat"
+]
+
+EVERYDAY_REAL_OBJECTS_KH = [
+    "កែវកាហ្វេទឹកកកដែលរលាយអស់", "មួកសុវត្ថិភាពចាស់នៅលើម៉ូតូ",
+    "សំឡេងទឹកភ្លៀងលើដំបូលស័ង្កសី", "អាវរងារចាស់ព្យួរក្រោយទ្វារ",
+    "កៅអីជ័រមុខតូបលក់បបរពេលយប់", "ទូរស័ព្ទសល់ថ្ម ១០ ភាគរយ",
+    "ស្បែកជើងមួយគូនៅមាត់ជណ្តើរ", "កូនសោផ្ទះច្រែះចាប់",
+    "ធុងទឹកកកក្រហមក្បែរផ្លូវ", "សៀវភៅកំណត់ត្រាសល់ទំព័រទទេ",
+    "ពន្លឺភ្លើងម៉ូតូជះកាត់ផ្លូវដីសើម", "រូបថតចាស់ក្នុងកាបូបលុយ",
+    "ឆ្នាំងបាយអគ្គិសនីដាំតែម្នាក់ឯង", "ផ្សែងចង្ក្រានធ្យូងពេលព្រឹកព្រលឹម",
+    "បង្អួចឈើដែលបក់ខ្យល់ឮសូរក្រិកៗ", "ទឹកសន្សើមលើកញ្ចក់ម៉ូតូ"
+]
+
 # ── 5. ALBUM STORY ARC TEMPLATES ──
 ALBUM_ARCS = {
     "5_track_ep": [
@@ -189,11 +259,25 @@ class AntiClicheEngine:
                 cliche_hits.append(phrase)
                 score -= 8
 
-        # Reward sensory grounding keywords
+        # Penalize single-word AI-slop giveaways
+        slop_list = AI_SLOP_PHRASES_KH if is_khmer else AI_SLOP_WORDS_EN
+        for sw in slop_list:
+            if is_khmer:
+                if sw in text_lower:
+                    cliche_hits.append(sw)
+                    score -= 5
+            else:
+                if re.search(rf'\b{re.escape(sw)}\b', text_lower):
+                    cliche_hits.append(sw)
+                    score -= 4
+
+        # Reward grounded, everyday sensory human details (NOT AI-slop)
         sensory_words = [
-            "brass", "coffee", "key", "smoke", "rain", "neon", "mirror", "tape",
-            "wood", "salt", "whisper", "train", "clock", "window", "shadow",
-            "កែវ", "កូនសោ", "ភ្លៀង", "កាហ្វេ", "ផ្សែង", "ស្ពាន", "ផ្លូវ", "ទូក", "នាឡិកា"
+            "coffee", "key", "receipt", "hoodie", "porch", "mug", "windshield",
+            "pocket", "stairs", "kitchen", "bus", "train", "clock", "window",
+            "street", "jacket", "phone", "seat", "counter", "shoes", "radio",
+            "កែវ", "កូនសោ", "ភ្លៀង", "កាហ្វេ", "ម៉ូតូ", "ស្ពាន", "ផ្លូវ", "ដំបូល",
+            "នាឡិកា", "អាវ", "បង្អួច", "តុ", "ស្បែកជើង", "ទូរស័ព្ទ", "បបរ", "កៅអី"
         ]
         sensory_count = sum(1 for w in sensory_words if w in text_lower)
         score += min(7, sensory_count * 2)
@@ -259,4 +343,198 @@ class AntiClicheEngine:
         mutated["novelty_badge"] = novelty["badge"]
 
         return mutated
+
+    @classmethod
+    def generate_unique_track_dna_slots(
+        cls,
+        count: int,
+        language: str = "Both",
+        offset: int = 0
+    ) -> List[Dict[str, str]]:
+        """
+        Pre-assigns each track slot in a batch its own non-repeating real-world setting,
+        tangible everyday object, POV narrative angle, musical BPM tier, and musical key
+        so no two tracks in a batch (or across runs) ever collapse into clones.
+        """
+        rng = random.SystemRandom()
+
+        bpms_pool = [66, 72, 76, 82, 88, 94, 102, 108, 115, 122, 128, 134, 140, 148, 156, 70, 85, 98, 118, 132]
+        keys_pool = ["Am", "C", "Dm", "F", "Em", "G", "Bm", "D", "F#m", "A", "C#m", "E", "Gm", "Bb", "Cm", "Eb"]
+        structures_pool = [
+            "[Intro] -> [Verse 1] -> [Pre-Chorus] -> [Chorus] -> [Verse 2] -> [Bridge] -> [Final Chorus] -> [Outro]",
+            "[Chorus Hook Intro] -> [Verse 1] -> [Chorus] -> [Verse 2] -> [Bridge] -> [Outro]",
+            "[Spoken/Intimate Intro] -> [Verse 1] -> [Verse 2] -> [Chorus] -> [Instrumental Solo] -> [Final Chorus]",
+            "[Verse 1] -> [Pre-Chorus] -> [Chorus] -> [Post-Chorus] -> [Verse 2] -> [Drop/Bridge] -> [Outro]",
+            "[Acoustic Verse 1] -> [Chorus] -> [Verse 2] -> [Build-Up Bridge] -> [Stripped Chorus] -> [Fade Out]"
+        ]
+
+        rng.shuffle(bpms_pool)
+        rng.shuffle(keys_pool)
+
+        kh_settings = list(KHMER_UNEXPECTED_SETTINGS)
+        en_settings = list(ENGLISH_UNEXPECTED_SETTINGS)
+        kh_objects = list(EVERYDAY_REAL_OBJECTS_KH) + list(KHMER_SENSORY_OBJECTS)
+        en_objects = list(EVERYDAY_REAL_OBJECTS_EN) + list(ENGLISH_SENSORY_OBJECTS)
+        kh_povs = list(HUMAN_POV_ANGLES_KH)
+        en_povs = list(HUMAN_POV_ANGLES_EN)
+
+        for pool in [kh_settings, en_settings, kh_objects, en_objects, kh_povs, en_povs]:
+            rng.shuffle(pool)
+
+        is_kh_only = "khmer" in language.lower() or "ខ្មែរ" in language.lower()
+        is_en_only = language.lower() == "english"
+
+        slots = []
+        for i in range(count):
+            global_idx = offset + i
+            use_kh = True if is_kh_only else (False if is_en_only else (global_idx % 2 == 0))
+            bpm = bpms_pool[i % len(bpms_pool)] + rng.choice([-2, -1, 0, 1, 2])
+            key = keys_pool[i % len(keys_pool)]
+            struct = structures_pool[(global_idx + i) % len(structures_pool)]
+
+            if use_kh:
+                setting = kh_settings[i % len(kh_settings)]
+                obj = kh_objects[i % len(kh_objects)]
+                pov = kh_povs[i % len(kh_povs)]
+                lang_tag = "Khmer"
+            else:
+                setting = en_settings[i % len(en_settings)]
+                obj = en_objects[i % len(en_objects)]
+                pov = en_povs[i % len(en_povs)]
+                lang_tag = "English"
+
+            slots.append({
+                "slot_num": global_idx + 1,
+                "lang": lang_tag,
+                "bpm": f"{bpm} BPM",
+                "key": key,
+                "setting": setting,
+                "object": obj,
+                "pov": pov,
+                "structure": struct,
+            })
+        return slots
+
+    @staticmethod
+    def _extract_tokens(text: str) -> Set[str]:
+        cleaned = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", text.lower())
+        cleaned = re.sub(r"[^\w\u1780-\u17ff\s]", " ", cleaned)
+        tokens = [w for w in cleaned.split() if len(w) >= 2]
+        return set(tokens)
+
+    @staticmethod
+    def extract_chorus_hook(lyrics: str) -> str:
+        """Extracts the primary chorus or opening hook line for fingerprint deduplication."""
+        lines = [l.strip() for l in lyrics.split("\n") if l.strip()]
+        in_chorus = False
+        for line in lines:
+            low = line.lower()
+            if line.startswith("["):
+                in_chorus = ("chorus" in low or "បន្ទរ" in low or "hook" in low)
+                continue
+            if in_chorus and not line.startswith("("):
+                return line[:90]
+        # Fallback: first non-tag line
+        for line in lines:
+            if not line.startswith("[") and not line.startswith("("):
+                return line[:90]
+        return ""
+
+    @classmethod
+    def compute_similarity(cls, title_a: str, lyrics_a: str, title_b: str, lyrics_b: str) -> float:
+        """
+        Returns a 0.0-1.0 similarity ratio combining normalized title overlap
+        and lyric vocabulary Jaccard similarity.
+        """
+        ta_norm = re.sub(r"\s*\([^)]*\)", "", title_a or "").strip().lower()
+        tb_norm = re.sub(r"\s*\([^)]*\)", "", title_b or "").strip().lower()
+        if ta_norm and tb_norm and ta_norm == tb_norm:
+            return 1.0
+
+        tok_ta = cls._extract_tokens(ta_norm)
+        tok_tb = cls._extract_tokens(tb_norm)
+        title_sim = (len(tok_ta & tok_tb) / max(1, len(tok_ta | tok_tb))) if (tok_ta and tok_tb) else 0.0
+
+        tok_la = cls._extract_tokens(lyrics_a or "")
+        tok_lb = cls._extract_tokens(lyrics_b or "")
+        lyric_sim = (len(tok_la & tok_lb) / max(1, len(tok_la | tok_lb))) if (tok_la and tok_lb) else 0.0
+
+        return max(title_sim * 0.9, lyric_sim)
+
+
+class BatchMemoryVault:
+    """
+    Persistent Cross-Session Lyric Fingerprint Vault (~/.lyric_ai_writer/batch_memory_vault.json).
+    Stores the last 300 generated song titles, chorus hooks, and themes across restarts
+    so newly generated batch tracks never duplicate old songs.
+    """
+    MAX_ENTRIES = 300
+
+    @classmethod
+    def _vault_path(cls) -> Path:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        return CONFIG_DIR / "batch_memory_vault.json"
+
+    @classmethod
+    def load_entries(cls) -> List[Dict[str, str]]:
+        p = cls._vault_path()
+        if not p.exists():
+            return []
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return [e for e in data if isinstance(e, dict) and e.get("title")]
+        except Exception:
+            pass
+        return []
+
+    @classmethod
+    def save_entries(cls, entries: List[Dict[str, str]]) -> None:
+        try:
+            trimmed = entries[-cls.MAX_ENTRIES:]
+            with open(cls._vault_path(), "w", encoding="utf-8") as f:
+                json.dump(trimmed, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    @classmethod
+    def record_songs(cls, songs: List[Dict]) -> int:
+        """Adds newly generated songs to persistent vault, deduplicating by title."""
+        entries = cls.load_entries()
+        existing_lower = {e.get("title", "").strip().lower() for e in entries}
+        for s in songs:
+            t = str(s.get("title", "")).strip()
+            if not t:
+                continue
+            tl = t.lower()
+            if tl in existing_lower:
+                continue
+            hook = AntiClicheEngine.extract_chorus_hook(str(s.get("lyrics", "")))
+            entries.append({
+                "title": t,
+                "hook": hook,
+                "genre": str(s.get("genre", "")),
+                "bpm": str(s.get("bpm", "")),
+                "key": str(s.get("key", "")),
+            })
+            existing_lower.add(tl)
+        cls.save_entries(entries)
+        return len(entries)
+
+    @classmethod
+    def get_banned_titles_and_hooks(cls, max_titles: int = 60, max_hooks: int = 25) -> Tuple[List[str], List[str]]:
+        entries = cls.load_entries()
+        recent = entries[-max_titles:]
+        titles = [e["title"] for e in recent if e.get("title")]
+        hooks = [e["hook"] for e in entries[-max_hooks:] if e.get("hook")]
+        return titles, hooks
+
+    @classmethod
+    def count(cls) -> int:
+        return len(cls.load_entries())
+
+    @classmethod
+    def clear(cls) -> None:
+        cls.save_entries([])
 
