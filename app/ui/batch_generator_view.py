@@ -5,17 +5,22 @@ with instant Style Prompts, Sectioned Lyrics, Suno v6 Metatag Injection,
 and 1-click Quick-Queue workflows for Suno v3.5 / v4 / v6.
 """
 
+import csv
+import io
 import json
 import re
+import zipfile
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTextEdit, QScrollArea, QFrame, QGridLayout,
     QComboBox, QApplication, QFileDialog, QMessageBox,
     QProgressBar, QMenu, QSizePolicy, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView
+    QHeaderView, QAbstractItemView, QStackedWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QAction
+from app.config import CONFIG_DIR
 from app.gemini_client import BatchGenerateWorker, DeepenLyricWorker
 from app.ui.styles import get_theme
 from app.ui.batch_song_dialog import StudioSongInspectorDialog
@@ -1016,10 +1021,14 @@ class BatchGeneratorView(QWidget):
         }
         self.metatag_pills = []
         self.inspector_dialog = None
+        self.current_sort_mode = "default"
+        self._suppress_autosave = True
 
         self._init_ui()
         self._update_dynamic_language_presets(self.current_lang)
-        self._load_initial_demo()
+        if not self._load_autosaved_batch():
+            self._load_initial_demo()
+        self._suppress_autosave = False
 
     def _calculate_columns(self) -> int:
         if getattr(self, "_user_fixed_cols", None):
@@ -1097,6 +1106,14 @@ class BatchGeneratorView(QWidget):
                 else:
                     btn.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; font-size: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;")
 
+    def _switch_sidebar_tab(self, index: int):
+        if hasattr(self, "side_tab_stack"):
+            self.side_tab_stack.setCurrentIndex(index)
+        if hasattr(self, "btn_side_quick"):
+            self.btn_side_quick.setChecked(index == 0)
+        if hasattr(self, "btn_side_pro"):
+            self.btn_side_pro.setChecked(index == 1)
+
     def _toggle_sidebar(self):
         target = getattr(self, "left_panel_container", getattr(self, "side_scroll", None))
         if not target:
@@ -1153,13 +1170,40 @@ class BatchGeneratorView(QWidget):
         main_layout.setSpacing(12)
 
         # ══════════════════════════════════════════════════════════════════
-        # ── LEFT CONTROLLER SIDEBAR (WIDTH ~ 365px - ZERO CLIPPING FIT) ──
+        # ── LEFT CONTROLLER SIDEBAR (2-TAB CLEAN STUDIO DECK, ZERO SCROLL) ─
         # ══════════════════════════════════════════════════════════════════
         self.left_panel_container = QWidget()
         self.left_panel_container.setFixedWidth(365)
         left_container_layout = QVBoxLayout(self.left_panel_container)
         left_container_layout.setContentsMargins(0, 0, 0, 0)
         left_container_layout.setSpacing(6)
+
+        # Clean 2-Tab Segmented Switcher (⚡ Quick Setup | 🎛️ Pro Control)
+        self.side_tab_bar = QFrame()
+        self.side_tab_bar.setObjectName("batchSideTabBar")
+        stb_layout = QHBoxLayout(self.side_tab_bar)
+        stb_layout.setContentsMargins(3, 3, 3, 3)
+        stb_layout.setSpacing(4)
+
+        self.btn_side_quick = QPushButton("⚡ Quick Setup")
+        self.btn_side_quick.setCheckable(True)
+        self.btn_side_quick.setChecked(True)
+        self.btn_side_quick.setFixedHeight(26)
+        self.btn_side_quick.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_side_quick.setToolTip("Essential controls: Theme, Language, Vocal & Track Count (Zero scrolling)")
+        self.btn_side_quick.clicked.connect(lambda: self._switch_sidebar_tab(0))
+        stb_layout.addWidget(self.btn_side_quick, 1)
+
+        self.btn_side_pro = QPushButton("🎛️ Pro Control")
+        self.btn_side_pro.setCheckable(True)
+        self.btn_side_pro.setChecked(False)
+        self.btn_side_pro.setFixedHeight(26)
+        self.btn_side_pro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_side_pro.setToolTip("Advanced controls: Story Seed, Depth, Persona, Diversity, Album Arc & Memory")
+        self.btn_side_pro.clicked.connect(lambda: self._switch_sidebar_tab(1))
+        stb_layout.addWidget(self.btn_side_pro, 1)
+
+        left_container_layout.addWidget(self.side_tab_bar)
 
         self.side_scroll = QScrollArea()
         self.side_scroll.setWidgetResizable(True)
@@ -1169,21 +1213,29 @@ class BatchGeneratorView(QWidget):
         self.side_scroll.setStyleSheet("background-color: transparent;")
 
         self.sidebar = QWidget()
-        side_layout = QVBoxLayout(self.sidebar)
-        side_layout.setContentsMargins(6, 4, 6, 4)
-        side_layout.setSpacing(4)
+        sidebar_root_layout = QVBoxLayout(self.sidebar)
+        sidebar_root_layout.setContentsMargins(2, 2, 2, 2)
+        sidebar_root_layout.setSpacing(0)
+
+        self.side_tab_stack = QStackedWidget()
+        sidebar_root_layout.addWidget(self.side_tab_stack)
+
+        # ── PAGE 0: ⚡ QUICK SETUP (Theme, Language, Vocal, Count) ──
+        quick_page = QWidget()
+        quick_layout = QVBoxLayout(quick_page)
+        quick_layout.setContentsMargins(4, 2, 4, 2)
+        quick_layout.setSpacing(6)
 
         # ── 1. SONG THEME / MOOD ──
         self.lbl_s1 = QLabel("🎵 1. THEME & MOOD • ប្រធានបទ")
-        lbl_s1 = self.lbl_s1
-        lbl_s1.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
-        side_layout.addWidget(lbl_s1)
+        self.lbl_s1.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        quick_layout.addWidget(self.lbl_s1)
 
         self.txt_theme = QTextEdit("sad song")
         self.txt_theme.setPlaceholderText("ឧទាហរណ៍: sad song, heartbreak, midnight drive, ស្រណោះស្រណោក...")
-        self.txt_theme.setFixedHeight(30)
-        self.txt_theme.setStyleSheet("padding: 2px 6px; font-size: 11px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #f1f5f9;")
-        side_layout.addWidget(self.txt_theme)
+        self.txt_theme.setFixedHeight(32)
+        self.txt_theme.setStyleSheet("padding: 3px 6px; font-size: 11px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #f1f5f9;")
+        quick_layout.addWidget(self.txt_theme)
 
         # 🎲 Anti-Cliché Concept Matrix Shuffler
         self.btn_roll_concept = QPushButton("🎲 Shuffler: គំនិតថ្មីប្លែក (Anti-Cliché Metaphor)")
@@ -1207,9 +1259,9 @@ class BatchGeneratorView(QWidget):
             }
         """)
         self.btn_roll_concept.clicked.connect(self._roll_fresh_anti_cliche_concept)
-        side_layout.addWidget(self.btn_roll_concept)
+        quick_layout.addWidget(self.btn_roll_concept)
 
-        # Quick Theme Inspiration Pills (3 spacious rows of 2 pills - zero clipping, ~155px each)
+        # Quick Theme Inspiration Pills (3 spacious rows of 2 pills)
         initial_theme_pills = self.theme_pills_data.get(self.current_lang, self.theme_pills_data["Both"])
         for row_pills in initial_theme_pills:
             t_row = QHBoxLayout()
@@ -1217,67 +1269,17 @@ class BatchGeneratorView(QWidget):
             for t_label, t_val in row_pills:
                 b = QPushButton(t_label)
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
-                b.setFixedHeight(23)
+                b.setFixedHeight(24)
                 b.setStyleSheet("background-color: #171d34; color: #94a3b8; border: 1px solid #253052; border-radius: 4px; padding: 2px 4px; font-size: 9.5px; font-weight: 600;")
                 b.clicked.connect(lambda _, v=t_val: self.txt_theme.setPlainText(v))
                 self.theme_pills.append(b)
                 t_row.addWidget(b, 1)
-            side_layout.addLayout(t_row)
+            quick_layout.addLayout(t_row)
 
-        # ── 2. STORY SEED / NARRATIVE BACKSTORY ──
-        self.lbl_s2 = QLabel("📖 2. STORY SEED • ដំណើររឿង")
-        lbl_s2 = self.lbl_s2
-        lbl_s2.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
-        side_layout.addWidget(lbl_s2)
-
-        self.txt_story_seed = QTextEdit()
-        self.txt_story_seed.setPlaceholderText("ឧទាហរណ៍: ជួបគ្នាម្តងទៀតក្រោយបែកគ្នា ១០ ឆ្នាំ, កូនខ្មែរតស៊ូពីបាតដៃទទេ...")
-        self.txt_story_seed.setFixedHeight(28)
-        self.txt_story_seed.setStyleSheet("padding: 2px 6px; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #e2e8f0;")
-        side_layout.addWidget(self.txt_story_seed)
-
-        # Quick Seed Pills (2 spacious rows of 2 pills - zero clipping, ~155px each)
-        initial_seed_pills = self.seed_pills_data.get(self.current_lang, self.seed_pills_data["Both"])
-        for row_seeds in initial_seed_pills:
-            s_row = QHBoxLayout()
-            s_row.setSpacing(4)
-            for s_label, s_val in row_seeds:
-                b = QPushButton(s_label)
-                b.setCursor(Qt.CursorShape.PointingHandCursor)
-                b.setFixedHeight(23)
-                b.setStyleSheet("background-color: #111827; color: #a5b4fc; border: 1px solid #374151; border-radius: 4px; padding: 2px 4px; font-size: 9.5px; font-weight: 600;")
-                b.clicked.connect(lambda _, v=s_val: self.txt_story_seed.setPlainText(v))
-                self.seed_pills.append(b)
-                s_row.addWidget(b, 1)
-            side_layout.addLayout(s_row)
-
-        # ── 3. LYRICAL DEPTH & MEANING MODE ──
-        self.lbl_s3 = QLabel("💎 3. LYRICAL DEPTH • ជម្រៅអត្ថន័យ")
-        lbl_s3 = self.lbl_s3
-        lbl_s3.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
-        side_layout.addWidget(lbl_s3)
-
-        self.combo_depth_mode = QComboBox()
-        self.combo_depth_mode.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.combo_depth_mode.setMinimumContentsLength(10)
-        self.combo_depth_mode.addItems([
-            "💔 Deep Catharsis (កម្សត់ជ្រៅ • ពាក្យ ៧)",
-            "📖 Narrative Storyteller (ដំណើររឿង • ពាក្យ ៨)",
-            "⚡ Fast Trap / Dance (ចង្វាក់ញាក់ • ពាក្យ ៤)",
-            "🌟 Classical Poetic Metaphor (រចនាបទកាព្យ ព្រហ្មគីតិ)",
-            "🌐 Bilingual Fusion (Khmer Verses + English Chorus Hook)",
-            "📻 Commercial Radio Hit (ចង្វាក់ទាក់ទាញ Billboard)"
-        ])
-        self.combo_depth_mode.currentTextChanged.connect(self._on_depth_mode_changed)
-        self.combo_depth_mode.setFixedHeight(25)
-        self.combo_depth_mode.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #7c3aed; border-radius: 4px; color: #c084fc;")
-        side_layout.addWidget(self.combo_depth_mode)
-
-        # ── 4. LYRICS LANGUAGE PILLS (1 Sleek Row - 5 Languages) ──
-        self.lbl_s4 = QLabel("🌐 4. LYRICS LANGUAGE • ភាសា")
-        lbl_s4 = self.lbl_s4
-        lbl_s4.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
-        side_layout.addWidget(lbl_s4)
+        # ── 2. LYRICS LANGUAGE PILLS ──
+        self.lbl_s4 = QLabel("🌐 2. LYRICS LANGUAGE • ភាសា")
+        self.lbl_s4.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        quick_layout.addWidget(self.lbl_s4)
 
         self.lang_buttons = {}
         langs_def_rows = [
@@ -1299,19 +1301,18 @@ class BatchGeneratorView(QWidget):
                 b.setCheckable(True)
                 b.setChecked(l_code == self.current_lang)
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
-                b.setFixedHeight(23)
+                b.setFixedHeight(24)
                 b.setToolTip(l_tip)
                 b.setStyleSheet(self._pill_style(l_code == self.current_lang))
                 b.clicked.connect(lambda _, code=l_code: self._set_language(code))
                 self.lang_buttons[l_code] = b
                 l_row.addWidget(b, 1)
-            side_layout.addLayout(l_row)
+            quick_layout.addLayout(l_row)
 
-        # ── 5. VOCAL TYPE CHIPS (1 Sleek Row - 4 Vocals) ──
-        self.lbl_s5 = QLabel("🎙️ 5. VOCAL FILTER • សំឡេង")
-        lbl_s5 = self.lbl_s5
-        lbl_s5.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
-        side_layout.addWidget(lbl_s5)
+        # ── 3. VOCAL TYPE CHIPS ──
+        self.lbl_s5 = QLabel("🎙️ 3. VOCAL FILTER • សំឡេង")
+        self.lbl_s5.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        quick_layout.addWidget(self.lbl_s5)
 
         self.vocal_buttons = {}
         for row_vocs in [
@@ -1325,28 +1326,118 @@ class BatchGeneratorView(QWidget):
                 b.setCheckable(True)
                 b.setChecked(v_code == "Mixed")
                 b.setCursor(Qt.CursorShape.PointingHandCursor)
-                b.setFixedHeight(23)
+                b.setFixedHeight(24)
                 b.setStyleSheet(self._pill_style(v_code == "Mixed"))
                 b.clicked.connect(lambda _, code=v_code: self._set_vocal(code))
                 self.vocal_buttons[v_code] = b
                 v_row.addWidget(b, 1)
-            side_layout.addLayout(v_row)
+            quick_layout.addLayout(v_row)
 
-        # Vocal Persona & Acoustic Stem Dropdown
+        # ── 4. SONG COUNT & STYLE LIMIT ──
+        count_row = QHBoxLayout()
+        count_row.setSpacing(6)
+
+        c_box = QVBoxLayout()
+        c_box.setSpacing(2)
+        self.lbl_count = QLabel("ចំនួនបទ (Count):")
+        self.lbl_count.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #94a3b8;")
+        c_box.addWidget(self.lbl_count)
+        self.combo_count = QComboBox()
+        self.combo_count.addItems(["5 បទ", "10 បទ", "15 បទ", "20 បទ", "30 បទ"])
+        self.combo_count.setCurrentText("20 បទ")
+        self.combo_count.setFixedHeight(26)
+        self.combo_count.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #a78bfa;")
+        self.combo_count.currentTextChanged.connect(self._on_count_changed)
+        c_box.addWidget(self.combo_count)
+        count_row.addLayout(c_box, 1)
+
+        s_box = QVBoxLayout()
+        s_box.setSpacing(2)
+        s_lbl = QLabel("Style Limit:")
+        s_lbl.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #94a3b8;")
+        s_box.addWidget(s_lbl)
+        self.combo_style_limit = QComboBox()
+        self.combo_style_limit.addItems(["200 Chars (Suno v3.5/v4/v6)", "120 Chars (Suno v3)"])
+        self.combo_style_limit.setFixedHeight(26)
+        self.combo_style_limit.setStyleSheet("padding: 1px 6px; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #38bdf8;")
+        self.combo_style_limit.currentTextChanged.connect(self._on_style_limit_changed)
+        s_box.addWidget(self.combo_style_limit)
+        count_row.addLayout(s_box, 2)
+
+        quick_layout.addLayout(count_row)
+        quick_layout.addStretch()
+        self.side_tab_stack.addWidget(quick_page)
+
+        # ── PAGE 1: 🎛️ PRO CONTROL (Story Seed, Depth, Persona, Diversity, Arc, Auto-Save) ──
+        pro_page = QWidget()
+        pro_layout = QVBoxLayout(pro_page)
+        pro_layout.setContentsMargins(4, 2, 4, 2)
+        pro_layout.setSpacing(6)
+
+        # ── STORY SEED / NARRATIVE BACKSTORY ──
+        self.lbl_s2 = QLabel("📖 STORY SEED • ដំណើររឿង")
+        self.lbl_s2.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        pro_layout.addWidget(self.lbl_s2)
+
+        self.txt_story_seed = QTextEdit()
+        self.txt_story_seed.setPlaceholderText("ឧទាហរណ៍: ជួបគ្នាម្តងទៀតក្រោយបែកគ្នា 10 ឆ្នាំ, កូនខ្មែរតស៊ូពីបាតដៃទទេ...")
+        self.txt_story_seed.setFixedHeight(36)
+        self.txt_story_seed.setStyleSheet("padding: 3px 6px; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #e2e8f0;")
+        pro_layout.addWidget(self.txt_story_seed)
+
+        initial_seed_pills = self.seed_pills_data.get(self.current_lang, self.seed_pills_data["Both"])
+        for row_seeds in initial_seed_pills:
+            s_row = QHBoxLayout()
+            s_row.setSpacing(4)
+            for s_label, s_val in row_seeds:
+                b = QPushButton(s_label)
+                b.setCursor(Qt.CursorShape.PointingHandCursor)
+                b.setFixedHeight(24)
+                b.setStyleSheet("background-color: #111827; color: #a5b4fc; border: 1px solid #374151; border-radius: 4px; padding: 2px 4px; font-size: 9.5px; font-weight: 600;")
+                b.clicked.connect(lambda _, v=s_val: self.txt_story_seed.setPlainText(v))
+                self.seed_pills.append(b)
+                s_row.addWidget(b, 1)
+            pro_layout.addLayout(s_row)
+
+        # ── LYRICAL DEPTH & MEANING MODE ──
+        self.lbl_s3 = QLabel("💎 LYRICAL DEPTH • ជម្រៅអត្ថន័យ")
+        self.lbl_s3.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        pro_layout.addWidget(self.lbl_s3)
+
+        self.combo_depth_mode = QComboBox()
+        self.combo_depth_mode.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.combo_depth_mode.setMinimumContentsLength(10)
+        self.combo_depth_mode.addItems([
+            "💔 Deep Catharsis (កម្សត់ជ្រៅ • ពាក្យ ៧)",
+            "📖 Narrative Storyteller (ដំណើររឿង • ពាក្យ ៨)",
+            "⚡ Fast Trap / Dance (ចង្វាក់ញាក់ • ពាក្យ ៤)",
+            "🌟 Classical Poetic Metaphor (រចនាបទកាព្យ ព្រហ្មគីតិ)",
+            "🌐 Bilingual Fusion (Khmer Verses + English Chorus Hook)",
+            "📻 Commercial Radio Hit (ចង្វាក់ទាក់ទាញ Billboard)"
+        ])
+        self.combo_depth_mode.currentTextChanged.connect(self._on_depth_mode_changed)
+        self.combo_depth_mode.setFixedHeight(26)
+        self.combo_depth_mode.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #7c3aed; border-radius: 4px; color: #c084fc;")
+        pro_layout.addWidget(self.combo_depth_mode)
+
+        # ── VOCAL PERSONA & ACOUSTIC REALISM ──
+        self.lbl_persona_head = QLabel("🎤 VOCAL PERSONA & ACOUSTIC STEM")
+        self.lbl_persona_head.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        pro_layout.addWidget(self.lbl_persona_head)
+
         self.combo_persona = QComboBox()
         self.combo_persona.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.combo_persona.setMinimumContentsLength(10)
         self.combo_persona.addItems(self.persona_presets_data["Both"])
-        self.combo_persona.setFixedHeight(24)
+        self.combo_persona.setFixedHeight(26)
         self.combo_persona.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 9.5px; background: #0b0f1f; border: 1px solid #3b82f6; border-radius: 4px; color: #93c5fd;")
         self.combo_persona.currentTextChanged.connect(self._on_persona_changed)
-        side_layout.addWidget(self.combo_persona)
+        pro_layout.addWidget(self.combo_persona)
 
-        # ── 6. DIVERSITY SPECTRUM & ANTI-DUPLICATION (Integrated Row) ──
-        self.lbl_s6 = QLabel("🎼 6. DIVERSITY & ANTI-DUPLICATION")
-        lbl_s6 = self.lbl_s6
-        lbl_s6.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
-        side_layout.addWidget(lbl_s6)
+        # ── DIVERSITY SPECTRUM & ANTI-DUPLICATION ──
+        self.lbl_s6 = QLabel("🎼 DIVERSITY & ANTI-DUPLICATION")
+        self.lbl_s6.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
+        pro_layout.addWidget(self.lbl_s6)
 
         div_dup_row = QHBoxLayout()
         div_dup_row.setSpacing(4)
@@ -1364,7 +1455,7 @@ class BatchGeneratorView(QWidget):
             "⚡ 80s Synthwave & Dance (ចង្វាក់រាំសម័យ)",
             "🌧️ Deep Emotional Melancholy (មនោសញ្ចេតនាជ្រៅ)"
         ])
-        self.combo_diversity.setFixedHeight(25)
+        self.combo_diversity.setFixedHeight(26)
         self.combo_diversity.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #4338ca; border-radius: 4px; color: #a5b4fc;")
         self.combo_diversity.currentTextChanged.connect(self._on_diversity_changed)
         div_dup_row.addWidget(self.combo_diversity, 1)
@@ -1373,13 +1464,13 @@ class BatchGeneratorView(QWidget):
         self.btn_anti_dup.setCheckable(True)
         self.btn_anti_dup.setChecked(True)
         self.btn_anti_dup.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_anti_dup.setFixedHeight(25)
-        self.btn_anti_dup.setFixedWidth(95)
+        self.btn_anti_dup.setFixedHeight(26)
+        self.btn_anti_dup.setFixedWidth(98)
         self.btn_anti_dup.setToolTip("Enforces 5-dimensional variance across all songs:\n• Shifts tempo tiers (<75, 85, 120, 140, 3/4 waltz)\n• Rotates musical keys (Am, Dm, G, F#m, C, Eb, Bm)\n• Blacklists AI rhyme clichés (night/light, fire/desire)\n• Enforces concrete physical imagery & micro-genre tags")
         self._update_anti_dup_style(True)
         self.btn_anti_dup.clicked.connect(self._toggle_anti_dup)
         div_dup_row.addWidget(self.btn_anti_dup)
-        side_layout.addLayout(div_dup_row)
+        pro_layout.addLayout(div_dup_row)
 
         # 💿 Concept Album Story Arc & 🧠 Cross-Batch Semantic Memory Tracker
         arc_mem_row = QHBoxLayout()
@@ -1389,63 +1480,53 @@ class BatchGeneratorView(QWidget):
         self.btn_album_arc_toggle.setCheckable(True)
         self.btn_album_arc_toggle.setChecked(getattr(self, "album_arc_enabled", False))
         self.btn_album_arc_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_album_arc_toggle.setFixedHeight(24)
-        self.btn_album_arc_toggle.setToolTip("1-Click Concept Album / EP Story Arc:\nMaps tracks across a dramatic narrative progression (The Spark -> Golden Hour -> The Fracture -> Midnight Climax -> Dawn Acceptance) instead of isolated songs!")
+        self.btn_album_arc_toggle.setFixedHeight(25)
+        self.btn_album_arc_toggle.setToolTip("1-Click Concept Album / EP Story Arc:\nMaps tracks across a dramatic narrative progression instead of isolated songs!")
         self._update_album_arc_style()
         self.btn_album_arc_toggle.clicked.connect(self._toggle_album_arc)
         arc_mem_row.addWidget(self.btn_album_arc_toggle, 1)
 
         self.lbl_memory_badge = QLabel("🧠 Memory: 0")
-        self.lbl_memory_badge.setFixedHeight(24)
+        self.lbl_memory_badge.setFixedHeight(25)
         self.lbl_memory_badge.setStyleSheet("font-size: 8.5px; font-weight: 700; color: #a5b4fc; background: #1e1b4b; border: 1px solid #4338ca; border-radius: 4px; padding: 1px 5px;")
         self.lbl_memory_badge.setToolTip("Session-persistent zero-repeat memory cache: Tracks all generated song titles to ensure subsequent batches never repeat previous concepts.")
         arc_mem_row.addWidget(self.lbl_memory_badge)
 
         self.btn_clear_memory = QPushButton("Clear")
         self.btn_clear_memory.setFixedWidth(52)
-        self.btn_clear_memory.setFixedHeight(24)
+        self.btn_clear_memory.setFixedHeight(25)
         self.btn_clear_memory.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear_memory.setStyleSheet("font-size: 9px; font-weight: 700; color: #94a3b8; background: #13172c; border: 1px solid #232c4b; border-radius: 4px; padding: 0px;")
         self.btn_clear_memory.setToolTip("Clear session memory cache")
         self.btn_clear_memory.clicked.connect(self._clear_memory_cache)
         arc_mem_row.addWidget(self.btn_clear_memory)
+        pro_layout.addLayout(arc_mem_row)
 
-        side_layout.addLayout(arc_mem_row)
+        # ── SESSION PERSISTENCE & ALBUM EXPORT PACK ──
+        self.lbl_autosave_status = QLabel("💾 Auto-Save Active: Batch auto-saved locally")
+        self.lbl_autosave_status.setStyleSheet("font-size: 9.5px; font-weight: 600; color: #64748b;")
+        pro_layout.addWidget(self.lbl_autosave_status)
 
-        # ── 7. SONG COUNT & STYLE LIMIT ──
-        count_row = QHBoxLayout()
-        count_row.setSpacing(4)
+        pack_row = QHBoxLayout()
+        pack_row.setSpacing(4)
+        self.btn_export_zip_side = QPushButton("📦 Export Album Pack (.zip)")
+        self.btn_export_zip_side.setFixedHeight(26)
+        self.btn_export_zip_side.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_zip_side.setToolTip("Export full release ZIP: Master CSV + Album Booklet + individual track sheets + Favorites folder")
+        self.btn_export_zip_side.clicked.connect(self._export_album_zip_dialog)
+        pack_row.addWidget(self.btn_export_zip_side, 1)
 
-        c_box = QVBoxLayout()
-        c_box.setSpacing(1)
-        self.lbl_count = QLabel("ចំនួនបទ (Count):")
-        c_lbl = self.lbl_count
-        c_lbl.setStyleSheet("font-size: 9px; color: #94a3b8;")
-        c_box.addWidget(c_lbl)
-        self.combo_count = QComboBox()
-        self.combo_count.addItems(["5 បទ", "10 បទ", "15 បទ", "20 បទ", "30 បទ"])
-        self.combo_count.setCurrentText("20 បទ")
-        self.combo_count.setFixedHeight(25)
-        self.combo_count.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #a78bfa;")
-        self.combo_count.currentTextChanged.connect(self._on_count_changed)
-        c_box.addWidget(self.combo_count)
-        count_row.addLayout(c_box, 1)
+        self.btn_export_fav_side = QPushButton("⭐ Export Favorites")
+        self.btn_export_fav_side.setFixedHeight(26)
+        self.btn_export_fav_side.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_fav_side.setToolTip("Export only your starred favorite tracks to CSV or ZIP")
+        self.btn_export_fav_side.clicked.connect(self._export_favorites_only)
+        pack_row.addWidget(self.btn_export_fav_side, 1)
+        pro_layout.addLayout(pack_row)
 
-        s_box = QVBoxLayout()
-        s_box.setSpacing(1)
-        s_lbl = QLabel("Style Limit:")
-        s_lbl.setStyleSheet("font-size: 9px; color: #94a3b8;")
-        s_box.addWidget(s_lbl)
-        self.combo_style_limit = QComboBox()
-        self.combo_style_limit.addItems(["200 Chars (Suno v3.5/v4/v6)", "120 Chars (Suno v3)"])
-        self.combo_style_limit.setFixedHeight(25)
-        self.combo_style_limit.setStyleSheet("padding: 1px 6px; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #38bdf8;")
-        self.combo_style_limit.currentTextChanged.connect(self._on_style_limit_changed)
-        s_box.addWidget(self.combo_style_limit)
-        count_row.addLayout(s_box, 2)
+        pro_layout.addStretch()
+        self.side_tab_stack.addWidget(pro_page)
 
-        side_layout.addLayout(count_row)
-        side_layout.addStretch()
         self.side_scroll.setWidget(self.sidebar)
         left_container_layout.addWidget(self.side_scroll, stretch=1)
 
@@ -1676,7 +1757,7 @@ class BatchGeneratorView(QWidget):
             }
         """)
         studio_menu = QMenu(self)
-        act_v6 = studio_menu.addAction("⚡ Inject Suno v6 Cues (All 20 Tracks)")
+        act_v6 = studio_menu.addAction("⚡ Inject Suno v6 Cues (All Tracks)")
         act_v6.triggered.connect(self._inject_v6_to_all)
         act_arc = studio_menu.addAction("💿 Structure Concept Album Arc (Intro ➔ Climax)")
         act_arc.triggered.connect(self._apply_album_concept_arc)
@@ -1685,8 +1766,15 @@ class BatchGeneratorView(QWidget):
         studio_menu.addSeparator()
         act_copy_all = studio_menu.addAction("📋 Copy All Suno Prompts to Clipboard")
         act_copy_all.triggered.connect(self._copy_entire_batch)
-        act_export_json = studio_menu.addAction("💾 Export Full Batch to JSON (.json)")
+        act_export_zip = studio_menu.addAction("📦 Export Album Production Pack (.zip)")
+        act_export_zip.triggered.connect(self._export_album_zip_dialog)
+        act_export_fav = studio_menu.addAction("⭐ Export Favorites Only (.csv / .zip)")
+        act_export_fav.triggered.connect(self._export_favorites_only)
+        act_export_json = studio_menu.addAction("💾 Export Batch File (.csv / .json / .md / .lrc)")
         act_export_json.triggered.connect(self._export_batch_file)
+        studio_menu.addSeparator()
+        act_keep_favs = studio_menu.addAction("✨ Keep Starred Favorites Only")
+        act_keep_favs.triggered.connect(self._keep_favorites_only)
         self.btn_studio_tools.setMenu(studio_menu)
         grid_header1.addWidget(self.btn_studio_tools)
 
@@ -1735,8 +1823,8 @@ class BatchGeneratorView(QWidget):
         self.txt_grid_search = QLineEdit()
         self.txt_grid_search.setPlaceholderText("🔍 ស្វែងរក... (Search)")
         self.txt_grid_search.setClearButtonEnabled(True)
-        self.txt_grid_search.setMinimumWidth(110)
-        self.txt_grid_search.setMaximumWidth(230)
+        self.txt_grid_search.setMinimumWidth(95)
+        self.txt_grid_search.setMaximumWidth(200)
         self.txt_grid_search.setStyleSheet("""
             QLineEdit {
                 background: #0f1426;
@@ -1753,27 +1841,43 @@ class BatchGeneratorView(QWidget):
         self.txt_grid_search.textChanged.connect(self._on_search_text_changed)
         grid_filter_bar.addWidget(self.txt_grid_search, stretch=1)
 
-        # Grid Density & View Switchers: [ 🔲 3 Cols ] [ ⊞ 4 Cols ] [ 📋 Table ] [ ◫ Auto ]
-        self.btn_cols_3 = QPushButton("🔲 3 Cols")
+        # Smart Sort Dropdown (Bubble Hits, Freshness, BPM, or Language)
+        self.combo_sort = QComboBox()
+        self.combo_sort.setFixedHeight(25)
+        self.combo_sort.setFixedWidth(132)
+        self.combo_sort.addItems([
+            "↕ Default (#01)",
+            "🏆 Hit Score",
+            "✨ Freshness",
+            "⚡ BPM (Fast)",
+            "🐢 BPM (Slow)",
+            "🌐 Language"
+        ])
+        self.combo_sort.setToolTip("Sort tracks instantaneously by Hit Score, Freshness, BPM, or Language")
+        self.combo_sort.currentTextChanged.connect(self._on_sort_changed)
+        grid_filter_bar.addWidget(self.combo_sort)
+
+        # Grid Density & View Switchers: [ 🔲 3 ] [ ⊞ 4 ] [ 📋 Table ] [ ◫ Auto ]
+        self.btn_cols_3 = QPushButton("🔲 3")
         self.btn_cols_3.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_cols_3.setToolTip("Switch to 3 spacious columns with wide readable cards (Recommended for 1080p)")
+        self.btn_cols_3.setToolTip("Switch to 3 spacious columns with wide readable cards")
         self.btn_cols_3.clicked.connect(lambda: self._set_view_mode(3))
         grid_filter_bar.addWidget(self.btn_cols_3)
 
-        self.btn_cols_4 = QPushButton("⊞ 4 Cols")
+        self.btn_cols_4 = QPushButton("⊞ 4")
         self.btn_cols_4.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cols_4.setToolTip("Switch to balanced 4 columns studio grid")
         self.btn_cols_4.clicked.connect(lambda: self._set_view_mode(4))
         grid_filter_bar.addWidget(self.btn_cols_4)
 
-        self.btn_cols_5 = QPushButton("▦ 5 Cols")
+        self.btn_cols_5 = QPushButton("▦ 5")
         self.btn_cols_5.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cols_5.setToolTip("Switch to compact 5 columns view")
         self.btn_cols_5.clicked.connect(lambda: self._set_view_mode(5))
 
         self.btn_view_table = QPushButton("📋 Table")
         self.btn_view_table.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_view_table.setToolTip("Switch to Studio Multi-Track Table View (Review all 20 songs in one clear spreadsheet)")
+        self.btn_view_table.setToolTip("Switch to Studio Multi-Track Table View")
         self.btn_view_table.clicked.connect(lambda: self._set_view_mode("table"))
         grid_filter_bar.addWidget(self.btn_view_table)
 
@@ -1785,6 +1889,48 @@ class BatchGeneratorView(QWidget):
         self._update_column_toggle_ui()
 
         grid_v_layout.addLayout(grid_filter_bar)
+
+        # ── Slim 2-Step Fast Suno Queue HUD & Progress Strip ──
+        self.queue_hud_frame = QFrame()
+        self.queue_hud_frame.setObjectName("batchQueueHud")
+        self.queue_hud_frame.setFixedHeight(32)
+        qh_layout = QHBoxLayout(self.queue_hud_frame)
+        qh_layout.setContentsMargins(8, 3, 8, 3)
+        qh_layout.setSpacing(8)
+
+        self.lbl_queue_progress = QLabel("⚡ Queue 0/20")
+        self.lbl_queue_progress.setStyleSheet("font-size: 10px; font-weight: 800; color: #38bdf8; border: none; background: transparent;")
+        qh_layout.addWidget(self.lbl_queue_progress)
+
+        self.queue_progress_bar = QProgressBar()
+        self.queue_progress_bar.setFixedWidth(74)
+        self.queue_progress_bar.setFixedHeight(7)
+        self.queue_progress_bar.setTextVisible(False)
+        self.queue_progress_bar.setRange(0, 100)
+        self.queue_progress_bar.setValue(0)
+        qh_layout.addWidget(self.queue_progress_bar)
+
+        self.lbl_queue_next = QLabel("Next: #01 Ready")
+        self.lbl_queue_next.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #e2e8f0; border: none; background: transparent;")
+        qh_layout.addWidget(self.lbl_queue_next, stretch=1)
+
+        self.btn_q_style = QPushButton("1. 🎨 Style")
+        self.btn_q_style.setFixedHeight(23)
+        self.btn_q_style.setMinimumWidth(92)
+        self.btn_q_style.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_q_style.setToolTip("Step 1 for Suno Custom Mode: Copy next track's Style Prompt")
+        self.btn_q_style.clicked.connect(self._copy_next_style_step)
+        qh_layout.addWidget(self.btn_q_style)
+
+        self.btn_q_lyrics = QPushButton("2. ✍️ Lyrics ✓")
+        self.btn_q_lyrics.setFixedHeight(23)
+        self.btn_q_lyrics.setMinimumWidth(112)
+        self.btn_q_lyrics.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_q_lyrics.setToolTip("Step 2 for Suno Custom Mode: Copy Lyrics, mark track Done, and advance to next track")
+        self.btn_q_lyrics.clicked.connect(self._copy_next_lyrics_step)
+        qh_layout.addWidget(self.btn_q_lyrics)
+
+        grid_v_layout.addWidget(self.queue_hud_frame)
 
         self.cards_scroll = QScrollArea()
         self.cards_scroll.setWidgetResizable(True)
@@ -2722,18 +2868,21 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
 
         if not songs:
             self.selected_song = None
-            self.txt_insp_style.blockSignals(True)
-            self.txt_insp_lyrics.blockSignals(True)
-            self.txt_insp_style.clear()
-            self.txt_insp_lyrics.clear()
-            self.txt_insp_style.blockSignals(False)
-            self.txt_insp_lyrics.blockSignals(False)
+            if hasattr(self, "txt_insp_style"):
+                self.txt_insp_style.blockSignals(True)
+                self.txt_insp_lyrics.blockSignals(True)
+                self.txt_insp_style.clear()
+                self.txt_insp_lyrics.clear()
+                self.txt_insp_style.blockSignals(False)
+                self.txt_insp_lyrics.blockSignals(False)
             if hasattr(self, "lbl_insp_style_chars"):
                 self.lbl_insp_style_chars.setText(f"0 / {self.current_style_limit} chars")
             self._show_empty_state()
-            self.lbl_grid_title.setText("🎴 បណ្ដុំបទចម្រៀង Studio Pro (0 Tracks — Empty Canvas)")
+            self.lbl_grid_title.setText("🎴 Batch Studio (0 Tracks)")
             self.lbl_batch_stat.setText("✨ ផ្ទាំងការងារទទេ — រួចរាល់សម្រាប់បង្កើតថ្មី")
             self._update_filter_counts()
+            self._update_queue_hud()
+            self._autosave_batch_session()
             return
 
         cols = self._calculate_columns()
@@ -2760,11 +2909,11 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
             self.grid_layout.setColumnStretch(c, 1)
 
         if self.current_lang == "English":
-            self.lbl_grid_title.setText(f"🎴 Batch Studio Pro Tracks ({len(songs)} Ready Takes)")
+            self.lbl_grid_title.setText("🎴 Batch Studio")
         elif "Khmer" in self.current_lang or "ខ្មែរ" in self.current_lang:
-            self.lbl_grid_title.setText(f"🎴 បណ្ដុំបទចម្រៀង Studio Pro ({len(songs)} បទរួចរាល់)")
+            self.lbl_grid_title.setText("🎴 បណ្ដុំបទ Studio Pro")
         else:
-            self.lbl_grid_title.setText(f"🎴 Batch Studio Pro Tracks ({len(songs)} បទចម្រៀង)")
+            self.lbl_grid_title.setText("🎴 Batch Studio")
 
         if hasattr(self, "lbl_batch_stat"):
             if self.current_lang == "English":
@@ -2781,10 +2930,12 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
         if hasattr(self, "lbl_grid_badge"):
             self.lbl_grid_badge.setText(f"{len(songs)} Tracks")
         self._update_novelty_metrics()
+        self._update_queue_hud()
         for s in songs:
             if s.get("title"):
                 self.session_memory_titles.add(s["title"])
         self._update_memory_ui()
+        self._autosave_batch_session()
         if songs:
             self._on_card_selected(songs[0], open_dialog=False)
 
@@ -3017,6 +3168,8 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
                 if hasattr(card, "quality_badge"):
                     card.quality_badge.setText(f"🎯 {q_hit}% • Rhyme: {q_rhyme}%")
                 break
+        self._update_queue_hud()
+        self._autosave_batch_session()
 
     def _on_dialog_closed(self):
         self.inspector_dialog = None
@@ -3024,6 +3177,8 @@ Genre: {song.get('genre', '')} ({song.get('bpm', '')}, Key: {song.get('key', '')
     def _on_card_status_changed(self, song_data: dict):
         self._update_filter_counts()
         self._apply_filter()
+        self._update_queue_hud()
+        self._autosave_batch_session()
         if hasattr(self, "tracklist_table") and self.tracklist_table.isVisible():
             self._populate_table()
 
@@ -3219,7 +3374,259 @@ Genre: {next_song.get('genre', '')} ({next_song.get('bpm', '')}, Key: {next_song
 
         self._update_filter_counts()
         self._apply_filter()
+        self._update_queue_hud()
+        self._autosave_batch_session()
         self._flash_btn(self.btn_copy_next, f"✓ Copied #{next_song.get('id', 1):02d}!")
+
+    # ── Smart Sorting, 2-Step Suno Queue HUD & Auto-Save Persistence ──
+    def _parse_bpm_num(self, song: dict) -> int:
+        digits = "".join(filter(str.isdigit, str(song.get("bpm", "120"))))
+        return int(digits) if digits else 120
+
+    def _on_sort_changed(self, text: str):
+        if not self.all_songs:
+            return
+        if "Hit Score" in text:
+            self.all_songs.sort(key=lambda s: int(s.get("quality_score", 0)), reverse=True)
+        elif "Freshness" in text:
+            self.all_songs.sort(key=lambda s: int(s.get("novelty_score", 95)), reverse=True)
+        elif "Fast" in text:
+            self.all_songs.sort(key=self._parse_bpm_num, reverse=True)
+        elif "Slow" in text:
+            self.all_songs.sort(key=self._parse_bpm_num)
+        elif "Language" in text:
+            self.all_songs.sort(key=lambda s: (str(s.get("language", "")), int(s.get("id", 0))))
+        else:
+            self.all_songs.sort(key=lambda s: int(s.get("id", 0)))
+
+        # Reorder existing card_widgets cleanly to match sorted songs
+        id_order = {id(s): idx for idx, s in enumerate(self.all_songs)}
+        self.card_widgets.sort(key=lambda c: id_order.get(id(c.song_data), 9999))
+        self._apply_filter()
+        if hasattr(self, "tracklist_table") and self.tracklist_table.isVisible():
+            self._populate_table()
+        self._update_queue_hud()
+
+    def _get_next_uncopied_pair(self):
+        for card in self.card_widgets:
+            if card.song_data.get("status", "new") == "new":
+                return card.song_data, card
+        return None, None
+
+    def _update_queue_hud(self):
+        if not hasattr(self, "lbl_queue_progress"):
+            return
+        total = len(self.all_songs)
+        copied = sum(1 for s in self.all_songs if s.get("status") in ["copied", "done"])
+        pct = int((copied / total) * 100) if total > 0 else 0
+
+        self.lbl_queue_progress.setText(f"⚡ Queue {copied}/{total}")
+        if hasattr(self, "queue_progress_bar"):
+            self.queue_progress_bar.setValue(pct)
+
+        next_song, _ = self._get_next_uncopied_pair()
+        if total == 0:
+            self.lbl_queue_next.setText("No tracks loaded — generate a batch to begin")
+            self.btn_q_style.setEnabled(False)
+            self.btn_q_lyrics.setEnabled(False)
+        elif next_song:
+            tid = next_song.get("id", 1)
+            title = str(next_song.get("title", "Untitled"))
+            short_t = title if len(title) <= 34 else title[:33] + "…"
+            self.lbl_queue_next.setText(f"Next: #{tid:02d} {short_t} ({next_song.get('bpm', '')})")
+            self.btn_q_style.setEnabled(True)
+            self.btn_q_lyrics.setEnabled(True)
+        else:
+            self.lbl_queue_next.setText("🎉 All tracks copied — Queue Complete!")
+            self.btn_q_style.setEnabled(False)
+            self.btn_q_lyrics.setEnabled(False)
+
+    def _copy_next_style_step(self):
+        next_song, target_card = self._get_next_uncopied_pair()
+        if not next_song:
+            return
+        style = next_song.get("style_prompt", "").strip()
+        if style:
+            QApplication.clipboard().setText(style)
+            if target_card:
+                self._on_card_selected(next_song, open_dialog=False)
+                self.cards_scroll.ensureWidgetVisible(target_card)
+            self._flash_btn(self.btn_q_style, f"✓ Style #{next_song.get('id', 1):02d}!")
+
+    def _copy_next_lyrics_step(self):
+        next_song, target_card = self._get_next_uncopied_pair()
+        if not next_song:
+            return
+        lyrics = next_song.get("lyrics", "").strip()
+        if lyrics:
+            QApplication.clipboard().setText(lyrics)
+        next_song["status"] = "copied"
+        if target_card:
+            target_card._update_status_ui()
+            self.cards_scroll.ensureWidgetVisible(target_card)
+        self._update_filter_counts()
+        self._apply_filter()
+        self._update_queue_hud()
+        self._autosave_batch_session()
+        self._flash_btn(self.btn_q_lyrics, f"✓ Done #{next_song.get('id', 1):02d}!")
+
+    def _get_autosave_path(self) -> Path:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        return CONFIG_DIR / "last_batch.json"
+
+    def _autosave_batch_session(self):
+        if getattr(self, "_suppress_autosave", False):
+            return
+        try:
+            payload = {
+                "theme": self.txt_theme.toPlainText().strip() if hasattr(self, "txt_theme") else "",
+                "language": self.current_lang,
+                "vocal": self.current_vocal,
+                "songs": self.all_songs,
+            }
+            with open(self._get_autosave_path(), "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, indent=2)
+            if hasattr(self, "lbl_autosave_status"):
+                self.lbl_autosave_status.setText(f"💾 Auto-Saved ({len(self.all_songs)} tracks preserved)")
+        except Exception:
+            pass
+
+    def _load_autosaved_batch(self) -> bool:
+        try:
+            p = self._get_autosave_path()
+            if not p.exists():
+                return False
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            songs = data.get("songs", [])
+            if not isinstance(songs, list) or len(songs) == 0:
+                return False
+            saved_theme = data.get("theme", "")
+            if saved_theme and hasattr(self, "txt_theme"):
+                self.txt_theme.setPlainText(saved_theme)
+            self._populate_grid(songs)
+            if hasattr(self, "lbl_autosave_status"):
+                self.lbl_autosave_status.setText(f"🕒 Restored last session ({len(songs)} tracks)")
+            return True
+        except Exception:
+            return False
+
+    def _keep_favorites_only(self):
+        favs = [s for s in self.all_songs if s.get("is_favorite", False)]
+        if not favs:
+            QMessageBox.information(self, "No Favorites Yet", "Click the ☆ star icon on your favorite song cards first.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Keep Favorites Only",
+            f"Keep only your {len(favs)} starred favorite tracks and remove the other {len(self.all_songs) - len(favs)} tracks?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            for idx, s in enumerate(favs, start=1):
+                s["id"] = idx
+            self._populate_grid(favs)
+
+    def _write_album_zip(self, zip_path: str, songs: list):
+        theme_txt = self.txt_theme.toPlainText().strip() or "Studio Session"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            # 1. Master CSV (Excel / Notion / Suno ready)
+            csv_buf = io.StringIO()
+            writer = csv.writer(csv_buf)
+            writer.writerow(["ID", "Favorite", "Status", "Title", "Language", "Genre", "BPM", "Key", "Hit Score", "Style Prompt", "Lyrics"])
+            for s in songs:
+                writer.writerow([
+                    s.get("id", 1),
+                    "YES" if s.get("is_favorite") else "",
+                    s.get("status", "new"),
+                    s.get("title", ""),
+                    s.get("language", ""),
+                    s.get("genre", ""),
+                    s.get("bpm", ""),
+                    s.get("key", ""),
+                    f"{s.get('quality_score', 95)}%",
+                    s.get("style_prompt", ""),
+                    s.get("lyrics", ""),
+                ])
+            zf.writestr("00_MASTER_SUNO_PROMPTS.csv", "\ufeff" + csv_buf.getvalue())
+
+            # 2. Markdown Album Booklet
+            md_lines = [
+                f"# 💿 SMG Suno Studio Pro — Album Production Pack",
+                f"**Theme**: {theme_txt}  •  **Tracks**: {len(songs)}\n",
+                "| # | Title | Genre | BPM | Key | Quality |",
+                "|---|---|---|---|---|---|"
+            ]
+            for s in songs:
+                md_lines.append(f"| {s.get('id', 1):02d} | {s.get('title', '')} | {s.get('genre', '')} | {s.get('bpm', '')} | {s.get('key', '')} | {s.get('quality_score', 95)}% |")
+            zf.writestr("00_ALBUM_BOOKLET.md", "\n".join(md_lines))
+
+            # 3. Individual Track Sheets (+ favorites/ subfolder)
+            for s in songs:
+                tid = int(s.get("id", 1))
+                safe_title = re.sub(r'[\\/:*?"<>|]+', "", str(s.get("title", f"Track_{tid}"))).strip()[:48] or f"Track_{tid}"
+                fname = f"{tid:02d}_{safe_title}.txt"
+                content = (
+                    f"TITLE: {s.get('title', '')}\n"
+                    f"GENRE: {s.get('genre', '')} | BPM: {s.get('bpm', '')} | KEY: {s.get('key', '')}\n"
+                    f"HIT SCORE: {s.get('quality_score', 95)}% | METER: {s.get('meter', '')}\n\n"
+                    f"[STYLE OF MUSIC]\n{s.get('style_prompt', '')}\n\n"
+                    f"[LYRICS]\n{s.get('lyrics', '')}\n"
+                )
+                zf.writestr(f"tracks/{fname}", content)
+                if s.get("is_favorite"):
+                    zf.writestr(f"favorites/{fname}", content)
+
+    def _export_album_zip_dialog(self):
+        if not self.all_songs:
+            return
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Album Production Pack (.zip)",
+            "SMG_Studio_Album_Pack.zip",
+            "Album Production ZIP Pack (*.zip)"
+        )
+        if not file_path:
+            return
+        try:
+            self._write_album_zip(file_path, self.all_songs)
+            QMessageBox.information(
+                self,
+                "Album Pack Exported",
+                f"📦 Exported {len(self.all_songs)} tracks (Master CSV + Booklet + Individual TXT Sheets) to:\n{file_path}"
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Export Error", f"Failed to create ZIP pack:\n{e}")
+
+    def _export_favorites_only(self):
+        favs = [s for s in self.all_songs if s.get("is_favorite", False)]
+        if not favs:
+            QMessageBox.information(self, "No Starred Favorites", "Star (⭐) at least one track card first to export favorites.")
+            return
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Starred Favorites",
+            "SMG_Favorite_Hits.zip",
+            "Album Production ZIP Pack (*.zip);;CSV for Suno / Excel (*.csv)"
+        )
+        if not file_path:
+            return
+        try:
+            if file_path.endswith(".zip"):
+                self._write_album_zip(file_path, favs)
+            else:
+                with open(file_path, "w", encoding="utf-8-sig", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["ID", "Title", "Genre", "BPM", "Key", "Hit Quality", "Style Prompt", "Lyrics"])
+                    for s in favs:
+                        writer.writerow([
+                            s.get("id", 1), s.get("title", ""), s.get("genre", ""),
+                            s.get("bpm", ""), s.get("key", ""), f"{s.get('quality_score', 95)}%",
+                            s.get("style_prompt", ""), s.get("lyrics", "")
+                        ])
+            QMessageBox.information(self, "Favorites Exported", f"⭐ Exported {len(favs)} favorite hits to:\n{file_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "Export Error", f"Failed to export favorites:\n{e}")
 
     def _forward_to_editor(self, song_data: dict):
         self.open_editor_requested.emit(song_data)
@@ -3737,7 +4144,7 @@ Stand up for the stories never told!"""
                     card.quality_badge.setText(f"🎯 {song_data['quality_score']}% • Rhyme: {song_data['rhyme_score']}%")
                 break
 
-        if self.selected_song and self.selected_song.get("id") == song_data.get("id"):
+        if self.selected_song and self.selected_song.get("id") == song_data.get("id") and hasattr(self, "txt_insp_lyrics"):
             self.txt_insp_lyrics.blockSignals(True)
             self.txt_insp_lyrics.setPlainText(lyrics)
             self.txt_insp_lyrics.blockSignals(False)
@@ -3751,15 +4158,18 @@ Stand up for the stories never told!"""
         if not self.all_songs:
             return
         file_path, _ = QFileDialog.getSaveFileName(
-            self, 
-            "Export Pro Studio Batch", 
-            "Studio_Pro_Batch_Session.csv", 
-            "CSV for Suno / Excel (*.csv);;Karaoke LRC Bundle (*.lrc);;Album Booklet Markdown (*.md);;JSON Files (*.json);;Text Files (*.txt)"
+            self,
+            "Export Pro Studio Batch",
+            "Studio_Pro_Batch_Session.zip",
+            "Album Production ZIP Pack (*.zip);;CSV for Suno / Excel (*.csv);;Karaoke LRC Bundle (*.lrc);;Album Booklet Markdown (*.md);;JSON Files (*.json);;Text Files (*.txt)"
         )
         if not file_path:
             return
         try:
-            if file_path.endswith(".json"):
+            if file_path.endswith(".zip"):
+                self._write_album_zip(file_path, self.all_songs)
+
+            elif file_path.endswith(".json"):
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(self.all_songs, f, ensure_ascii=False, indent=2)
 
@@ -4012,6 +4422,52 @@ Stand up for the stories never told!"""
             if hasattr(self, "theme_pills"):
                 for p in self.theme_pills:
                     p.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; border: 1px solid {t['border']}; border-radius: 4px; padding: 1px 4px; font-size: 9px; font-weight: 600;")
+
+            if hasattr(self, "side_tab_bar"):
+                self.side_tab_bar.setStyleSheet(f"QFrame#batchSideTabBar {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 7px; }}")
+            side_tab_qss = f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: {t['text_secondary']};
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 10px;
+                    font-weight: 700;
+                    padding: 3px 6px;
+                }}
+                QPushButton:hover {{
+                    color: {t['text_primary']};
+                    background-color: {t['bg_card_alt']};
+                }}
+                QPushButton:checked {{
+                    background: {t['accent_gradient']};
+                    color: #ffffff;
+                    font-weight: 800;
+                }}
+            """
+            for b in [getattr(self, "btn_side_quick", None), getattr(self, "btn_side_pro", None)]:
+                if b:
+                    b.setStyleSheet(side_tab_qss)
+            if hasattr(self, "combo_persona"):
+                self.combo_persona.setStyleSheet(f"padding: 1px 6px; font-weight: 700; font-size: 9.5px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 4px; color: {t['text_accent']};")
+            if hasattr(self, "combo_sort"):
+                self.combo_sort.setStyleSheet(f"padding: 2px 6px; font-weight: 700; font-size: 10px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 5px; color: {t['text_secondary']};")
+            if hasattr(self, "queue_hud_frame"):
+                self.queue_hud_frame.setStyleSheet(f"QFrame#batchQueueHud {{ background-color: {t['bg_card']}; border: 1px solid {t['border']}; border-radius: 6px; }} QFrame#batchQueueHud QLabel {{ border: none; background: transparent; }}")
+            if hasattr(self, "lbl_queue_progress"):
+                self.lbl_queue_progress.setStyleSheet(f"font-size: 10px; font-weight: 800; color: {t['text_accent']}; border: none; background: transparent;")
+            if hasattr(self, "lbl_queue_next"):
+                self.lbl_queue_next.setStyleSheet(f"font-size: 10.5px; font-weight: 700; color: {t['text_primary']}; border: none; background: transparent;")
+            if hasattr(self, "queue_progress_bar"):
+                self.queue_progress_bar.setStyleSheet(f"QProgressBar {{ background-color: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 3px; }} QProgressBar::chunk {{ background: {t['accent_gradient']}; border-radius: 2px; }}")
+            if hasattr(self, "btn_q_style"):
+                self.btn_q_style.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700;")
+            if hasattr(self, "btn_q_lyrics"):
+                self.btn_q_lyrics.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 800;")
+            if hasattr(self, "btn_export_zip_side"):
+                self.btn_export_zip_side.setStyleSheet(self._btn_sub())
+            if hasattr(self, "btn_export_fav_side"):
+                self.btn_export_fav_side.setStyleSheet(self._btn_sub())
         else:
             # Modern High-Contrast Light Mode
             if hasattr(self, "txt_theme"):
@@ -4108,6 +4564,52 @@ Stand up for the stories never told!"""
             if hasattr(self, "theme_pills"):
                 for p in self.theme_pills:
                     p.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; font-size: 9.5px; font-weight: 600;")
+
+            if hasattr(self, "side_tab_bar"):
+                self.side_tab_bar.setStyleSheet("QFrame#batchSideTabBar { background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 7px; }")
+            side_tab_qss_l = f"""
+                QPushButton {{
+                    background-color: transparent;
+                    color: #475569;
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 10px;
+                    font-weight: 700;
+                    padding: 3px 6px;
+                }}
+                QPushButton:hover {{
+                    color: #0f172a;
+                    background-color: #e2e8f0;
+                }}
+                QPushButton:checked {{
+                    background-color: {t['accent']};
+                    color: #ffffff;
+                    font-weight: 800;
+                }}
+            """
+            for b in [getattr(self, "btn_side_quick", None), getattr(self, "btn_side_pro", None)]:
+                if b:
+                    b.setStyleSheet(side_tab_qss_l)
+            if hasattr(self, "combo_persona"):
+                self.combo_persona.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 9.5px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; color: #1d4ed8;")
+            if hasattr(self, "combo_sort"):
+                self.combo_sort.setStyleSheet("padding: 2px 6px; font-weight: 700; font-size: 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px; color: #0f172a;")
+            if hasattr(self, "queue_hud_frame"):
+                self.queue_hud_frame.setStyleSheet("QFrame#batchQueueHud { background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; } QFrame#batchQueueHud QLabel { border: none; background: transparent; }")
+            if hasattr(self, "lbl_queue_progress"):
+                self.lbl_queue_progress.setStyleSheet("font-size: 10px; font-weight: 800; color: #1d4ed8; border: none; background: transparent;")
+            if hasattr(self, "lbl_queue_next"):
+                self.lbl_queue_next.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #0f172a; border: none; background: transparent;")
+            if hasattr(self, "queue_progress_bar"):
+                self.queue_progress_bar.setStyleSheet(f"QProgressBar {{ background-color: #e2e8f0; border: 1px solid #cbd5e1; border-radius: 3px; }} QProgressBar::chunk {{ background-color: {t['accent']}; border-radius: 2px; }}")
+            if hasattr(self, "btn_q_style"):
+                self.btn_q_style.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700;")
+            if hasattr(self, "btn_q_lyrics"):
+                self.btn_q_lyrics.setStyleSheet("background-color: #ecfdf5; color: #047857; border: 1px solid #86efac; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 800;")
+            if hasattr(self, "btn_export_zip_side"):
+                self.btn_export_zip_side.setStyleSheet(self._btn_sub())
+            if hasattr(self, "btn_export_fav_side"):
+                self.btn_export_fav_side.setStyleSheet(self._btn_sub())
 
         if not self.all_songs and hasattr(self, "grid_layout"):
             self._show_empty_state()
