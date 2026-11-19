@@ -977,6 +977,29 @@ class EditorPanel(QWidget):
         self.editor.setPlainText(lyrics)
         self.version_manager.save_take(self.current_take_name, lyrics)
 
+    def get_takes_state(self) -> tuple:
+        """Return (takes_dict, current_take_name) with current editor text synced."""
+        self.version_manager.save_take(self.current_take_name, self.editor.toPlainText())
+        return dict(self.version_manager.takes), self.current_take_name
+
+    def set_takes_state(self, takes: dict, current_take: str = ""):
+        """Restore multi-take lyric versions and select the active take."""
+        if not takes or not isinstance(takes, dict):
+            return
+        clean_takes = {str(k): str(v or "") for k, v in takes.items() if str(k).strip()}
+        if not clean_takes:
+            return
+        self.version_manager.takes = clean_takes
+        target = current_take if current_take in clean_takes else next(iter(clean_takes.keys()))
+        self.current_take_name = target
+        self.version_manager.current_take = target
+        self.take_combo.blockSignals(True)
+        self.take_combo.clear()
+        self.take_combo.addItems(self.version_manager.list_takes())
+        self.take_combo.setCurrentText(target)
+        self.take_combo.blockSignals(False)
+        self.editor.setPlainText(clean_takes.get(target, ""))
+
     def insert_text_at_cursor(self, text: str):
         cursor = self.editor.textCursor()
         cursor.insertText(text)

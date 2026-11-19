@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
+*.bak
 
 # Build outputs & Binaries (Installers are hosted via GitHub Releases)
 build/

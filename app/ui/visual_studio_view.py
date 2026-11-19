@@ -1549,16 +1549,21 @@ We only stop when the race is won!
                 self.lbl_macro_status.setText("📋 Copied Style Prompt to Clipboard!")
 
     def get_generation_parameters(self) -> dict:
+        style_text = self.txt_suno_prompt.toPlainText().strip()
+        neg_text = self.txt_negative.text().strip() if hasattr(self, "txt_negative") else ""
         return {
             "genre": self.current_genre,
             "region": "Southeast Asia" if "Khmer" in self.current_genre else "Global",
             "language": self.current_language,
             "bpm": self.current_bpm,
+            "key": self.current_key,
             "mood": self.current_mood,
             "theme": self.current_story,
+            "style_prompt": style_text,
+            "negative_prompt": neg_text,
             "structure": "Standard Pop / Global Radio (3-Minute Hit)",
             "rhyme": "AABB (Classic Couplets)",
-            "user_notes": f"Style: {self.txt_suno_prompt.toPlainText().strip()}\nKey: {self.current_key}\nChords: {' - '.join(self.current_chords)}\nStoryline: {self.current_story}"
+            "user_notes": f"Style: {style_text}\nKey: {self.current_key}\nChords: {' - '.join(self.current_chords)}\nStoryline: {self.current_story}"
         }
 
     def _emit_generate(self):

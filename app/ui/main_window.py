@@ -28,6 +28,7 @@ from app.gemini_client import (
     GenerateLyricWorker, RewriteWorker, RhymeWorker, SunoPromptWorker
 )
 from app.exporter import Exporter
+from app.project_manager import ProjectManager, SongProject
 
 class HistoryDialog(QDialog):
     """Browse and restore recently generated lyric projects."""
@@ -85,6 +86,7 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(logo_path)))
 
         self.current_worker = None
+        self.current_project_path = None
         self.current_theme = config_manager.get("theme", "obsidian")
         if self.current_theme in ["dark", "dark_modern"]:
             self.current_theme = "obsidian"
@@ -169,7 +171,7 @@ class MainWindow(QMainWindow):
 
         r_layout.addStretch(1)
 
-        self.lbl_ribbon_hint = QLabel("Ctrl+1..5 Switch Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
+        self.lbl_ribbon_hint = QLabel("Ctrl+S Save  •  Ctrl+O Open  •  Ctrl+1..5 Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
         self.lbl_ribbon_hint.setObjectName("lblRibbonHint")
         r_layout.addWidget(self.lbl_ribbon_hint)
 
@@ -396,7 +398,7 @@ class MainWindow(QMainWindow):
             self._set_studio_mode(3)
             self.status_bar.showMessage("Switched to Lyric Editor Workbench with current Wizard lyrics", 3000)
         elif mode == 1:  # Visual Studio -> Editor
-            params = self.visual_studio.get_prompt_parameters()
+            params = self.visual_studio.get_generation_parameters()
             self._transfer_to_editor(params)
         elif mode == 2:  # Batch Studio Pro -> Editor
             if hasattr(self, "batch_view"):
@@ -411,7 +413,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Switched to Suno Visual Arranger", 3000)
         elif mode == 4:  # Song DNA Cloner -> Editor
             if hasattr(self, "clone_view"):
-                if hasattr(self.clone_view, "txt_cloned_lyrics") and self.clone_view.txt_cloned_lyrics.toPlainText().strip():
+                if hasattr(self.clone_view, "txt_clone_lyrics") and self.clone_view.txt_clone_lyrics.toPlainText().strip():
                     self.clone_view._send_to_editor()
                 else:
                     self._set_studio_mode(3)
@@ -522,8 +524,12 @@ class MainWindow(QMainWindow):
         self.btn_export.setFixedHeight(28)
         self.btn_export.setObjectName("accentButton")
         self.btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_export.setToolTip("Export song formats [Ctrl+E]")
+        self.btn_export.setToolTip("Save / Open Studio Project (.smgsong) or Export song formats [Ctrl+E]")
         self.export_menu = QMenu(self)
+        self.export_menu.addAction("💾 Save Studio Project (.smgsong)  [Ctrl+S]", self._save_project)
+        self.export_menu.addAction("💾 Save Project As...  [Ctrl+Shift+S]", self._save_project_as)
+        self.export_menu.addAction("📂 Open Project / Lyrics (.smgsong, .txt, .lrc)  [Ctrl+O]", self._open_file)
+        self.export_menu.addSeparator()
         self.export_menu.addAction("📄 Export Video Subtitles (.srt - YouTube / TikTok)", lambda: self._export("srt"))
         self.export_menu.addAction("🎵 Export Timed Karaoke (.lrc - Spotify / Players)", lambda: self._export("lrc"))
         self.export_menu.addAction("🎤 Export Clean Singer Sheet (.txt - Vocals Only)", lambda: self._export("vocal"))
@@ -1169,6 +1175,8 @@ class MainWindow(QMainWindow):
 
         # Workflow Actions
         QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self._new_song)
+        QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self._save_project)
+        QShortcut(QKeySequence("Ctrl+Shift+S"), self).activated.connect(self._save_project_as)
         QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self._open_file)
         QShortcut(QKeySequence("Ctrl+E"), self).activated.connect(self._show_export_menu)
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self._open_history)
@@ -1264,23 +1272,72 @@ class MainWindow(QMainWindow):
         self.tools_panel.transpose_requested.connect(self._on_transpose_chords)
         self.tools_panel.insert_text_requested.connect(self.editor_panel.insert_text_at_cursor)
 
+    def _update_window_title(self):
+        base = "SMG Suno AI Lyric Writer — Global Music Studio"
+        if self.current_project_path:
+            self.setWindowTitle(f"{Path(self.current_project_path).name} — {base}")
+        else:
+            self.setWindowTitle(base)
+
+    def _sync_style_and_production_state(
+        self,
+        style_prompt: str = "",
+        bpm=None,
+        key: str = "",
+        genre: str = "",
+        negative_prompt: str = "",
+    ):
+        """Keep Editor BPM, ToolsPanel Suno Style Prompt, Generator Genre, and Visual Arranger in sync."""
+        if bpm is not None:
+            bpm_val = ProjectManager.parse_bpm(bpm, default=120)
+            if hasattr(self, "editor_panel") and hasattr(self.editor_panel, "metro_bpm_spin"):
+                self.editor_panel.metro_bpm_spin.setValue(bpm_val)
+            if hasattr(self, "visual_studio"):
+                self.visual_studio.current_bpm = f"{bpm_val} BPM"
+                if hasattr(self.visual_studio, "lbl_bpm_display"):
+                    self.visual_studio.lbl_bpm_display.setText(f"{bpm_val} BPM")
+
+        if key and hasattr(self, "visual_studio"):
+            self.visual_studio.current_key = key
+            if hasattr(self.visual_studio, "lbl_key_display"):
+                self.visual_studio.lbl_key_display.setText(key)
+
+        if genre:
+            if hasattr(self, "generator_panel") and hasattr(self.generator_panel, "genre_combo"):
+                idx = self.generator_panel.genre_combo.findText(genre)
+                if idx >= 0:
+                    self.generator_panel.genre_combo.setCurrentIndex(idx)
+            if hasattr(self, "visual_studio"):
+                self.visual_studio.current_genre = genre
+
+        if style_prompt:
+            if hasattr(self, "tools_panel"):
+                self.tools_panel.set_suno_results(style_prompt)
+            if hasattr(self, "visual_studio") and hasattr(self.visual_studio, "txt_suno_prompt"):
+                self.visual_studio.txt_suno_prompt.setPlainText(style_prompt)
+
+        if negative_prompt and hasattr(self, "visual_studio") and hasattr(self.visual_studio, "txt_negative"):
+            self.visual_studio.txt_negative.setText(negative_prompt)
+
     def _load_song_from_batch(self, song_data: dict):
         title = song_data.get("title", "Untitled Track")
         lyrics = song_data.get("lyrics", "")
         style = song_data.get("style_prompt", "")
         bpm_str = song_data.get("bpm", "120 BPM")
         key = song_data.get("key", "C")
+        genre = song_data.get("genre", "")
 
         self.editor_panel.set_title(title)
         self.editor_panel.set_lyrics(lyrics)
-        try:
-            bpm_val = int("".join(filter(str.isdigit, str(bpm_str)[:4])))
-            self.editor_panel.metro_bpm_spin.setValue(bpm_val)
-        except Exception:
-            pass
+        self._sync_style_and_production_state(
+            style_prompt=style,
+            bpm=bpm_str,
+            key=key,
+            genre=genre,
+        )
 
         self._set_studio_mode(3) # Switch to Lyric Editor
-        self.status_bar.showMessage(f"Loaded '{title}' into Lyric Editor Workbench", 3000)
+        self.status_bar.showMessage(f"Loaded '{title}' (Lyrics + Style Prompt + {bpm_str}) into Lyric Editor Workbench", 4000)
 
     def _on_wizard_toggle_recording(self):
         self.tools_panel._toggle_mic_recording()
@@ -1309,20 +1366,20 @@ class MainWindow(QMainWindow):
         self._set_studio_mode(3)
         # Update generator panel inputs to match visual studio
         self.generator_panel.custom_notes.setText(params.get("user_notes", ""))
-        if "genre" in params:
-            idx = self.generator_panel.genre_combo.findText(params["genre"])
-            if idx >= 0:
-                self.generator_panel.genre_combo.setCurrentIndex(idx)
-        if "bpm" in params:
-            try:
-                bpm_val = int("".join(filter(str.isdigit, str(params["bpm"])[:4])))
-                self.editor_panel.metro_bpm_spin.setValue(bpm_val)
-            except Exception:
-                pass
+        style_prompt = params.get("style_prompt", "")
+        if not style_prompt and hasattr(self.visual_studio, "txt_suno_prompt"):
+            style_prompt = self.visual_studio.txt_suno_prompt.toPlainText().strip()
+        self._sync_style_and_production_state(
+            style_prompt=style_prompt,
+            bpm=params.get("bpm"),
+            key=params.get("key", ""),
+            genre=params.get("genre", ""),
+            negative_prompt=params.get("negative_prompt", ""),
+        )
         if "theme" in params and params["theme"]:
             t_clean = params["theme"][:40]
             self.editor_panel.set_title(t_clean)
-        self.status_bar.showMessage("Transferred formula parameters to Lyric Editor Workbench", 3000)
+        self.status_bar.showMessage("Transferred formula, BPM & Suno Style Prompt to Lyric Editor Workbench", 3500)
 
     def _load_song_into_visual_arranger(self, song_data: dict):
         title = song_data.get("title", "Untitled Track")
@@ -1499,26 +1556,126 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 return
 
+        self.current_project_path = None
+        self._update_window_title()
         self.editor_panel.set_title("Untitled Song")
-        self.editor_panel.set_lyrics("")
+        self.editor_panel.set_takes_state({"Take 1 (Main)": ""}, "Take 1 (Main)")
+        if hasattr(self, "tools_panel"):
+            self.tools_panel.set_suno_results("")
         self.status_bar.showMessage("New lyric session started", 3000)
+
+    def _build_current_project(self) -> SongProject:
+        """Snapshot the active studio state across Editor, Generator, Tools, and Visual Arranger."""
+        params = self.generator_panel.get_generation_parameters() if hasattr(self, "generator_panel") else {}
+        takes, current_take = self.editor_panel.get_takes_state()
+
+        style_prompt = ""
+        if hasattr(self, "tools_panel") and hasattr(self.tools_panel, "suno_output"):
+            style_prompt = self.tools_panel.suno_output.toPlainText().strip()
+        if not style_prompt and hasattr(self, "visual_studio") and hasattr(self.visual_studio, "txt_suno_prompt"):
+            style_prompt = self.visual_studio.txt_suno_prompt.toPlainText().strip()
+
+        negative_prompt = ""
+        if hasattr(self, "visual_studio") and hasattr(self.visual_studio, "txt_negative"):
+            negative_prompt = self.visual_studio.txt_negative.text().strip()
+
+        bpm = 120
+        if hasattr(self, "editor_panel") and hasattr(self.editor_panel, "metro_bpm_spin"):
+            bpm = self.editor_panel.metro_bpm_spin.value()
+
+        key = getattr(self.visual_studio, "current_key", "C") if hasattr(self, "visual_studio") else "C"
+        prog = self.tools_panel.prog_combo.currentText() if hasattr(self, "tools_panel") and hasattr(self.tools_panel, "prog_combo") else ""
+
+        return SongProject(
+            title=self.editor_panel.get_title(),
+            lyrics=self.editor_panel.get_lyrics(),
+            style_prompt=style_prompt,
+            negative_prompt=negative_prompt,
+            bpm=bpm,
+            key=key,
+            genre=params.get("genre", "Pop & Synthpop"),
+            mood=params.get("mood", "Euphoric"),
+            language=params.get("language", "English"),
+            chord_progression=prog,
+            takes=takes,
+            current_take=current_take,
+        )
+
+    def _apply_project(self, project: SongProject):
+        """Restore a SongProject across all studio panels."""
+        self.editor_panel.set_title(project.title)
+        if project.takes:
+            self.editor_panel.set_takes_state(project.takes, project.current_take)
+        else:
+            self.editor_panel.set_lyrics(project.lyrics)
+
+        self._sync_style_and_production_state(
+            style_prompt=project.style_prompt,
+            bpm=project.bpm,
+            key=project.key,
+            genre=project.genre,
+            negative_prompt=project.negative_prompt,
+        )
+
+        if project.chord_progression and hasattr(self, "tools_panel") and hasattr(self.tools_panel, "prog_combo"):
+            idx = self.tools_panel.prog_combo.findText(project.chord_progression)
+            if idx >= 0:
+                self.tools_panel.prog_combo.setCurrentIndex(idx)
+
+    def _save_project(self):
+        """Save current studio project (.smgsong). Prompts for path on first save."""
+        if not self.current_project_path:
+            self._save_project_as()
+            return
+        try:
+            proj = self._build_current_project()
+            saved = ProjectManager.save_project(self.current_project_path, proj)
+            self.current_project_path = str(saved)
+            self._update_window_title()
+            self.status_bar.showMessage(f"💾 Project saved: {saved.name}", 4000)
+        except Exception as e:
+            QMessageBox.critical(self, "Save Project Error", f"Failed to save project:\n{e}")
+
+    def _save_project_as(self):
+        """Save current studio project to a chosen .smgsong path."""
+        title = self.editor_panel.get_title()
+        safe_title = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).strip() or "Untitled_Song"
+        default_path = self.current_project_path or f"{safe_title}.smgsong"
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Studio Project",
+            default_path,
+            "SMG Studio Project (*.smgsong);;JSON Project (*.json)"
+        )
+        if not filepath:
+            return
+        try:
+            proj = self._build_current_project()
+            saved = ProjectManager.save_project(filepath, proj)
+            self.current_project_path = str(saved)
+            self._update_window_title()
+            self.status_bar.showMessage(f"💾 Studio project saved: {saved.name}", 4500)
+        except Exception as e:
+            QMessageBox.critical(self, "Save Project Error", f"Failed to save project:\n{e}")
 
     def _open_file(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open Lyrics", "", "Lyric Files (*.txt *.lrc *.json);;All Files (*.*)"
+            self,
+            "Open Studio Project or Lyrics",
+            "",
+            "Studio & Lyric Files (*.smgsong *.json *.txt *.lrc *.cho);;SMG Studio Project (*.smgsong);;All Files (*.*)"
         )
         if not path:
             return
 
         p = Path(path)
         try:
-            with open(p, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            self.editor_panel.set_title(p.stem)
-            self.editor_panel.set_lyrics(content)
+            project = ProjectManager.load_project(str(p))
+            self._apply_project(project)
+            self.current_project_path = str(p) if p.suffix.lower() == ".smgsong" else None
+            self._update_window_title()
             self._set_studio_mode(3) # Switch to Lyric Editor
-            self.status_bar.showMessage(f"Loaded: {p.name}", 4000)
+            self.status_bar.showMessage(f"📂 Loaded studio project: {project.title} ({p.name})", 4500)
         except Exception as e:
             QMessageBox.critical(self, "Error Loading File", str(e))
 
@@ -1538,7 +1695,6 @@ class MainWindow(QMainWindow):
             "vocal": ("Singer Vocal Sheet (*.txt)", f"{safe_title}_vocals.txt"),
             "chordpro": ("ChordPro Lead Sheet (*.cho)", f"{safe_title}.cho"),
             "txt": ("Complete Lyric Sheet (*.txt)", f"{safe_title}.txt"),
-            "lrc": ("Karaoke Timed Lyrics (*.lrc)", f"{safe_title}.lrc"),
             "pdf": ("Printable PDF Lead Sheet (*.pdf)", f"{safe_title}.pdf"),
             "html": ("Interactive Printable HTML Lead Sheet (*.html)", f"{safe_title}.html"),
             "json": ("Structured JSON (*.json)", f"{safe_title}.json")
@@ -1591,6 +1747,8 @@ class MainWindow(QMainWindow):
             return
 
         suno_prompt = self.visual_studio.txt_suno_prompt.toPlainText().strip()
+        if not suno_prompt and hasattr(self, "tools_panel") and hasattr(self.tools_panel, "suno_output"):
+            suno_prompt = self.tools_panel.suno_output.toPlainText().strip()
         if not suno_prompt:
             suno_prompt = f"{metadata.get('genre', 'Pop')}, {metadata.get('mood', 'Uplifting')}, {metadata.get('bpm', '120 BPM')}"
         negative_prompt = self.visual_studio.txt_negative.text().strip()
@@ -1689,8 +1847,18 @@ class MainWindow(QMainWindow):
     def _load_cloned_song_into_editor(self, title: str, lyrics: str):
         self.editor_panel.set_title(title)
         self.editor_panel.set_lyrics(lyrics)
+        style_prompt = ""
+        bpm = None
+        if hasattr(self, "clone_view"):
+            if hasattr(self.clone_view, "txt_clone_style"):
+                style_prompt = self.clone_view.txt_clone_style.text().strip()
+            if not style_prompt:
+                style_prompt = getattr(self.clone_view, "generated_style", "")
+            if hasattr(self.clone_view, "spin_target_bpm"):
+                bpm = self.clone_view.spin_target_bpm.value()
+        self._sync_style_and_production_state(style_prompt=style_prompt, bpm=bpm)
         self._set_studio_mode(3)
-        self.status_bar.showMessage(f"Loaded cloned track into Editor: '{title}'", 3500)
+        self.status_bar.showMessage(f"Loaded cloned track (Lyrics + Style Prompt + BPM) into Editor: '{title}'", 4000)
 
     def _open_settings(self):
         dlg = SettingsDialog(self, is_dark=self.is_dark_theme)
@@ -1725,12 +1893,16 @@ class MainWindow(QMainWindow):
     def _load_last_session(self):
         last_lyrics = config_manager.get("last_lyrics", "")
         last_title = config_manager.get("last_title", "")
+        last_bpm = config_manager.get("last_bpm", None)
+        last_style = config_manager.get("last_style_prompt", "")
         if last_lyrics:
             self.editor_panel.set_title(last_title)
             self.editor_panel.set_lyrics(last_lyrics)
+        if last_bpm is not None or last_style:
+            self._sync_style_and_production_state(style_prompt=last_style, bpm=last_bpm)
 
-        # Apply initial theme across all views
-        self._apply_all_themes(self.is_dark_theme)
+        # Apply saved theme ID (preserving all 5 themes across restarts)
+        self._apply_all_themes(self.current_theme)
 
     def _check_updates_startup(self):
         """Silently queries update manifest in background after boot without interrupting user workflow."""
@@ -1854,4 +2026,12 @@ class MainWindow(QMainWindow):
 
         config_manager.set("last_lyrics", self.editor_panel.get_lyrics())
         config_manager.set("last_title", self.editor_panel.get_title())
+        if hasattr(self.editor_panel, "metro_bpm_spin"):
+            config_manager.set("last_bpm", self.editor_panel.metro_bpm_spin.value())
+        style_out = ""
+        if hasattr(self, "tools_panel") and hasattr(self.tools_panel, "suno_output"):
+            style_out = self.tools_panel.suno_output.toPlainText().strip()
+        if not style_out and hasattr(self, "visual_studio") and hasattr(self.visual_studio, "txt_suno_prompt"):
+            style_out = self.visual_studio.txt_suno_prompt.toPlainText().strip()
+        config_manager.set("last_style_prompt", style_out)
         super().closeEvent(event)
