@@ -15,23 +15,32 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from app.suno_downloader import SunoLinkParser, SunoDownloadWorker
+from app.suno_downloader import SunoLinkParser, SunoDownloadWorker, SunoAudioConverter, SunoBulkDownloadWorker
 from app.ui.suno_downloader_dialog import SunoLinkDownloadDialog
 from app.ui.main_window import MainWindow
 
 
 def test_url_parser():
-    print("[1/4] Testing SunoLinkParser...")
+    print("[1/5] Testing SunoLinkParser & Track Types...")
     test_uuid = "35fb9f7a-24ce-47e1-888e-730c45582f34"
 
     # Test full song URL
     res1 = SunoLinkParser.parse_input(f"https://suno.com/song/{test_uuid}")
     assert res1.get("is_suno") is True
     assert res1.get("uuid") == test_uuid
+    assert res1.get("track_type") == "Song"
     assert res1.get("audio_url") == f"https://cdn1.suno.ai/{test_uuid}.mp3"
     assert res1.get("video_url") == f"https://cdn1.suno.ai/{test_uuid}.mp4"
     assert res1.get("image_url") == f"https://cdn1.suno.ai/image_{test_uuid}.png"
     print("  ✓ Full song URL parsed correctly into MP3, MP4, and Image endpoints")
+
+    # Test Suno Hook URL
+    res_hook = SunoLinkParser.parse_input(f"https://suno.com/hook/{test_uuid}")
+    assert res_hook.get("is_suno") is True
+    assert res_hook.get("uuid") == test_uuid
+    assert res_hook.get("track_type") == "Hook"
+    assert res_hook.get("audio_url") == f"https://cdn1.suno.ai/{test_uuid}.mp3"
+    print("  ✓ Suno Hook URL parsed correctly with 'Hook' badge metadata")
 
     # Test direct CDN audio URL
     res2 = SunoLinkParser.parse_input(f"https://cdn1.suno.ai/{test_uuid}.mp3")
@@ -51,8 +60,65 @@ def test_url_parser():
     print("  ✓ Filename sanitization preserves Khmer Unicode and cleans illegal characters")
 
 
+def test_audio_converter_and_zip():
+    print("[2/5] Testing Local SunoAudioConverter (WAV & ZIP)...")
+    import tempfile
+    import zipfile
+    import wave
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        # Create a tiny mock mono wav file to simulate source audio
+        mock_src_wav = tmp_path / "mock_src.wav"
+        with wave.open(str(mock_src_wav), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(44100)
+            wf.writeframes(b"\x00\x00" * 4410)  # 0.1s of silence
+
+        # Convert to studio WAV
+        dest_wav = tmp_path / "studio_export.wav"
+        ok = SunoAudioConverter.convert_to_wav(str(mock_src_wav), str(dest_wav))
+        assert ok is True
+        assert dest_wav.exists()
+        with open(dest_wav, "rb") as f:
+            header = f.read(12)
+            assert header.startswith(b"RIFF") and b"WAVE" in header
+        print("  ✓ In-browser/in-app PCM studio WAV generation confirmed with RIFF WAVE header")
+
+        # Create mock production assets and test ZIP bundle packaging
+        mock_mp3 = tmp_path / "Song.mp3"
+        mock_mp3.write_bytes(b"ID3mock_audio")
+        mock_png = tmp_path / "Cover.png"
+        mock_png.write_bytes(b"\x89PNGmock_image")
+        mock_txt = tmp_path / "Lyrics.txt"
+        mock_txt.write_text("Suno downloaded lyrics", encoding="utf-8")
+
+        dest_zip = tmp_path / "ProductionPack.zip"
+        zip_path = SunoAudioConverter.create_production_zip(
+            output_zip_path=str(dest_zip),
+            assets={
+                "mp3": str(mock_mp3),
+                "wav": str(dest_wav),
+                "png": str(mock_png),
+                "txt": str(mock_txt),
+            },
+            metadata={"title": "Golden Sunset", "artist": "@testuser", "style": "acoustic indie"},
+        )
+        assert zip_path == str(dest_zip)
+        assert dest_zip.exists()
+        with zipfile.ZipFile(dest_zip, "r") as zf:
+            namelist = zf.namelist()
+            assert any(n.endswith(".mp3") for n in namelist)
+            assert any(n.endswith(".wav") for n in namelist)
+            assert any(n.endswith(".png") for n in namelist)
+            assert any("lyrics" in n.lower() for n in namelist)
+            assert any("metadata.json" in n.lower() for n in namelist)
+        print("  ✓ Production Pack ZIP packaging verified with all audio, art, and metadata assets")
+
+
 def test_worker_contract():
-    print("[2/4] Testing SunoDownloadWorker contracts...")
+    print("[3/5] Testing SunoDownloadWorker & BulkWorker contracts...")
     worker = SunoDownloadWorker(
         input_url_or_uuid="35fb9f7a-24ce-47e1-888e-730c45582f34",
         media_format="mp3",
@@ -61,25 +127,41 @@ def test_worker_contract():
     assert worker._is_cancelled is False
     worker.cancel()
     assert worker._is_cancelled is True
-    print("  ✓ Download worker initialization and cancellation contracts verified")
+    print("  ✓ Single Download Worker initialization and cancellation contracts verified")
+
+    bulk_worker = SunoBulkDownloadWorker(
+        urls=["https://suno.com/song/35fb9f7a-24ce-47e1-888e-730c45582f34"],
+        media_format="wav",
+    )
+    assert bulk_worker.media_format == "wav"
+    assert bulk_worker._is_cancelled is False
+    bulk_worker.cancel()
+    assert bulk_worker._is_cancelled is True
+    print("  ✓ Bulk Download Worker initialization and cancellation contracts verified")
 
 
 def test_dialog_and_themes():
-    print("[3/4] Testing SunoLinkDownloadDialog across all 5 themes...")
+    print("[4/5] Testing SunoLinkDownloadDialog across all 5 themes...")
     app = QApplication.instance() or QApplication(sys.argv)
 
     for theme_key in ["obsidian", "cyber_blue", "emerald", "sunset_amber", "canvas_light"]:
         dlg = SunoLinkDownloadDialog(theme_key=theme_key, initial_url="https://suno.com/song/test-123")
         assert dlg.txt_url.text() == "https://suno.com/song/test-123"
-        assert dlg.combo_format.count() >= 4
-        assert dlg.btn_download is not None
-        assert dlg.preview_card is not None
+        assert dlg.card_frame is not None
+        assert dlg.btn_dl_mp3 is not None
+        assert dlg.btn_dl_wav is not None
+        assert dlg.btn_dl_orig is not None
+        assert dlg.btn_dl_video is not None
+        assert dlg.btn_dl_art is not None
+        assert dlg.btn_dl_lyrics is not None
+        assert dlg.btn_dl_pack is not None
+        assert dlg.combo_bulk_fmt.count() >= 5
         dlg.close()
         print(f"  ✓ Dialog rendered and styled cleanly in '{theme_key}'")
 
 
 def test_main_window_integration():
-    print("[4/4] Testing MainWindow & Editor Panel Integration...")
+    print("[5/5] Testing MainWindow & Editor Panel Integration...")
     app = QApplication.instance() or QApplication(sys.argv)
     win = MainWindow()
     win.show()
@@ -113,6 +195,7 @@ def test_main_window_integration():
 
 if __name__ == "__main__":
     test_url_parser()
+    test_audio_converter_and_zip()
     test_worker_contract()
     test_dialog_and_themes()
     test_main_window_integration()

@@ -60,6 +60,14 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QIcon, QFontDatabase
 
+# Preload Chromium WebEngine OpenGL context sharing BEFORE any QApplication or Qt widget creation
+# Crucial on Windows to prevent "QtWebEngineWidgets must be imported or Qt.AA_ShareOpenGLContexts must be set before a QCoreApplication instance is created"
+try:
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
+except Exception:
+    pass
+
 from app.config import config_manager, get_asset_path, get_resource_dir, APP_NAME, APP_VERSION
 from app.ui.styles import get_theme
 from app.ui.main_window import MainWindow

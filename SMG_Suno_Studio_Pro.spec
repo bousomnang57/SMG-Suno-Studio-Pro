@@ -24,7 +24,7 @@ datas = [
     (str(base_dir / 'version.json'), '.'),
 ]
 
-for pkg in ('certifi', 'fpdf'):
+for pkg in ('certifi', 'fpdf', 'imageio_ffmpeg'):
     try:
         datas.extend(collect_data_files(pkg))
     except Exception:
@@ -98,6 +98,8 @@ hiddenimports = [
     'fpdf',
     'edge_tts',
     'aiohttp',
+    'imageio_ffmpeg',
+    'soundfile',
     'charset_normalizer',
     'multidict',
     'yarl',
@@ -142,7 +144,7 @@ excludes = [
     'tkinter', 'matplotlib', 'torch', 'torchaudio', 'scipy', 'IPython', 'notebook',
     'transformers', 'onnxruntime', 'funasr', 'librosa', 'mediapipe',
     'modelscope', 'kaldiio', 'sentencepiece', 'cv2', 'opencv_python',
-    'sounddevice', 'soundfile', 'webrtcvad', 'openai_whisper', 'yt_dlp',
+    'sounddevice', 'webrtcvad', 'openai_whisper', 'yt_dlp',
     'pytest', 'setuptools', 'pip', 'wheel',
 ]
 
