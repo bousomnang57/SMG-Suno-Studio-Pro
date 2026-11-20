@@ -33,10 +33,13 @@ class SunoBrowserView(QWidget):
     pull_from_studio_requested = pyqtSignal()
     open_link_downloader_requested = pyqtSignal(str)  # initial_url
     import_lyrics_requested = pyqtSignal(str, str)  # title, lyrics
+    toggle_fullscreen_requested = pyqtSignal(bool)  # is_fullscreen
 
     def __init__(self, parent=None, theme_key: str = "obsidian"):
         super().__init__(parent)
         self.theme_key = theme_key
+        self._is_fullscreen_active: bool = False
+        self._pre_fs_dock_visible: bool = True
         self.tracks: List[Dict] = [{
             "title": "Untitled Song",
             "style_prompt": "",
@@ -186,6 +189,13 @@ class SunoBrowserView(QWidget):
         self.btn_float_hud.setToolTip("Pop out Always-On-Top Floating Quick-Paste HUD [Ctrl+U]")
         self.btn_float_hud.clicked.connect(self.open_floating_hud_requested.emit)
         nav.addWidget(self.btn_float_hud)
+
+        self.btn_fullscreen = QPushButton("⛶ Full Screen")
+        self.btn_fullscreen.setFixedHeight(26)
+        self.btn_fullscreen.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fullscreen.setToolTip("Toggle Full Screen for Suno website (Press F11 or Esc to exit)")
+        self.btn_fullscreen.clicked.connect(self._toggle_fullscreen_view)
+        nav.addWidget(self.btn_fullscreen)
 
         root.addWidget(self.nav_bar)
 
@@ -429,6 +439,38 @@ class SunoBrowserView(QWidget):
         self.lbl_browser_placeholder.setStyleSheet("font-size: 13px; font-weight: 700; padding: 24px;")
         self.browser_layout.addWidget(self.lbl_browser_placeholder)
 
+        # Floating Overlay Bar for Full Screen Mode
+        self.floating_fs_bar = QFrame(self.browser_container)
+        self.floating_fs_bar.setObjectName("floatingFsBar")
+        fs_bar_layout = QHBoxLayout(self.floating_fs_bar)
+        fs_bar_layout.setContentsMargins(10, 4, 10, 4)
+        fs_bar_layout.setSpacing(8)
+
+        lbl_fs_info = QLabel("🌐 Suno Studio Full Screen")
+        lbl_fs_info.setStyleSheet("color: #38bdf8; font-weight: 800; font-size: 11px;")
+        fs_bar_layout.addWidget(lbl_fs_info)
+
+        self.btn_fs_toggle_dock = QPushButton("◀ Show Dock")
+        self.btn_fs_toggle_dock.setFixedHeight(24)
+        self.btn_fs_toggle_dock.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fs_toggle_dock.clicked.connect(self._toggle_left_dock)
+        fs_bar_layout.addWidget(self.btn_fs_toggle_dock)
+
+        self.btn_fs_autofill = QPushButton("⚡ Auto-Fill")
+        self.btn_fs_autofill.setFixedHeight(24)
+        self.btn_fs_autofill.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fs_autofill.clicked.connect(self.autofill_all_to_suno)
+        fs_bar_layout.addWidget(self.btn_fs_autofill)
+
+        self.btn_fs_exit = QPushButton("⛷️ Exit Full Screen (Esc / F11)")
+        self.btn_fs_exit.setObjectName("primaryGenerateButton")
+        self.btn_fs_exit.setFixedHeight(24)
+        self.btn_fs_exit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_fs_exit.clicked.connect(self._exit_fullscreen_view)
+        fs_bar_layout.addWidget(self.btn_fs_exit)
+
+        self.floating_fs_bar.hide()
+
         self.splitter.addWidget(self.dock_card)
         self.splitter.addWidget(self.browser_container)
         self.splitter.setCollapsible(0, True)
@@ -493,6 +535,8 @@ class SunoBrowserView(QWidget):
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
             settings.setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+            settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
+            page.fullScreenRequested.connect(self._on_web_fullscreen_requested)
 
             self.web_view.setPage(page)
             self.web_profile = profile
@@ -547,11 +591,83 @@ class SunoBrowserView(QWidget):
         visible = not self.dock_card.isVisible()
         self.dock_card.setVisible(visible)
         self.btn_toggle_dock.setChecked(visible)
-        self.btn_toggle_dock.setText("◀ Dock" if visible else "▶ Dock")
+        self.btn_toggle_dock.setText("◀ Dock" if visible else "▶ Dock (Full Width)")
+        if hasattr(self, "btn_fs_toggle_dock"):
+            self.btn_fs_toggle_dock.setText("▶ Hide Dock" if visible else "◀ Show Dock")
+        self._reposition_floating_bar()
 
     def _open_external_browser(self):
         url = self.txt_url.text().strip() or "https://suno.com/create"
         QDesktopServices.openUrl(QUrl(url))
+
+    # ── Full Screen Theater Mode (Max Website Real Estate) ──
+    def _reposition_floating_bar(self):
+        if hasattr(self, "floating_fs_bar") and self.floating_fs_bar.isVisible():
+            bw = self.browser_container.width()
+            fw = self.floating_fs_bar.sizeHint().width()
+            fh = self.floating_fs_bar.sizeHint().height()
+            x = max(10, (bw - fw) // 2)
+            self.floating_fs_bar.setGeometry(x, 10, fw, fh)
+            self.floating_fs_bar.raise_()
+
+    def set_fullscreen_active(self, is_active: bool):
+        """Toggle immersion full-screen mode: hides side dock, shows floating controls, maximizes web page."""
+        self._is_fullscreen_active = is_active
+        if is_active:
+            self._pre_fs_dock_visible = self.dock_card.isVisible()
+            self.dock_card.hide()
+            self.btn_toggle_dock.setChecked(False)
+            self.btn_toggle_dock.setText("▶ Dock (Full Width)")
+            self.btn_fullscreen.setText("⛷️ Exit Full Screen")
+            self.btn_fullscreen.setToolTip("Exit Full Screen mode [F11 or Esc]")
+            if hasattr(self, "btn_fs_toggle_dock"):
+                self.btn_fs_toggle_dock.setText("◀ Show Dock")
+            self.floating_fs_bar.show()
+            self.floating_fs_bar.raise_()
+            self._reposition_floating_bar()
+        else:
+            self.floating_fs_bar.hide()
+            self.btn_fullscreen.setText("⛶ Full Screen")
+            self.btn_fullscreen.setToolTip("Toggle Full Screen for Suno website (Press F11 or Esc to exit)")
+            if getattr(self, "_pre_fs_dock_visible", True):
+                self.dock_card.show()
+                self.btn_toggle_dock.setChecked(True)
+                self.btn_toggle_dock.setText("◀ Dock")
+
+    def _toggle_fullscreen_view(self):
+        new_state = not self._is_fullscreen_active
+        self.set_fullscreen_active(new_state)
+        self.toggle_fullscreen_requested.emit(new_state)
+
+    def _exit_fullscreen_view(self):
+        if self._is_fullscreen_active:
+            self.set_fullscreen_active(False)
+            self.toggle_fullscreen_requested.emit(False)
+
+    def _on_web_fullscreen_requested(self, request):
+        """Handle HTML5 fullscreen requests from videos, players, or web elements on suno.com."""
+        request.accept()
+        if request.toggleOn():
+            self.set_fullscreen_active(True)
+            self.toggle_fullscreen_requested.emit(True)
+        else:
+            self.set_fullscreen_active(False)
+            self.toggle_fullscreen_requested.emit(False)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_floating_bar()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_F11:
+            self._toggle_fullscreen_view()
+            event.accept()
+            return
+        elif event.key() == Qt.Key.Key_Escape and self._is_fullscreen_active:
+            self._exit_fullscreen_view()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     # ── Smart MP3 / WAV Download Manager ──
     def _on_download_requested(self, download_item):
@@ -962,13 +1078,46 @@ class SunoBrowserView(QWidget):
         for b in [
             self.btn_toggle_dock, self.btn_nav_create, self.btn_nav_library, self.btn_nav_account,
             self.btn_nav_reload, self.btn_zoom_out, self.btn_zoom_in, self.btn_open_ext,
-            self.btn_download_link, self.btn_float_hud, self.btn_sync_from_studio, self.btn_prev, self.btn_next,
+            self.btn_download_link, self.btn_float_hud, self.btn_fullscreen,
+            self.btn_sync_from_studio, self.btn_prev, self.btn_next,
             self.btn_fill_title, self.btn_fill_style, self.btn_fill_lyrics, self.btn_fill_neg,
             self.btn_fill_focused, self.btn_open_dl_folder, self.btn_load_dl_to_editor,
             self.btn_paste_quick_dl, self.btn_quick_dl, self.btn_open_full_dl,
         ]:
             if hasattr(self, b.__repr__() if False else "") or b is not None:
                 b.setStyleSheet(btn_qss)
+
+        if hasattr(self, "floating_fs_bar") and self.floating_fs_bar:
+            self.floating_fs_bar.setStyleSheet(f"""
+                QFrame#floatingFsBar {{
+                    background-color: {'rgba(15, 23, 42, 0.92)' if is_dark else 'rgba(255, 255, 255, 0.95)'};
+                    border: 1px solid {acc};
+                    border-radius: 12px;
+                }}
+                QFrame#floatingFsBar QLabel {{
+                    color: {pri};
+                    font-weight: 800;
+                    font-size: 11px;
+                }}
+                QFrame#floatingFsBar QPushButton {{
+                    background-color: {'rgba(30, 41, 59, 0.9)' if is_dark else '#f1f5f9'};
+                    color: {pri};
+                    border: 1px solid {border};
+                    border-radius: 5px;
+                    font-weight: 700;
+                    font-size: 10px;
+                    padding: 3px 8px;
+                }}
+                QFrame#floatingFsBar QPushButton:hover {{
+                    border-color: {acc};
+                }}
+                QFrame#floatingFsBar QPushButton#primaryGenerateButton {{
+                    background: {acc_grad};
+                    color: #ffffff;
+                    border: 1px solid {t['border_accent']};
+                    font-weight: 800;
+                }}
+            """)
 
         self.btn_autofill_all.setStyleSheet(
             f"background: {acc_grad}; color: #ffffff; border: 1px solid {t['border_accent']}; border-radius: 6px; font-weight: 800; font-size: 11px;"

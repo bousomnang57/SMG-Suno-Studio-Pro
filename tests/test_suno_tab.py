@@ -76,6 +76,34 @@ def run_all_tests():
     assert sb._last_js_executed != ""
     print("  ✓ Ribbon Action triggered autofill execution cleanly")
 
+    print("[3b/5] Testing Suno Website Full Screen & Dock Expand Engine...")
+    assert hasattr(sb, "btn_fullscreen"), "SunoBrowserView missing btn_fullscreen"
+    assert hasattr(sb, "floating_fs_bar"), "SunoBrowserView missing floating_fs_bar"
+    assert sb.floating_fs_bar.isHidden() is True
+
+    # Test entering full screen
+    sb.set_fullscreen_active(True)
+    assert sb._is_fullscreen_active is True
+    assert sb.dock_card.isHidden() is True
+    assert sb.floating_fs_bar.isVisible() is True
+    assert "Exit Full Screen" in sb.btn_fullscreen.text()
+    print("  ✓ Full screen immersion activated: left dock collapsed, floating exit bar mounted")
+
+    # Test exiting full screen
+    sb.set_fullscreen_active(False)
+    assert sb._is_fullscreen_active is False
+    assert sb.dock_card.isVisible() is True
+    assert sb.floating_fs_bar.isHidden() is True
+    assert "Full Screen" in sb.btn_fullscreen.text()
+    print("  ✓ Full screen exited cleanly: dock and navigation restored")
+
+    # Test MainWindow F11 shortcut bridge in Mode 5
+    win._toggle_fullscreen()
+    assert sb._is_fullscreen_active is True
+    win._on_escape_pressed()
+    assert sb._is_fullscreen_active is False
+    print("  ✓ MainWindow F11 and Esc shortcuts toggle Suno full screen seamlessly")
+
     print("[4/5] Testing 5-Theme Adaptive Switching on Suno Tab...")
     for theme_key in ["obsidian", "cyber_blue", "emerald", "sunset_amber", "canvas_light"]:
         win.set_theme(theme_key)

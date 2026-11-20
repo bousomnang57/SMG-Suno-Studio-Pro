@@ -156,6 +156,7 @@ class MainWindow(QMainWindow):
         self.suno_browser_view.pull_from_studio_requested.connect(lambda: self._sync_tracks_into_suno_browser(prefer_batch=False))
         self.suno_browser_view.open_link_downloader_requested.connect(self._open_suno_link_downloader)
         self.suno_browser_view.import_lyrics_requested.connect(self._import_downloaded_suno_lyrics)
+        self.suno_browser_view.toggle_fullscreen_requested.connect(self._on_suno_fullscreen_toggled)
         self.stack.addWidget(self.suno_browser_view)
 
         master_layout.addWidget(self.stack, stretch=1)
@@ -1209,6 +1210,8 @@ class MainWindow(QMainWindow):
                 self.lbl_editor_status.setStyleSheet("color: #334155; font-size: 11px; font-weight: 700; background: transparent;")
 
     def _set_studio_mode(self, index: int):
+        if index != 5 and hasattr(self, "suno_browser_view") and getattr(self.suno_browser_view, "_is_fullscreen_active", False):
+            self.suno_browser_view._exit_fullscreen_view()
         self.btn_mode_wizard.setChecked(index == 0)
         self.btn_mode_visual.setChecked(index == 1)
         self.btn_mode_batch.setChecked(index == 2)
@@ -1281,16 +1284,59 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Shift+C"), self).activated.connect(self._quick_copy_suno)
         QShortcut(QKeySequence("Ctrl+Shift+D"), self).activated.connect(self._open_suno_link_downloader)
         QShortcut(QKeySequence("F11"), self).activated.connect(self._toggle_fullscreen)
+        QShortcut(QKeySequence("Esc"), self).activated.connect(self._on_escape_pressed)
 
     def _show_export_menu(self):
         if hasattr(self, "export_menu") and hasattr(self, "btn_export"):
             self.export_menu.popup(self.btn_export.mapToGlobal(self.btn_export.rect().bottomLeft()))
 
     def _toggle_fullscreen(self):
+        if self.stack.currentIndex() == 5 and hasattr(self, "suno_browser_view"):
+            self.suno_browser_view._toggle_fullscreen_view()
+            return
+
         if self.isFullScreen():
             self.showNormal()
         else:
             self.showFullScreen()
+
+    def _on_suno_fullscreen_toggled(self, is_fs: bool):
+        if is_fs:
+            if hasattr(self, "header_frame"):
+                self.header_frame.hide()
+            if hasattr(self, "workflow_ribbon"):
+                self.workflow_ribbon.hide()
+            if hasattr(self, "status_bar"):
+                self.status_bar.hide()
+            if not self.isFullScreen():
+                self.showFullScreen()
+        else:
+            if hasattr(self, "header_frame"):
+                self.header_frame.show()
+            if hasattr(self, "workflow_ribbon"):
+                self.workflow_ribbon.show()
+            if hasattr(self, "status_bar"):
+                self.status_bar.show()
+            if self.isFullScreen():
+                self.showNormal()
+
+    def _on_escape_pressed(self):
+        if hasattr(self, "suno_browser_view") and getattr(self.suno_browser_view, "_is_fullscreen_active", False):
+            self.suno_browser_view._exit_fullscreen_view()
+        elif self.isFullScreen():
+            self._toggle_fullscreen()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            if hasattr(self, "suno_browser_view") and getattr(self.suno_browser_view, "_is_fullscreen_active", False):
+                self.suno_browser_view._exit_fullscreen_view()
+                event.accept()
+                return
+            elif self.isFullScreen():
+                self._toggle_fullscreen()
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
     def _apply_all_themes(self, theme_or_dark=None):
         if isinstance(theme_or_dark, str):
