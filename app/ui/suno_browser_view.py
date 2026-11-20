@@ -281,7 +281,7 @@ class SunoBrowserView(QWidget):
         self.chk_auto_fit_style.setToolTip("Automatically deduplicate & trim Style Prompt to your Suno engine character limit before injecting")
         st_hdr.addWidget(self.chk_auto_fit_style)
 
-        self.lbl_style_chars = QLabel("0 / 200")
+        self.lbl_style_chars = QLabel("0 / 1000")
         self.lbl_style_chars.setStyleSheet("font-size: 10px; font-weight: 800;")
         st_hdr.addWidget(self.lbl_style_chars)
         d_layout.addLayout(st_hdr)
@@ -753,9 +753,9 @@ class SunoBrowserView(QWidget):
 
     # ── Track & Batch Queue Sync ──
     def _get_engine_char_limit(self) -> int:
-        eng = config_manager.get("suno_engine", "Suno v4 / v3.5 (200 chars)")
-        m = re.search(r"(\d{3})", str(eng))
-        return int(m.group(1)) if m else 200
+        eng = config_manager.get("suno_engine", "Suno v6 Pro / Max (1000 chars)")
+        m = re.search(r"(\d+)\s*(?:chars|c\b)", str(eng), re.IGNORECASE) or re.search(r"\((\d+)", str(eng))
+        return int(m.group(1)) if m else 1000
 
     @staticmethod
     def _fit_style_to_limit(style_text: str, limit: int) -> str:

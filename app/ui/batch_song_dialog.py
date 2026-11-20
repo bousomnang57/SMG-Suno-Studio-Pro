@@ -38,7 +38,7 @@ class StudioSongInspectorDialog(QDialog):
         self.all_songs = all_songs or [self.song_data]
         self.current_index = self._find_song_index(self.song_data.get("id"))
         self.is_dark = is_dark
-        self.style_limit = 200
+        self.style_limit = 1000
 
         self.setWindowTitle(f"🎵 Studio Track Inspector — {self.song_data.get('title', 'Track')}")
         self.resize(920, 600)

@@ -875,7 +875,7 @@ class BatchGeneratorView(QWidget):
         self.current_persona = "Natural Studio Vocal"
         self.album_arc_enabled = False
         self.session_memory_titles = set()
-        self.current_style_limit = 200
+        self.current_style_limit = 1000
         self.current_diversity = "Wide Spectrum"
         self.anti_duplication = True
         self.filter_mode = "all"  # "all", "favorites", "uncopied", "copied"
@@ -1367,7 +1367,12 @@ class BatchGeneratorView(QWidget):
         s_lbl.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #94a3b8;")
         s_box.addWidget(s_lbl)
         self.combo_style_limit = QComboBox()
-        self.combo_style_limit.addItems(["200 Chars (Suno v3.5/v4/v6)", "120 Chars (Suno v3)"])
+        self.combo_style_limit.addItems([
+            "1000 Chars (Suno v6 Pro / v5)",
+            "500 Chars (Extended)",
+            "200 Chars (Suno v4 / v3.5)",
+            "120 Chars (Suno v3 Legacy)",
+        ])
         self.combo_style_limit.setFixedHeight(26)
         self.combo_style_limit.setStyleSheet("padding: 1px 6px; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #38bdf8;")
         self.combo_style_limit.currentTextChanged.connect(self._on_style_limit_changed)
@@ -2659,8 +2664,12 @@ class BatchGeneratorView(QWidget):
     def _on_style_limit_changed(self, text: str):
         if "120" in text:
             self.current_style_limit = 120
-        else:
+        elif "200" in text:
             self.current_style_limit = 200
+        elif "500" in text:
+            self.current_style_limit = 500
+        else:
+            self.current_style_limit = 1000
         if hasattr(self, "lbl_insp_style_chars") and self.selected_song:
             self.lbl_insp_style_chars.setText(f"{len(self.selected_song.get('style_prompt', ''))} / {self.current_style_limit} chars")
 

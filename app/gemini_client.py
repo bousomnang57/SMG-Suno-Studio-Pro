@@ -885,7 +885,7 @@ class BatchGenerateWorker(QThread):
         theme: str,
         language: str = "English",
         count: int = 20,
-        style_limit: int = 200,
+        style_limit: int = 1000,
         vocal_type: str = "Mixed",
         diversity_mode: str = "Wide Spectrum",
         anti_duplication: bool = True,
@@ -1217,9 +1217,10 @@ AUTHENTIC HUMAN SONGWRITING CRAFT (ZERO AI-SLOP):
    - SHOW, DON'T TELL: Build each verse around the assigned Tangible Anchor and Human POV above. Use concrete everyday actions instead of saying "I am sad".
    - FULL SONG ARCHITECTURE: Include rich Verse 1 (4-6 lines), Pre-Chorus, memorable sing-along Chorus (4-6 lines), Verse 2 (new story detail), emotional Bridge twist, and Outro.
 
-3. SUNO V3.5/V4/V6 MICRO-GENRE STYLE PROMPT:
+3. SUNO V6 PRO / V5 / V4.5 MICRO-GENRE STYLE PROMPT:
    - Keep `style_prompt` strictly under {self.style_limit} characters.
-   - Include: specific sub-genre, mood, exact assigned BPM, assigned musical key, 2-3 real studio instruments, authentic vocal texture, and organic mix tone (warm room acoustics, natural breath).
+   - For Suno v6 Pro (1000 chars limit): Provide a rich, highly expressive and multi-layered style prompt with specific sub-genre, mood, exact BPM, musical key, 3-4 real studio instruments, vocal timbre & delivery nuances, spatial room acoustics, and dynamic sonic progression.
+   - For legacy limits (120/200 chars): Provide compact comma-separated tags.
 
 Return ONLY a valid JSON array of {chunk_len} song objects, with no markdown fences or commentary.
 Format:
@@ -1229,7 +1230,7 @@ Format:
   "genre": "Precise Sub-genre",
   "bpm": "74 BPM",
   "key": "F#m",
-  "style_prompt": "comma-separated descriptors strictly under {self.style_limit} chars",
+  "style_prompt": "highly expressive style prompt strictly under {self.style_limit} chars",
   "lyrics": "[Verse 1]\\n...\\n[Chorus]\\n...\\n[Verse 2]\\n...\\n[Bridge]\\n...\\n[Outro]"
 }}
 """

@@ -5,6 +5,7 @@ Khmer Traditional Instruments, Master Sound Presets, and a Live Suno Formula Car
 """
 
 import json
+import re
 from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -865,20 +866,20 @@ class VisualStudioView(QWidget):
 
         self.vs_engine_combo = QComboBox()
         self.vs_engine_combo.addItems([
-            "Suno v6 Master (400c - HDR)",
-            "Suno v4.5 (350c - HiFi)",
+            "Suno v6 Pro / Max (1000c - HDR)",
+            "Suno v5 / v4.5 (1000c - HiFi)",
             "Suno v4 / v3.5 (200c - Fast)",
             "Suno v3 (120c - Legacy)",
             "Udio v1.5 / v2 (350c - Prose)"
         ])
-        self.vs_engine_combo.setCurrentIndex(2) # Default Suno v4/v3.5 (200 Chars)
+        self.vs_engine_combo.setCurrentIndex(0) # Default Suno v6 Pro (1000 Chars)
         self.vs_engine_combo.setStyleSheet("padding: 2px 4px; font-size: 10px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px;")
         self.vs_engine_combo.currentIndexChanged.connect(lambda _: self._on_prompt_text_changed())
         suno_head.addWidget(self.vs_engine_combo)
 
         suno_head.addStretch()
 
-        self.lbl_char_count = QLabel("0 / 200 chars")
+        self.lbl_char_count = QLabel("0 / 1000 chars")
         self.lbl_char_count.setStyleSheet("font-size: 10px; font-weight: 800; color: #059669; background: #ecfdf5; padding: 2px 6px; border-radius: 4px;")
         suno_head.addWidget(self.lbl_char_count)
         layout.addLayout(suno_head)
@@ -1127,15 +1128,10 @@ class VisualStudioView(QWidget):
     def _get_engine_char_limit(self) -> int:
         if hasattr(self, "vs_engine_combo"):
             eng_txt = self.vs_engine_combo.currentText()
-            if "400" in eng_txt:
-                return 400
-            elif "350" in eng_txt:
-                return 350
-            elif "120" in eng_txt:
-                return 120
-            elif "200" in eng_txt:
-                return 200
-        return 200
+            m = re.search(r"(\d+)\s*(?:chars|c\b)", eng_txt, re.IGNORECASE) or re.search(r"\((\d+)", eng_txt)
+            if m:
+                return int(m.group(1))
+        return 1000
 
     def _load_master_preset(self, p_item: dict):
         """Instantly loads one of the 6 Master Sound Design Presets into the Formula Card."""

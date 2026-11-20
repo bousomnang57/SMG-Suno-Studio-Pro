@@ -56,11 +56,11 @@ SUNO_PLANS = {
 }
 
 SUNO_ENGINES = [
-    "Suno v6 Master (400 chars)",
-    "Suno v4.5 (350 chars)",
+    "Suno v6 Pro / Max (1000 chars)",
+    "Suno v5 / v4.5 (1000 chars)",
     "Suno v4 / v3.5 (200 chars)",
     "Suno v3 (120 chars)",
-    "Udio v1.5 (350 chars)",
+    "Udio v1.5 / v2 (350 chars)",
 ]
 
 DEFAULT_CONFIG = {
@@ -77,7 +77,7 @@ DEFAULT_CONFIG = {
     "auto_check_updates": True,
     "update_url": DEFAULT_UPDATE_URL,
     "suno_plan": "Pro (2,500 cr/mo — Commercial)",
-    "suno_engine": "Suno v4 / v3.5 (200 chars)",
+    "suno_engine": "Suno v6 Pro / Max (1000 chars)",
     "suno_account_handle": "",
     "suno_credits_remaining": 2500,
     "suno_create_url": "https://suno.com/create",
@@ -158,6 +158,12 @@ class ConfigManager:
             self.save()
         elif raw_theme in ["light", "modern_light"]:
             self.config["theme"] = "canvas_light"
+            self.save()
+
+        # Normalize suno_engine to V6 Pro (1000 chars) if unset or legacy
+        current_eng = self.config.get("suno_engine", "")
+        if not current_eng or "400" in current_eng or current_eng not in SUNO_ENGINES:
+            self.config["suno_engine"] = "Suno v6 Pro / Max (1000 chars)"
             self.save()
 
         # Synchronize single and multi-key lists

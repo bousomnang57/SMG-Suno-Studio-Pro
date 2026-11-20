@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QFrame, QApplication, QGroupBox, QFileDialog,
     QMessageBox, QScrollArea, QGridLayout
 )
+import re
 from PyQt6.QtCore import Qt, pyqtSignal
 from app.tts_player import VocalPlayer
 from app.chord_engine import CHORD_PROGRESSIONS, VOCAL_RANGES, ChordEngine
@@ -487,7 +488,13 @@ class ToolsPanel(QWidget):
         engine_row = QHBoxLayout()
         engine_row.addWidget(QLabel("Target Engine:"))
         self.combo_suno_engine = QComboBox()
-        self.combo_suno_engine.addItems(["Suno AI v3.5 (200 Chars)", "Suno AI v3 (120 Chars)", "Udio AI v1.5 (350 Chars)"])
+        self.combo_suno_engine.addItems([
+            "Suno AI v6 Pro (1000 Chars)",
+            "Suno AI v5 / v4.5 (1000 Chars)",
+            "Suno AI v4 / v3.5 (200 Chars)",
+            "Suno AI v3 (120 Chars)",
+            "Udio AI v1.5 / v2 (350 Chars)"
+        ])
         self.combo_suno_engine.currentIndexChanged.connect(self._on_suno_engine_changed)
         engine_row.addWidget(self.combo_suno_engine)
         layout.addLayout(engine_row)
@@ -507,7 +514,7 @@ class ToolsPanel(QWidget):
         gauge_row = QHBoxLayout()
         gauge_row.addWidget(QLabel("Generated Style Prompt:"))
         gauge_row.addStretch()
-        self.lbl_suno_chars = QLabel("0 / 200 chars")
+        self.lbl_suno_chars = QLabel("0 / 1000 chars")
         self.lbl_suno_chars.setStyleSheet("font-size: 11px; font-weight: 700; color: #059669; background: #ecfdf5; padding: 2px 6px; border-radius: 4px;")
         gauge_row.addWidget(self.lbl_suno_chars)
         layout.addLayout(gauge_row)
@@ -532,13 +539,12 @@ class ToolsPanel(QWidget):
         text = self.suno_output.toPlainText().strip()
         cnt = len(text)
         idx = getattr(self, "combo_suno_engine", None)
-        limit = 200
+        limit = 1000
         if idx:
             engine_text = self.combo_suno_engine.currentText()
-            if "120" in engine_text:
-                limit = 120
-            elif "350" in engine_text:
-                limit = 350
+            m = re.search(r"(\d+)\s*(?:chars|c\b)", engine_text, re.IGNORECASE) or re.search(r"\((\d+)", engine_text)
+            if m:
+                limit = int(m.group(1))
 
         self.lbl_suno_chars.setText(f"{cnt} / {limit} chars")
         if cnt > limit:

@@ -152,7 +152,7 @@ class SunoCompanionHUD(QDialog):
         self.lbl_style_hdr.setStyleSheet("font-size: 10px; font-weight: 700;")
         s_hdr.addWidget(self.lbl_style_hdr)
         s_hdr.addStretch(1)
-        self.lbl_style_chars = QLabel("0 / 200")
+        self.lbl_style_chars = QLabel("0 / 1000")
         self.lbl_style_chars.setStyleSheet("font-size: 10px; font-weight: 800;")
         s_hdr.addWidget(self.lbl_style_chars)
         root.addLayout(s_hdr)
@@ -230,9 +230,9 @@ class SunoCompanionHUD(QDialog):
         root.addWidget(self.lbl_status)
 
     def _get_engine_char_limit(self) -> int:
-        eng = config_manager.get("suno_engine", "Suno v4 / v3.5 (200 chars)")
-        m = re.search(r"(\d{3})", str(eng))
-        return int(m.group(1)) if m else 200
+        eng = config_manager.get("suno_engine", "Suno v6 Pro / Max (1000 chars)")
+        m = re.search(r"(\d+)\s*(?:chars|c\b)", str(eng), re.IGNORECASE) or re.search(r"\((\d+)", str(eng))
+        return int(m.group(1)) if m else 1000
 
     def _refresh_account_strip(self):
         plan_name = config_manager.get("suno_plan", "Pro (2,500 cr/mo — Commercial)")
