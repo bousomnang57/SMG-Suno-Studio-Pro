@@ -23,6 +23,7 @@ from app.ui.settings_dialog import SettingsDialog
 from app.ui.visual_studio_view import VisualStudioView
 from app.ui.wizard_view import SongCreationWizardView
 from app.ui.batch_generator_view import BatchGeneratorView
+from app.ui.suno_browser_view import SunoBrowserView
 from app.ui.styles import STUDIO_THEMES, get_theme
 from app.gemini_client import (
     GenerateLyricWorker, RewriteWorker, RhymeWorker, SunoPromptWorker
@@ -146,6 +147,13 @@ class MainWindow(QMainWindow):
         self.clone_view = SongDNAClonerView(parent=self, is_dark=self.is_dark_theme)
         self.clone_view.send_to_editor_requested.connect(self._load_cloned_song_into_editor)
         self.stack.addWidget(self.clone_view)
+
+        # View 5: Native Embedded Suno Browser Studio (Account Switcher, Auto-Fill, Downloads)
+        self.suno_browser_view = SunoBrowserView(parent=self, theme_key=self.current_theme)
+        self.suno_browser_view.load_audio_into_editor_requested.connect(self._load_downloaded_suno_audio_into_editor)
+        self.suno_browser_view.open_floating_hud_requested.connect(self._open_suno_hud)
+        self.suno_browser_view.pull_from_studio_requested.connect(lambda: self._sync_tracks_into_suno_browser(prefer_batch=False))
+        self.stack.addWidget(self.suno_browser_view)
 
         master_layout.addWidget(self.stack, stretch=1)
 
@@ -449,6 +457,9 @@ class MainWindow(QMainWindow):
                     self.clone_view._send_to_editor()
                 else:
                     self._set_studio_mode(3)
+        elif mode == 5:  # Suno Browser Studio -> 1-Click Auto-Fill
+            if hasattr(self, "suno_browser_view"):
+                self.suno_browser_view.autofill_all_to_suno()
 
     def _create_header_bar(self) -> QWidget:
         self.header_frame = QFrame()
@@ -523,8 +534,15 @@ class MainWindow(QMainWindow):
         self.btn_mode_clone.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mode_clone.clicked.connect(lambda: self._set_studio_mode(4))
 
-        for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone]:
-            btn.setFixedWidth(72)
+        self.btn_mode_suno = QPushButton("🌐 Suno")
+        self.btn_mode_suno.setToolTip("🌐 Suno Browser Studio (Auto-Fill & Direct Creation) [Ctrl+6]")
+        self.btn_mode_suno.setCheckable(True)
+        self.btn_mode_suno.setChecked(False)
+        self.btn_mode_suno.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mode_suno.clicked.connect(lambda: self._set_studio_mode(5))
+
+        for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno]:
+            btn.setFixedWidth(66)
             btn.setFixedHeight(28)
             mb_layout.addWidget(btn)
 
@@ -779,7 +797,7 @@ class MainWindow(QMainWindow):
                     border: 1px solid {accent};
                 }}
             """
-            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone]:
+            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno]:
                 btn.setStyleSheet(mode_btn_qss)
 
             capsule_qss = f"""
@@ -1003,7 +1021,7 @@ class MainWindow(QMainWindow):
                     font-weight: 800;
                 }
             """
-            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone]:
+            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno]:
                 btn.setStyleSheet(mode_btn_qss)
 
             capsule_qss = """
@@ -1191,22 +1209,26 @@ class MainWindow(QMainWindow):
         self.btn_mode_batch.setChecked(index == 2)
         self.btn_mode_editor.setChecked(index == 3)
         self.btn_mode_clone.setChecked(index == 4)
+        if hasattr(self, "btn_mode_suno"):
+            self.btn_mode_suno.setChecked(index == 5)
         self.stack.setCurrentIndex(index)
 
-        mode_titles = ["🗺️ WIZARD", "🎨 VISUAL", "⚡ BATCH", "✍️ EDITOR", "🧬 CLONE"]
+        mode_titles = ["🗺️ WIZARD", "🎨 VISUAL", "⚡ BATCH", "✍️ EDITOR", "🧬 CLONE", "🌐 SUNO"]
         ribbon_infos = [
             "🗺️ Wizard Studio • Step-by-step guided song creation with automatic genre & prompt setup",
             "🎨 Visual Arranger • Suno AI visual prompt tags, mood matrix & live formula preview",
             "⚡ Batch Studio Pro • Multi-song generation, anti-cliché shuffler & album story arcs",
             "✍️ Lyric Editor Workbench • 3-pane DAW lyric writing, syllable meter, chord transposer & takes",
-            "🧬 Song DNA Cloner • Deep structure & cadence cloner with twin rhyme scheme generator"
+            "🧬 Song DNA Cloner • Deep structure & cadence cloner with twin rhyme scheme generator",
+            "🌐 Suno Browser Studio • Persistent multi-account login, 1-click Title/Style/Lyrics auto-fill & MP3 download manager"
         ]
         action_labels = [
             "✍️ Open in Editor ➔",
             "✍️ Open in Editor ➔",
             "✍️ Open in Editor ➔",
             "🎨 Open in Arranger ➔",
-            "✍️ Open in Editor ➔"
+            "✍️ Open in Editor ➔",
+            "⚡ Auto-Fill to Suno ➔"
         ]
 
         if hasattr(self, "header_stage_pill") and 0 <= index < len(mode_titles):
@@ -1227,14 +1249,18 @@ class MainWindow(QMainWindow):
             cur_lyrics = self.editor_panel.get_lyrics()
             if cur_lyrics and len(cur_lyrics.strip()) > 30:
                 self.clone_view.set_reference(cur_lyrics, self.editor_panel.get_title())
+        elif index == 5 and hasattr(self, "suno_browser_view"):
+            self._sync_tracks_into_suno_browser()
+            self.suno_browser_view.ensure_browser_initialized()
 
     def _setup_global_shortcuts(self):
-        # Studio Modes 1-5
+        # Studio Modes 1-6
         QShortcut(QKeySequence("Ctrl+1"), self).activated.connect(lambda: self._set_studio_mode(0))
         QShortcut(QKeySequence("Ctrl+2"), self).activated.connect(lambda: self._set_studio_mode(1))
         QShortcut(QKeySequence("Ctrl+3"), self).activated.connect(lambda: self._set_studio_mode(2))
         QShortcut(QKeySequence("Ctrl+4"), self).activated.connect(lambda: self._set_studio_mode(3))
         QShortcut(QKeySequence("Ctrl+5"), self).activated.connect(lambda: self._set_studio_mode(4))
+        QShortcut(QKeySequence("Ctrl+6"), self).activated.connect(lambda: self._set_studio_mode(5))
 
         # Workflow Actions
         QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self._new_song)
@@ -1292,6 +1318,8 @@ class MainWindow(QMainWindow):
             self.batch_view.apply_theme(theme_key)
         if hasattr(self, "clone_view") and self.clone_view:
             self.clone_view.apply_theme(theme_key)
+        if hasattr(self, "suno_browser_view") and self.suno_browser_view:
+            self.suno_browser_view.apply_theme(theme_key)
         if getattr(self, "suno_hud", None):
             self.suno_hud.apply_theme(theme_key)
 
@@ -1945,12 +1973,13 @@ class MainWindow(QMainWindow):
         start_idx = 0
         on_done_cb = None
 
-        # If currently in Batch Studio Pro with generated tracks, load the full Batch Queue
+        # If currently in Batch Studio Pro (or Suno tab with batch songs), load the full Batch Queue
         if (
             hasattr(self, "stack")
-            and self.stack.currentIndex() == 2
+            and self.stack.currentIndex() in (2, 5)
             and hasattr(self, "batch_view")
             and getattr(self.batch_view, "all_songs", None)
+            and len(self.batch_view.all_songs) > 0
         ):
             tracks = list(self.batch_view.all_songs)
             # Start at first pending track (or selected track)
@@ -1979,10 +2008,10 @@ class MainWindow(QMainWindow):
             # Build single active song snapshot from Editor / Visual / Tools
             proj = self._build_current_project()
             tracks = [{
-                "title": proj.title,
-                "style_prompt": proj.style_prompt,
-                "lyrics": proj.lyrics,
-                "negative_prompt": proj.negative_prompt,
+                "title": proj.title or "Untitled Song",
+                "style_prompt": proj.style_prompt or "",
+                "lyrics": proj.lyrics or "",
+                "negative_prompt": proj.negative_prompt or "",
             }]
             on_done_cb = lambda _tr: self._update_status_bar()
 
@@ -2002,6 +2031,71 @@ class MainWindow(QMainWindow):
         self.suno_hud.raise_()
         self.suno_hud.activateWindow()
         self.status_bar.showMessage("🚀 Suno Quick-Paste Companion HUD opened (Always-On-Top)", 3500)
+
+    def _sync_tracks_into_suno_browser(self, prefer_batch: bool = True):
+        """Snapshot current active project or Batch Queue and load into Suno Browser Left Dock."""
+        if not hasattr(self, "suno_browser_view"):
+            return
+
+        tracks = []
+        start_idx = 0
+        on_done_cb = None
+
+        has_batch_songs = (
+            hasattr(self, "batch_view")
+            and getattr(self.batch_view, "all_songs", None)
+            and len(self.batch_view.all_songs) > 0
+        )
+
+        if has_batch_songs and prefer_batch:
+            tracks = list(self.batch_view.all_songs)
+            sel = getattr(self.batch_view, "selected_song", None)
+            if sel in tracks:
+                start_idx = tracks.index(sel)
+            else:
+                for i, tr in enumerate(tracks):
+                    if not tr.get("suno_done") and str(tr.get("status", "")).lower() != "done":
+                        start_idx = i
+                        break
+
+            def _sync_batch_done(song_dict: dict):
+                song_dict["status"] = "Done"
+                song_dict["suno_done"] = True
+                if hasattr(self.batch_view, "_update_filter_counts"):
+                    self.batch_view._update_filter_counts()
+                if hasattr(self.batch_view, "_update_suno_queue_hud"):
+                    self.batch_view._update_suno_queue_hud()
+                if hasattr(self.batch_view, "_autosave_batch_session"):
+                    self.batch_view._autosave_batch_session()
+                self._update_status_bar()
+
+            on_done_cb = _sync_batch_done
+        else:
+            proj = self._build_current_project()
+            tracks = [{
+                "title": proj.title or "Untitled Song",
+                "style_prompt": proj.style_prompt or "",
+                "lyrics": proj.lyrics or "",
+                "negative_prompt": proj.negative_prompt or "",
+            }]
+            on_done_cb = lambda _tr: self._update_status_bar()
+
+        self.suno_browser_view.set_tracks(tracks, start_index=start_idx, on_track_done=on_done_cb)
+
+    def _load_downloaded_suno_audio_into_editor(self, audio_path: str):
+        """Switch to Lyric Editor Workbench and attach downloaded Suno audio into stem player."""
+        p = Path(audio_path)
+        if not p.exists():
+            self.status_bar.showMessage(f"Audio file not found: {p.name}", 3500)
+            return
+
+        self._set_studio_mode(3)  # Switch to Editor workbench
+        if hasattr(self, "editor_panel"):
+            if hasattr(self.editor_panel, "load_audio_stem"):
+                self.editor_panel.load_audio_stem(str(p))
+            if hasattr(self.editor_panel, "_switch_tool_deck"):
+                self.editor_panel._switch_tool_deck(1)  # Deck 1 is Tempo, Metronome & Audio Stem
+            self.status_bar.showMessage(f"🎧 Loaded Suno audio '{p.name}' into Editor Stem Player", 4500)
 
     def _sync_suno_engine_preference(self):
         """Sync preferred Suno Engine character limit from Settings into Visual Studio & Tools Panel."""

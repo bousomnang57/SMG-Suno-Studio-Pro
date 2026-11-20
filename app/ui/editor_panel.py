@@ -783,19 +783,25 @@ class EditorPanel(QWidget):
             RhythmEngine.stop_groove()
 
     # ── Stem Player Handlers ──
+    def load_audio_stem(self, path: str):
+        """Programmatically attach a local audio file (e.g. from Suno Browser downloads)."""
+        if not path or not Path(path).exists():
+            return
+        self.attached_audio_path = str(path)
+        p = Path(path)
+        self.lbl_stem_track.setText(p.name[:24] + ("..." if len(p.name) > 24 else ""))
+        self.btn_play_stem.setEnabled(True)
+        self.stem_slider.setEnabled(True)
+        self.btn_remove_stem.setVisible(True)
+        self.stem_player.setSource(QUrl.fromLocalFile(str(path)))
+
     def _attach_audio_stem(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Attach Suno / Udio Master Audio", "", "Audio Files (*.mp3 *.wav *.m4a *.ogg);;All Files (*.*)"
         )
         if not path:
             return
-        self.attached_audio_path = path
-        p = Path(path)
-        self.lbl_stem_track.setText(p.name[:24] + ("..." if len(p.name) > 24 else ""))
-        self.btn_play_stem.setEnabled(True)
-        self.stem_slider.setEnabled(True)
-        self.btn_remove_stem.setVisible(True)
-        self.stem_player.setSource(QUrl.fromLocalFile(path))
+        self.load_audio_stem(path)
 
     def _toggle_stem_playback(self):
         from PyQt6.QtMultimedia import QMediaPlayer

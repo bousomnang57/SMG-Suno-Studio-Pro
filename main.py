@@ -159,8 +159,8 @@ def main():
             pass
 
     if smoke_test:
-        # Automated frozen-EXE health verification for release builds
-        for idx in range(5):
+        # Automated frozen-EXE health verification for release builds across all 6 studio modes
+        for idx in range(6):
             window._set_studio_mode(idx)
         window.close()
         app.quit()

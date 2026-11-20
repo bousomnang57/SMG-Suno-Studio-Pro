@@ -56,7 +56,7 @@ for dyn_pkg in ('PIL', 'numpy'):
 
 # ── 3. Explicit Hidden Imports (Zero ModuleNotFoundError on Clean PCs) ──
 hiddenimports = [
-    # PyQt6 GUI, SVG Icons & Multimedia (Stem Player, Mic Recorder, Audio Synth)
+    # PyQt6 GUI, SVG Icons, Multimedia & Embedded Suno WebEngine Browser
     'PyQt6',
     'PyQt6.QtCore',
     'PyQt6.QtGui',
@@ -64,6 +64,11 @@ hiddenimports = [
     'PyQt6.QtSvg',
     'PyQt6.QtMultimedia',
     'PyQt6.QtMultimediaWidgets',
+    'PyQt6.QtWebEngineWidgets',
+    'PyQt6.QtWebEngineCore',
+    'PyQt6.QtWebChannel',
+    'PyQt6.QtNetwork',
+    'PyQt6.QtPrintSupport',
     'PyQt6.sip',
 
     # Google Gemini SDK & Async HTTP/SSL Stack
