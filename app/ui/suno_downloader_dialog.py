@@ -75,12 +75,22 @@ class SunoLinkDownloadDialog(QDialog):
         header_row.addWidget(lbl_logo)
 
         h_col = QVBoxLayout()
-        h_col.setSpacing(1)
+        h_col.setSpacing(2)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
         self.lbl_head_title = QLabel("Suno Downloader Studio — MP3, Lossless WAV & MP4")
         self.lbl_head_title.setStyleSheet("font-size: 15px; font-weight: 800;")
-        h_col.addWidget(self.lbl_head_title)
+        title_row.addWidget(self.lbl_head_title)
 
-        self.lbl_head_sub = QLabel("Download any public Suno song or Hook as MP3, WAV, original audio, MP4 video or cover art. 100% local conversion.")
+        self.badge_unlimited = QLabel("♾️ Unlimited Downloads • No Monthly Limit")
+        self.badge_unlimited.setObjectName("badgeUnlimited")
+        self.badge_unlimited.setToolTip("Unlimited song downloads with zero monthly quotas, zero rate limits, and zero Suno generation credit usage.")
+        title_row.addWidget(self.badge_unlimited)
+        title_row.addStretch(1)
+        h_col.addLayout(title_row)
+
+        self.lbl_head_sub = QLabel("Download any public Suno song or Hook without monthly download limits. 100% local conversion • 0 credits consumed.")
         self.lbl_head_sub.setStyleSheet("font-size: 10.5px; color: #94a3b8;")
         h_col.addWidget(self.lbl_head_sub)
         header_row.addLayout(h_col)
@@ -112,10 +122,10 @@ class SunoLinkDownloadDialog(QDialog):
         self._init_single_tab(self.tab_single)
         self.tabs.addTab(self.tab_single, "🎵 Single Song / Hook")
 
-        # Tab 2: Bulk / Batch Downloader (Up to 20 links)
+        # Tab 2: Bulk / Batch Downloader (Unlimited Tracks / Playlists)
         self.tab_bulk = QWidget()
         self._init_bulk_tab(self.tab_bulk)
-        self.tabs.addTab(self.tab_bulk, "📑 Bulk Downloader (Up to 20 Links)")
+        self.tabs.addTab(self.tab_bulk, "📑 Bulk Downloader (Unlimited Tracks / Playlists)")
 
         root.addWidget(self.tabs, stretch=1)
 
@@ -245,7 +255,7 @@ class SunoLinkDownloadDialog(QDialog):
         cp_layout.setContentsMargins(8, 8, 8, 8)
         cp_layout.setSpacing(6)
 
-        lbl_chips_head = QLabel("⚡ 1-Click Fast Download Options (Decryption & Conversion In-App):")
+        lbl_chips_head = QLabel("⚡ 1-Click Fast Download Options (♾️ Unlimited • No Monthly Limit • 0 Credits):")
         lbl_chips_head.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #38bdf8;")
         cp_layout.addWidget(lbl_chips_head)
 
@@ -349,7 +359,7 @@ class SunoLinkDownloadDialog(QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        lbl_bulk_hint = QLabel("Paste up to 20 Suno song/hook links (one per line) or a Suno playlist/album URL:")
+        lbl_bulk_hint = QLabel("Paste unlimited Suno song/hook links (one per line) or a Suno playlist/album URL:")
         lbl_bulk_hint.setStyleSheet("font-size: 11px; font-weight: 600; color: #94a3b8;")
         layout.addWidget(lbl_bulk_hint)
 
@@ -358,7 +368,8 @@ class SunoLinkDownloadDialog(QDialog):
         self.txt_bulk_input.setPlaceholderText(
             "https://suno.com/song/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\n"
             "https://suno.com/hook/yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy\n"
-            "https://suno.com/playlist/zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"
+            "https://suno.com/playlist/zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz\n"
+            "(Paste unlimited links — zero monthly limits, no rate caps)"
         )
         self.txt_bulk_input.setStyleSheet("font-size: 10px; font-family: monospace;")
         layout.addWidget(self.txt_bulk_input)
@@ -377,6 +388,13 @@ class SunoLinkDownloadDialog(QDialog):
         self.btn_parse_bulk.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_parse_bulk.clicked.connect(self._parse_bulk_links)
         b_ctrl.addWidget(self.btn_parse_bulk)
+
+        self.btn_clear_bulk = QPushButton("🗑️ Clear")
+        self.btn_clear_bulk.setFixedHeight(28)
+        self.btn_clear_bulk.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_clear_bulk.setToolTip("Clear queue table and input links")
+        self.btn_clear_bulk.clicked.connect(self._clear_bulk_queue)
+        b_ctrl.addWidget(self.btn_clear_bulk)
 
         b_ctrl.addStretch(1)
 
@@ -554,6 +572,11 @@ class SunoLinkDownloadDialog(QDialog):
             QMessageBox.critical(self, "Download Error", f"Failed to download Suno media:\n\n{err}")
 
     # ── Bulk / Playlist Tab Actions ──
+    def _clear_bulk_queue(self):
+        self.txt_bulk_input.clear()
+        self.tbl_bulk.setRowCount(0)
+        self.lbl_status.setText("Queue cleared. Paste unlimited links or playlist above.")
+
     def _paste_into_bulk(self):
         clip = QApplication.clipboard().text().strip()
         if clip:
@@ -567,11 +590,11 @@ class SunoLinkDownloadDialog(QDialog):
 
         urls = []
         if "/playlist/" in text:
-            self.lbl_status.setText("🔍 Resolving Suno Playlist tracks...")
+            self.lbl_status.setText("🔍 Resolving Suno Playlist tracks (Unlimited)...")
             tracks = SunoLinkParser.fetch_playlist_tracks(text)
             urls = [f"https://suno.com/song/{t['uuid']}" for t in tracks if t.get("uuid")]
         else:
-            uids = SunoLinkParser.extract_all_uuids(text, max_limit=20)
+            uids = SunoLinkParser.extract_all_uuids(text, max_limit=None)
             urls = [f"https://suno.com/song/{u}" for u in uids]
 
         self.tbl_bulk.setRowCount(len(urls))
@@ -581,7 +604,7 @@ class SunoLinkDownloadDialog(QDialog):
             self.tbl_bulk.setItem(row, 2, QTableWidgetItem("Queued"))
             self.tbl_bulk.setItem(row, 3, QTableWidgetItem("0%"))
 
-        self.lbl_status.setText(f"✓ Found {len(urls)} Suno tracks in queue. Click 'Download All Queue' to begin.")
+        self.lbl_status.setText(f"✓ Found {len(urls)} Suno tracks in queue (Unlimited mode). Click 'Download All Queue' to begin.")
 
     def _start_bulk_download(self):
         row_count = self.tbl_bulk.rowCount()
@@ -744,6 +767,15 @@ class SunoLinkDownloadDialog(QDialog):
                 border-radius: 8px;
             }}
             QLabel {{ color: {pri}; background: transparent; }}
+            QLabel#badgeUnlimited {{
+                background-color: {t['subtle_pill_bg']};
+                color: {t['text_accent']};
+                border: 1px solid {t['border_accent']};
+                border-radius: 9px;
+                padding: 1px 7px;
+                font-weight: 800;
+                font-size: 9.5px;
+            }}
             QLineEdit, QTextEdit, QComboBox {{
                 background-color: {inp};
                 color: {pri};

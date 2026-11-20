@@ -163,8 +163,8 @@ class SunoLinkParser:
         return m.group(1).lower() if m else None
 
     @classmethod
-    def extract_all_uuids(cls, text: str, max_limit: int = 20) -> List[str]:
-        """Extract multiple unique Suno UUIDs for bulk downloading (up to max_limit)."""
+    def extract_all_uuids(cls, text: str, max_limit: Optional[int] = None) -> List[str]:
+        """Extract multiple unique Suno UUIDs for bulk downloading (unlimited when max_limit is None)."""
         if not text:
             return []
         matches = cls.UUID_REGEX.findall(text)
@@ -175,7 +175,7 @@ class SunoLinkParser:
             if u_clean not in seen:
                 seen.add(u_clean)
                 result.append(u_clean)
-                if len(result) >= max_limit:
+                if max_limit is not None and max_limit > 0 and len(result) >= max_limit:
                     break
         return result
 
@@ -696,7 +696,7 @@ class SunoBulkDownloadWorker(QThread):
         parent=None,
     ):
         super().__init__(parent)
-        self.urls = urls[:20]  # Max 20 tracks as on UseSuno
+        self.urls = list(urls)  # Unlimited track queue (no monthly download caps)
         self.media_format = media_format
         self.dest_dir = destination_dir or str(SunoDownloadWorker.default_download_dir())
         self._is_cancelled = False

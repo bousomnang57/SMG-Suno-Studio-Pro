@@ -53,6 +53,12 @@ def test_url_parser():
     assert res3.get("uuid") == test_uuid
     print("  ✓ Bare UUID string normalized correctly")
 
+    # Test unlimited UUID extraction
+    bulk_text = "\n".join([f"https://suno.com/song/00000000-0000-0000-0000-{i:012d}" for i in range(35)])
+    unlimited_uids = SunoLinkParser.extract_all_uuids(bulk_text, max_limit=None)
+    assert len(unlimited_uids) == 35
+    print("  ✓ Unlimited UUID extraction verified (35/35 extracted with zero monthly or batch caps)")
+
     # Test filename sanitizer with Khmer and special chars
     clean_khmer = SunoDownloadWorker.sanitize_filename("រាត្រីស្ងប់ស្ងាត់ / Night: In The Rain *?")
     assert "/" not in clean_khmer and ":" not in clean_khmer and "?" not in clean_khmer
@@ -156,6 +162,8 @@ def test_dialog_and_themes():
         assert dlg.btn_dl_lyrics is not None
         assert dlg.btn_dl_pack is not None
         assert dlg.combo_bulk_fmt.count() >= 5
+        assert hasattr(dlg, "badge_unlimited")
+        assert hasattr(dlg, "btn_clear_bulk")
         dlg.close()
         print(f"  ✓ Dialog rendered and styled cleanly in '{theme_key}'")
 
