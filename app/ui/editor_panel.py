@@ -205,6 +205,7 @@ class EditorPanel(QWidget):
     transpose_requested = pyqtSignal(int)      # semitones (-1, +1)
     rhyme_search_requested = pyqtSignal(str)   # word
     clone_song_requested = pyqtSignal()
+    download_suno_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -417,6 +418,13 @@ class EditorPanel(QWidget):
         self.btn_load_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid #bfdbfe; border-radius: 4px;")
         self.btn_load_stem.clicked.connect(self._attach_audio_stem)
         metro_layout.addWidget(self.btn_load_stem)
+
+        self.btn_download_stem = QPushButton("📥 Suno Link")
+        self.btn_download_stem.setToolTip("Download Suno music by link and attach to stem player [Ctrl+Shift+D]")
+        self.btn_download_stem.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_download_stem.setStyleSheet("background-color: #f0fdf4; color: #15803d; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid #86efac; border-radius: 4px;")
+        self.btn_download_stem.clicked.connect(self.download_suno_requested.emit)
+        metro_layout.addWidget(self.btn_download_stem)
 
         self.btn_play_stem = QPushButton("▶")
         self.btn_play_stem.setEnabled(False)
@@ -1531,6 +1539,8 @@ class EditorPanel(QWidget):
                 self.combo_groove.setStyleSheet(f"background-color: {t['bg_input']}; color: {t['text_primary']}; border: 1px solid {t['border']}; font-weight: 600; padding: 2px 4px; border-radius: 4px;")
             if hasattr(self, "btn_load_stem"):
                 self.btn_load_stem.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid {t['border_accent']}; border-radius: 4px;")
+            if hasattr(self, "btn_download_stem"):
+                self.btn_download_stem.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['accent']}; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid {t['border_subtle']}; border-radius: 4px;")
             if hasattr(self, "btn_play_stem"):
                 self.btn_play_stem.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_primary']}; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border: 1px solid {t['border']}; border-radius: 4px;")
             if hasattr(self, "lbl_stem_time"):
@@ -1654,6 +1664,8 @@ class EditorPanel(QWidget):
                 self.combo_groove.setStyleSheet("background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 600; padding: 2px 4px; border-radius: 4px;")
             if hasattr(self, "btn_load_stem"):
                 self.btn_load_stem.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid #bfdbfe; border-radius: 4px;")
+            if hasattr(self, "btn_download_stem"):
+                self.btn_download_stem.setStyleSheet("background-color: #f0fdf4; color: #15803d; font-weight: 700; font-size: 8.5pt; padding: 2px 6px; border: 1px solid #86efac; border-radius: 4px;")
             if hasattr(self, "btn_play_stem"):
                 self.btn_play_stem.setStyleSheet("background-color: #f8fafc; color: #0f172a; font-weight: 700; font-size: 8.5pt; padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px;")
             if hasattr(self, "lbl_stem_time"):

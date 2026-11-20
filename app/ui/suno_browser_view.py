@@ -31,6 +31,8 @@ class SunoBrowserView(QWidget):
     load_audio_into_editor_requested = pyqtSignal(str)
     open_floating_hud_requested = pyqtSignal()
     pull_from_studio_requested = pyqtSignal()
+    open_link_downloader_requested = pyqtSignal(str)  # initial_url
+    import_lyrics_requested = pyqtSignal(str, str)  # title, lyrics
 
     def __init__(self, parent=None, theme_key: str = "obsidian"):
         super().__init__(parent)
@@ -170,6 +172,13 @@ class SunoBrowserView(QWidget):
         self.btn_open_ext.setToolTip("Open current Suno URL in your external default browser")
         self.btn_open_ext.clicked.connect(self._open_external_browser)
         nav.addWidget(self.btn_open_ext)
+
+        self.btn_download_link = QPushButton("📥 Download by Link")
+        self.btn_download_link.setFixedHeight(26)
+        self.btn_download_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_download_link.setToolTip("Download Suno song by link (MP3, MP4 Video, Cover Art) [Ctrl+Shift+D]")
+        self.btn_download_link.clicked.connect(lambda: self.open_link_downloader_requested.emit(self.txt_url.text() if "song/" in self.txt_url.text() else ""))
+        nav.addWidget(self.btn_download_link)
 
         self.btn_float_hud = QPushButton("📌 Float HUD")
         self.btn_float_hud.setFixedHeight(26)
@@ -347,8 +356,40 @@ class SunoBrowserView(QWidget):
         self.download_frame = QFrame()
         self.download_frame.setObjectName("sunoDownloadFrame")
         dl_layout = QVBoxLayout(self.download_frame)
-        dl_layout.setContentsMargins(6, 5, 6, 5)
+        dl_layout.setContentsMargins(6, 6, 6, 6)
         dl_layout.setSpacing(4)
+
+        # Quick Link Downloader Row
+        quick_dl_row = QHBoxLayout()
+        quick_dl_row.setSpacing(3)
+        self.txt_quick_dl = QLineEdit()
+        self.txt_quick_dl.setFixedHeight(25)
+        self.txt_quick_dl.setPlaceholderText("Paste Suno link (suno.com/song/...)...")
+        self.txt_quick_dl.setToolTip("Paste any Suno song link to download MP3 immediately")
+        self.txt_quick_dl.returnPressed.connect(self._on_quick_download_clicked)
+        quick_dl_row.addWidget(self.txt_quick_dl, stretch=1)
+
+        self.btn_paste_quick_dl = QPushButton("📋")
+        self.btn_paste_quick_dl.setFixedSize(25, 25)
+        self.btn_paste_quick_dl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_paste_quick_dl.setToolTip("Paste link from clipboard")
+        self.btn_paste_quick_dl.clicked.connect(self._paste_into_quick_dl)
+        quick_dl_row.addWidget(self.btn_paste_quick_dl)
+
+        self.btn_quick_dl = QPushButton("⬇️")
+        self.btn_quick_dl.setFixedSize(28, 25)
+        self.btn_quick_dl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_quick_dl.setToolTip("Download MP3 from link")
+        self.btn_quick_dl.clicked.connect(self._on_quick_download_clicked)
+        quick_dl_row.addWidget(self.btn_quick_dl)
+
+        self.btn_open_full_dl = QPushButton("🔍")
+        self.btn_open_full_dl.setFixedSize(25, 25)
+        self.btn_open_full_dl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_open_full_dl.setToolTip("Open full Suno Downloader dialog (MP4 video, artwork, lyrics preview)")
+        self.btn_open_full_dl.clicked.connect(lambda: self.open_link_downloader_requested.emit(self.txt_quick_dl.text().strip()))
+        quick_dl_row.addWidget(self.btn_open_full_dl)
+        dl_layout.addLayout(quick_dl_row)
 
         self.lbl_download_status = QLabel("📥 Suno MP3/WAV downloads auto-save with song title")
         self.lbl_download_status.setWordWrap(True)
@@ -550,6 +591,49 @@ class SunoBrowserView(QWidget):
     def _send_last_download_to_editor(self):
         if self.last_downloaded_audio_path and Path(self.last_downloaded_audio_path).exists():
             self.load_audio_into_editor_requested.emit(self.last_downloaded_audio_path)
+
+    def _paste_into_quick_dl(self):
+        txt = QApplication.clipboard().text().strip()
+        if txt:
+            self.txt_quick_dl.setText(txt)
+
+    def _on_quick_download_clicked(self):
+        url = self.txt_quick_dl.text().strip()
+        if not url:
+            # Check clipboard for convenience
+            clip = QApplication.clipboard().text().strip()
+            if clip and ("suno.com" in clip or "suno.ai" in clip or SunoLinkParser.extract_uuid(clip)):
+                url = clip
+                self.txt_quick_dl.setText(url)
+            else:
+                self.open_link_downloader_requested.emit("")
+                return
+
+        from app.suno_downloader import SunoDownloadWorker
+        self.lbl_download_status.setText("⬇️ Connecting to Suno CDN...")
+        self.btn_quick_dl.setEnabled(False)
+
+        worker = SunoDownloadWorker(input_url_or_uuid=url, media_format="mp3", parent=self)
+        self._quick_dl_worker = worker
+
+        def _on_prog(pct, cur, tot, spd):
+            spd_txt = f"{spd / 1024:.1f} MB/s" if spd >= 1000 else f"{spd:.0f} KB/s"
+            self.lbl_download_status.setText(f"⬇️ Downloading: {pct}% • {spd_txt}")
+
+        def _on_done(ok, path, meta, err):
+            self.btn_quick_dl.setEnabled(True)
+            if ok and path:
+                self.last_downloaded_audio_path = path
+                p = Path(path)
+                self.lbl_download_status.setText(f"✅ Saved: {p.name}")
+                self.btn_load_dl_to_editor.setEnabled(True)
+                self.txt_quick_dl.clear()
+            else:
+                self.lbl_download_status.setText(f"⚠️ Error: {err[:45]}")
+
+        worker.progress.connect(_on_prog)
+        worker.finished.connect(_on_done)
+        worker.start()
 
     # ── Track & Batch Queue Sync ──
     def _get_engine_char_limit(self) -> int:
@@ -878,11 +962,13 @@ class SunoBrowserView(QWidget):
         for b in [
             self.btn_toggle_dock, self.btn_nav_create, self.btn_nav_library, self.btn_nav_account,
             self.btn_nav_reload, self.btn_zoom_out, self.btn_zoom_in, self.btn_open_ext,
-            self.btn_float_hud, self.btn_sync_from_studio, self.btn_prev, self.btn_next,
+            self.btn_download_link, self.btn_float_hud, self.btn_sync_from_studio, self.btn_prev, self.btn_next,
             self.btn_fill_title, self.btn_fill_style, self.btn_fill_lyrics, self.btn_fill_neg,
             self.btn_fill_focused, self.btn_open_dl_folder, self.btn_load_dl_to_editor,
+            self.btn_paste_quick_dl, self.btn_quick_dl, self.btn_open_full_dl,
         ]:
-            b.setStyleSheet(btn_qss)
+            if hasattr(self, b.__repr__() if False else "") or b is not None:
+                b.setStyleSheet(btn_qss)
 
         self.btn_autofill_all.setStyleSheet(
             f"background: {acc_grad}; color: #ffffff; border: 1px solid {t['border_accent']}; border-radius: 6px; font-weight: 800; font-size: 11px;"

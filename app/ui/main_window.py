@@ -24,6 +24,7 @@ from app.ui.visual_studio_view import VisualStudioView
 from app.ui.wizard_view import SongCreationWizardView
 from app.ui.batch_generator_view import BatchGeneratorView
 from app.ui.suno_browser_view import SunoBrowserView
+from app.ui.suno_downloader_dialog import SunoLinkDownloadDialog
 from app.ui.styles import STUDIO_THEMES, get_theme
 from app.gemini_client import (
     GenerateLyricWorker, RewriteWorker, RhymeWorker, SunoPromptWorker
@@ -153,6 +154,8 @@ class MainWindow(QMainWindow):
         self.suno_browser_view.load_audio_into_editor_requested.connect(self._load_downloaded_suno_audio_into_editor)
         self.suno_browser_view.open_floating_hud_requested.connect(self._open_suno_hud)
         self.suno_browser_view.pull_from_studio_requested.connect(lambda: self._sync_tracks_into_suno_browser(prefer_batch=False))
+        self.suno_browser_view.open_link_downloader_requested.connect(self._open_suno_link_downloader)
+        self.suno_browser_view.import_lyrics_requested.connect(self._import_downloaded_suno_lyrics)
         self.stack.addWidget(self.suno_browser_view)
 
         master_layout.addWidget(self.stack, stretch=1)
@@ -593,6 +596,8 @@ class MainWindow(QMainWindow):
         self.export_menu.addAction("🖼️ Export Album Cover Artwork (.png)", self._export_album_cover)
         self.export_menu.addSeparator()
         self.export_menu.addAction("📦 Export Suno & Udio Production Bundle (.zip)", self._export_bundle)
+        self.export_menu.addSeparator()
+        self.export_menu.addAction("📥 Download Suno Music by Link...  [Ctrl+Shift+D]", self._open_suno_link_downloader)
         self.btn_export.setMenu(self.export_menu)
         cp_layout.addWidget(self.btn_export)
         right_box.addWidget(self.capsule_prod)
@@ -1274,6 +1279,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self._toggle_focus_mode)
         QShortcut(QKeySequence("Ctrl+U"), self).activated.connect(self._open_suno_hud)
         QShortcut(QKeySequence("Ctrl+Shift+C"), self).activated.connect(self._quick_copy_suno)
+        QShortcut(QKeySequence("Ctrl+Shift+D"), self).activated.connect(self._open_suno_link_downloader)
         QShortcut(QKeySequence("F11"), self).activated.connect(self._toggle_fullscreen)
 
     def _show_export_menu(self):
@@ -1353,6 +1359,7 @@ class MainWindow(QMainWindow):
         self.editor_panel.transpose_requested.connect(self._on_transpose_chords)
         self.editor_panel.rhyme_search_requested.connect(self._search_rhyme_from_editor)
         self.editor_panel.clone_song_requested.connect(self._open_song_cloner)
+        self.editor_panel.download_suno_requested.connect(self._open_suno_link_downloader)
 
         # Generator Panel triggers
         self.generator_panel.generate_requested.connect(self._start_generation)
@@ -2096,6 +2103,24 @@ class MainWindow(QMainWindow):
             if hasattr(self.editor_panel, "_switch_tool_deck"):
                 self.editor_panel._switch_tool_deck(1)  # Deck 1 is Tempo, Metronome & Audio Stem
             self.status_bar.showMessage(f"🎧 Loaded Suno audio '{p.name}' into Editor Stem Player", 4500)
+
+    def _open_suno_link_downloader(self, initial_url: str = ""):
+        """Launch the Suno Music Downloader dialog to download by link [Ctrl+Shift+D]."""
+        dlg = SunoLinkDownloadDialog(parent=self, theme_key=self.current_theme, initial_url=initial_url)
+        dlg.load_into_editor_requested.connect(self._load_downloaded_suno_audio_into_editor)
+        dlg.import_lyrics_requested.connect(self._import_downloaded_suno_lyrics)
+        dlg.exec()
+
+    def _import_downloaded_suno_lyrics(self, title: str, lyrics: str):
+        """Load lyrics and title extracted from a downloaded Suno song directly into the Editor."""
+        if not lyrics:
+            return
+        if hasattr(self, "editor_panel"):
+            if title and title != "Suno Track":
+                self.editor_panel.set_title(title)
+            self.editor_panel.set_lyrics(lyrics)
+        self._set_studio_mode(3)
+        self.status_bar.showMessage(f"📝 Loaded lyrics for '{title}' into Lyric Editor Workbench", 4500)
 
     def _sync_suno_engine_preference(self):
         """Sync preferred Suno Engine character limit from Settings into Visual Studio & Tools Panel."""
