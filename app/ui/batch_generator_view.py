@@ -860,6 +860,7 @@ Genre: {self.song_data.get('genre', '')} ({self.song_data.get('bpm', '')}, Key: 
 class BatchGeneratorView(QWidget):
     open_editor_requested = pyqtSignal(dict)
     open_visual_requested = pyqtSignal(dict)
+    suno_hud_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1953,6 +1954,15 @@ class BatchGeneratorView(QWidget):
         self.btn_q_lyrics.setToolTip("Step 2 for Suno Custom Mode: Copy Lyrics, mark track Done, and advance to next track")
         self.btn_q_lyrics.clicked.connect(self._copy_next_lyrics_step)
         qh_layout.addWidget(self.btn_q_lyrics)
+
+        self.btn_q_suno_hud = QPushButton("🚀 Suno HUD")
+        self.btn_q_suno_hud.setFixedHeight(23)
+        self.btn_q_suno_hud.setMinimumWidth(92)
+        self.btn_q_suno_hud.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_q_suno_hud.setToolTip("Open Always-On-Top Floating Suno Quick-Paste HUD with this entire Batch Queue [Ctrl+U]")
+        self.btn_q_suno_hud.setStyleSheet("background: #1e3a8a; color: #dbeafe; border: 1px solid #3b82f6; border-radius: 5px; font-weight: 800; font-size: 10px; padding: 0px 8px;")
+        self.btn_q_suno_hud.clicked.connect(self.suno_hud_requested.emit)
+        qh_layout.addWidget(self.btn_q_suno_hud)
 
         grid_v_layout.addWidget(self.queue_hud_frame)
 

@@ -5,11 +5,15 @@ Engineered for clean UI fit, high contrast, responsive feedback, and seamless Li
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QComboBox, QGroupBox, QMessageBox, QFrame, QCheckBox
+    QPushButton, QComboBox, QGroupBox, QMessageBox, QFrame, QCheckBox,
+    QScrollArea, QWidget, QSpinBox
 )
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices, QIcon
-from app.config import config_manager, GEMINI_MODELS, get_asset_path, APP_VERSION, APP_NAME, DEFAULT_UPDATE_URL
+from app.config import (
+    config_manager, GEMINI_MODELS, SUNO_PLANS, SUNO_ENGINES,
+    get_asset_path, APP_VERSION, APP_NAME, DEFAULT_UPDATE_URL
+)
 from app.ui.styles import STUDIO_THEMES, get_theme
 from app.gemini_client import ConnectionTestWorker
 from app.ui.multi_key_dialog import MultiKeyDialog
@@ -19,7 +23,8 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None, is_dark: bool = None):
         super().__init__(parent)
         self.setWindowTitle(f"{APP_NAME} — Settings")
-        self.setFixedSize(620, 715)
+        self.resize(640, 700)
+        self.setMinimumSize(600, 560)
         self.setModal(True)
         self.update_worker = None
 
@@ -49,14 +54,27 @@ class SettingsDialog(QDialog):
         self.apply_theme(self.is_dark)
 
     def _init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(14)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(16, 14, 16, 14)
+        outer_layout.setSpacing(10)
 
-        # Header Title
+        # Header Title (Pinned Top)
         self.title_lbl = QLabel("⚙️ AI Studio Settings")
         self.title_lbl.setObjectName("headingLabel")
-        layout.addWidget(self.title_lbl)
+        outer_layout.addWidget(self.title_lbl)
+
+        # Scrollable Content Body so all settings cards fit cleanly on 1280x720 & 1366x768 screens
+        self.settings_scroll = QScrollArea()
+        self.settings_scroll.setWidgetResizable(True)
+        self.settings_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_content = QWidget()
+        layout = QVBoxLayout(scroll_content)
+        layout.setContentsMargins(2, 2, 6, 2)
+        layout.setSpacing(12)
+        self.settings_scroll.setWidget(scroll_content)
+        outer_layout.addWidget(self.settings_scroll, stretch=1)
+        self._outer_layout = outer_layout
 
         # Gemini API Box Card
         self.api_group = QGroupBox("Google Gemini API Configuration")
@@ -171,6 +189,87 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.theme_group)
         self._update_theme_cards_ui()
 
+        # ── 🎵 Suno Account Profile & Credit Tracker (Local — No Password Needed) ──
+        self.suno_group = QGroupBox("🎵 Suno Account Profile && Credit Tracker (Safe Companion Mode)")
+        suno_l = QVBoxLayout(self.suno_group)
+        suno_l.setContentsMargins(14, 14, 14, 12)
+        suno_l.setSpacing(8)
+
+        suno_profile = config_manager.get_suno_profile()
+
+        s_row1 = QHBoxLayout()
+        s_row1.setSpacing(8)
+        s_row1.addWidget(QLabel("Account Label:"))
+        self.suno_handle_input = QLineEdit()
+        self.suno_handle_input.setPlaceholderText("e.g. myemail@gmail.com or @studio (local reminder only)")
+        self.suno_handle_input.setText(suno_profile["handle"])
+        s_row1.addWidget(self.suno_handle_input, stretch=1)
+        suno_l.addLayout(s_row1)
+
+        s_row2 = QHBoxLayout()
+        s_row2.setSpacing(8)
+        s_row2.addWidget(QLabel("Plan:"))
+        self.suno_plan_combo = QComboBox()
+        self.suno_plan_combo.addItems(list(SUNO_PLANS.keys()))
+        p_idx = self.suno_plan_combo.findText(suno_profile["plan"])
+        if p_idx >= 0:
+            self.suno_plan_combo.setCurrentIndex(p_idx)
+        self.suno_plan_combo.currentTextChanged.connect(self._on_suno_plan_changed)
+        s_row2.addWidget(self.suno_plan_combo, stretch=1)
+
+        s_row2.addWidget(QLabel("Engine:"))
+        self.suno_engine_combo = QComboBox()
+        self.suno_engine_combo.addItems(SUNO_ENGINES)
+        e_idx = self.suno_engine_combo.findText(suno_profile["engine"])
+        if e_idx >= 0:
+            self.suno_engine_combo.setCurrentIndex(e_idx)
+        s_row2.addWidget(self.suno_engine_combo, stretch=1)
+        suno_l.addLayout(s_row2)
+
+        s_row3 = QHBoxLayout()
+        s_row3.setSpacing(8)
+        s_row3.addWidget(QLabel("Est. Credits Left:"))
+        self.suno_credits_spin = QSpinBox()
+        self.suno_credits_spin.setRange(0, 100000)
+        self.suno_credits_spin.setSingleStep(50)
+        self.suno_credits_spin.setValue(suno_profile["credits_remaining"])
+        self.suno_credits_spin.setSuffix(" cr")
+        s_row3.addWidget(self.suno_credits_spin)
+
+        self.btn_refill_credits = QPushButton("🔄 Refill Plan Credits")
+        self.btn_refill_credits.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_refill_credits.setFixedHeight(26)
+        self.btn_refill_credits.clicked.connect(self._refill_suno_credits)
+        s_row3.addWidget(self.btn_refill_credits)
+
+        self.lbl_suno_rights = QLabel("")
+        s_row3.addWidget(self.lbl_suno_rights, stretch=1)
+        suno_l.addLayout(s_row3)
+
+        s_links = QHBoxLayout()
+        s_links.setSpacing(6)
+        self.btn_suno_create_link = QPushButton("🌐 Open suno.com/create")
+        self.btn_suno_create_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_suno_create_link.setFixedHeight(26)
+        self.btn_suno_create_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://suno.com/create")))
+        s_links.addWidget(self.btn_suno_create_link, stretch=1)
+
+        self.btn_suno_lib_link = QPushButton("📚 My Suno Library")
+        self.btn_suno_lib_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_suno_lib_link.setFixedHeight(26)
+        self.btn_suno_lib_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://suno.com/me")))
+        s_links.addWidget(self.btn_suno_lib_link, stretch=1)
+
+        self.btn_suno_acct_link = QPushButton("💳 Account & Plan")
+        self.btn_suno_acct_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_suno_acct_link.setFixedHeight(26)
+        self.btn_suno_acct_link.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://suno.com/account")))
+        s_links.addWidget(self.btn_suno_acct_link, stretch=1)
+        suno_l.addLayout(s_links)
+
+        self._on_suno_plan_changed(self.suno_plan_combo.currentText())
+        layout.addWidget(self.suno_group)
+
         # ── 🚀 Application Updates & License Section ──
         self.update_group = QGroupBox("🚀 Application Updates && License")
         u_layout = QVBoxLayout(self.update_group)
@@ -225,7 +324,7 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(self.update_group)
 
-        # Bottom Action Buttons
+        # Pinned Bottom Action Buttons (always visible below scroll area)
         btn_box = QHBoxLayout()
         btn_box.setSpacing(10)
         btn_box.addStretch()
@@ -241,7 +340,23 @@ class SettingsDialog(QDialog):
         self.btn_save.clicked.connect(self._save_settings)
         btn_box.addWidget(self.btn_save)
 
-        layout.addLayout(btn_box)
+        self._outer_layout.addLayout(btn_box)
+
+    def _on_suno_plan_changed(self, plan_text: str):
+        if not hasattr(self, "lbl_suno_rights"):
+            return
+        info = SUNO_PLANS.get(plan_text, {"commercial": True})
+        if info.get("commercial", True):
+            self.lbl_suno_rights.setText("✓ Commercial Rights Active")
+            self.lbl_suno_rights.setStyleSheet("color: #10b981; font-weight: 800; font-size: 10.5px; background: transparent;")
+        else:
+            self.lbl_suno_rights.setText("⚠ Personal Use Only (Upgrade to Pro for Monetization)")
+            self.lbl_suno_rights.setStyleSheet("color: #f59e0b; font-weight: 800; font-size: 10px; background: transparent;")
+
+    def _refill_suno_credits(self):
+        plan_text = self.suno_plan_combo.currentText()
+        monthly = SUNO_PLANS.get(plan_text, {"monthly_credits": 2500})["monthly_credits"]
+        self.suno_credits_spin.setValue(monthly)
 
     def _select_theme_card(self, theme_id: str):
         self.selected_theme = theme_id
@@ -342,6 +457,46 @@ class SettingsDialog(QDialog):
                         background-color: {t['bg_card']};
                         color: {t['text_accent']};
                     }}
+                """)
+            if hasattr(self, "suno_group"):
+                self.suno_group.setStyleSheet(f"""
+                    QGroupBox {{
+                        background-color: {t['bg_card']};
+                        border: 1px solid {t['border']};
+                        border-radius: 8px;
+                        margin-top: 14px;
+                        padding: 14px 12px 12px 12px;
+                        font-weight: 700;
+                        font-size: 11px;
+                        color: {t['text_secondary']};
+                    }}
+                    QGroupBox::title {{
+                        subcontrol-origin: margin;
+                        subcontrol-position: top left;
+                        left: 10px;
+                        padding: 0 6px;
+                        background-color: {t['bg_card']};
+                        color: {t['text_accent']};
+                    }}
+                    QLabel {{ color: {t['text_secondary']}; font-size: 10.5px; font-weight: 600; background: transparent; }}
+                    QLineEdit, QComboBox, QSpinBox {{
+                        background-color: {t['bg_input']};
+                        color: {t['text_primary']};
+                        border: 1px solid {t['border']};
+                        border-radius: 5px;
+                        padding: 4px 6px;
+                        font-size: 10.5px;
+                    }}
+                    QPushButton {{
+                        background-color: {t['bg_input']};
+                        color: {t['text_primary']};
+                        border: 1px solid {t['border']};
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        padding: 3px 8px;
+                    }}
+                    QPushButton:hover {{ border-color: {t['border_accent']}; color: #ffffff; }}
                 """)
             if hasattr(self, "update_group"):
                 self.update_group.setStyleSheet(f"""
@@ -609,6 +764,46 @@ class SettingsDialog(QDialog):
                         background-color: #ffffff;
                         color: #1d4ed8;
                     }
+                """)
+            if hasattr(self, "suno_group"):
+                self.suno_group.setStyleSheet("""
+                    QGroupBox {
+                        background-color: #ffffff;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 8px;
+                        margin-top: 14px;
+                        padding: 14px 12px 12px 12px;
+                        font-weight: 700;
+                        font-size: 11px;
+                        color: #0f172a;
+                    }
+                    QGroupBox::title {
+                        subcontrol-origin: margin;
+                        subcontrol-position: top left;
+                        left: 10px;
+                        padding: 0 6px;
+                        background-color: #ffffff;
+                        color: #1d4ed8;
+                    }
+                    QLabel { color: #334155; font-size: 10.5px; font-weight: 600; background: transparent; }
+                    QLineEdit, QComboBox, QSpinBox {
+                        background-color: #ffffff;
+                        color: #0f172a;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 5px;
+                        padding: 4px 6px;
+                        font-size: 10.5px;
+                    }
+                    QPushButton {
+                        background-color: #f8fafc;
+                        color: #0f172a;
+                        border: 1px solid #cbd5e1;
+                        border-radius: 5px;
+                        font-size: 10.5px;
+                        font-weight: 700;
+                        padding: 3px 8px;
+                    }
+                    QPushButton:hover { border-color: #2563eb; color: #1d4ed8; background-color: #eff6ff; }
                 """)
             if hasattr(self, "update_group"):
                 self.update_group.setStyleSheet("""
@@ -1060,9 +1255,19 @@ class SettingsDialog(QDialog):
     def _save_settings(self):
         key = self.key_input.text().strip()
         model = self.model_combo.currentText()
+        chosen_theme = getattr(self, "selected_theme", "obsidian")
         config_manager.set_api_keys(key)
         config_manager.set("gemini_model", model)
-        config_manager.set("studio_theme", getattr(self, "selected_theme", "obsidian"))
+        config_manager.set("theme", chosen_theme)
+        config_manager.set("studio_theme", chosen_theme)
         if hasattr(self, "chk_auto_update"):
             config_manager.set("auto_check_updates", self.chk_auto_update.isChecked())
+        if hasattr(self, "suno_plan_combo"):
+            config_manager.set("suno_plan", self.suno_plan_combo.currentText())
+        if hasattr(self, "suno_engine_combo"):
+            config_manager.set("suno_engine", self.suno_engine_combo.currentText())
+        if hasattr(self, "suno_handle_input"):
+            config_manager.set("suno_account_handle", self.suno_handle_input.text().strip())
+        if hasattr(self, "suno_credits_spin"):
+            config_manager.set("suno_credits_remaining", int(self.suno_credits_spin.value()))
         self.accept()

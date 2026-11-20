@@ -87,6 +87,7 @@ class MainWindow(QMainWindow):
 
         self.current_worker = None
         self.current_project_path = None
+        self.suno_hud = None
         self.current_theme = config_manager.get("theme", "obsidian")
         if self.current_theme in ["dark", "dark_modern"]:
             self.current_theme = "obsidian"
@@ -171,9 +172,18 @@ class MainWindow(QMainWindow):
 
         r_layout.addStretch(1)
 
-        self.lbl_ribbon_hint = QLabel("Ctrl+S Save  •  Ctrl+O Open  •  Ctrl+1..5 Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
+        self.lbl_ribbon_hint = QLabel("Ctrl+S Save  •  Ctrl+U Suno HUD  •  Ctrl+1..5 Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
         self.lbl_ribbon_hint.setObjectName("lblRibbonHint")
         r_layout.addWidget(self.lbl_ribbon_hint)
+
+        self.btn_ribbon_suno_hud = QPushButton("🚀 Suno HUD")
+        self.btn_ribbon_suno_hud.setObjectName("btnRibbonSunoHud")
+        self.btn_ribbon_suno_hud.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ribbon_suno_hud.setFixedHeight(22)
+        self.btn_ribbon_suno_hud.setToolTip("Open Always-On-Top Floating Suno Quick-Paste Companion HUD & suno.com/create [Ctrl+U]")
+        self.btn_ribbon_suno_hud.setStyleSheet("background: #1e3a8a; color: #dbeafe; border: 1px solid #3b82f6; border-radius: 5px; font-weight: 800; font-size: 10px; padding: 0px 8px;")
+        self.btn_ribbon_suno_hud.clicked.connect(self._open_suno_hud)
+        r_layout.addWidget(self.btn_ribbon_suno_hud)
 
         self.btn_ribbon_action = QPushButton("✍️ Open in Editor ➔")
         self.btn_ribbon_action.setObjectName("btnRibbonAction")
@@ -1236,6 +1246,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+,"), self).activated.connect(self._open_settings)
         QShortcut(QKeySequence("Ctrl+T"), self).activated.connect(self._toggle_theme)
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self._toggle_focus_mode)
+        QShortcut(QKeySequence("Ctrl+U"), self).activated.connect(self._open_suno_hud)
         QShortcut(QKeySequence("Ctrl+Shift+C"), self).activated.connect(self._quick_copy_suno)
         QShortcut(QKeySequence("F11"), self).activated.connect(self._toggle_fullscreen)
 
@@ -1281,6 +1292,8 @@ class MainWindow(QMainWindow):
             self.batch_view.apply_theme(theme_key)
         if hasattr(self, "clone_view") and self.clone_view:
             self.clone_view.apply_theme(theme_key)
+        if getattr(self, "suno_hud", None):
+            self.suno_hud.apply_theme(theme_key)
 
     def _connect_panels(self):
         # Master Studio Transport Bar removed: each tab has its own dedicated controls
@@ -1304,6 +1317,8 @@ class MainWindow(QMainWindow):
         # Batch Multi-Song Studio Pro signals
         self.batch_view.open_editor_requested.connect(self._load_song_from_batch)
         self.batch_view.open_visual_requested.connect(self._load_song_into_visual_arranger)
+        if hasattr(self.batch_view, "suno_hud_requested"):
+            self.batch_view.suno_hud_requested.connect(self._open_suno_hud)
 
         # Editor Panel signals
         self.editor_panel.visual_arranger_requested.connect(lambda: self._set_studio_mode(1))
@@ -1922,6 +1937,88 @@ class MainWindow(QMainWindow):
         self._set_studio_mode(3)
         self.status_bar.showMessage(f"Loaded cloned track (Lyrics + Style Prompt + BPM) into Editor: '{title}'", 4000)
 
+    def _open_suno_hud(self):
+        """Launch or refresh the Always-On-Top Floating Suno Quick-Paste Companion HUD."""
+        from app.ui.suno_hud_dialog import SunoCompanionHUD
+
+        tracks = []
+        start_idx = 0
+        on_done_cb = None
+
+        # If currently in Batch Studio Pro with generated tracks, load the full Batch Queue
+        if (
+            hasattr(self, "stack")
+            and self.stack.currentIndex() == 2
+            and hasattr(self, "batch_view")
+            and getattr(self.batch_view, "all_songs", None)
+        ):
+            tracks = list(self.batch_view.all_songs)
+            # Start at first pending track (or selected track)
+            sel = getattr(self.batch_view, "selected_song", None)
+            if sel in tracks:
+                start_idx = tracks.index(sel)
+            else:
+                for i, tr in enumerate(tracks):
+                    if not tr.get("suno_done") and str(tr.get("status", "")).lower() != "done":
+                        start_idx = i
+                        break
+
+            def _sync_batch_done(song_dict: dict):
+                song_dict["status"] = "Done"
+                song_dict["suno_done"] = True
+                if hasattr(self.batch_view, "_update_filter_counts"):
+                    self.batch_view._update_filter_counts()
+                if hasattr(self.batch_view, "_update_suno_queue_hud"):
+                    self.batch_view._update_suno_queue_hud()
+                if hasattr(self.batch_view, "_autosave_batch_session"):
+                    self.batch_view._autosave_batch_session()
+                self._update_status_bar()
+
+            on_done_cb = _sync_batch_done
+        else:
+            # Build single active song snapshot from Editor / Visual / Tools
+            proj = self._build_current_project()
+            tracks = [{
+                "title": proj.title,
+                "style_prompt": proj.style_prompt,
+                "lyrics": proj.lyrics,
+                "negative_prompt": proj.negative_prompt,
+            }]
+            on_done_cb = lambda _tr: self._update_status_bar()
+
+        if getattr(self, "suno_hud", None) is None:
+            self.suno_hud = SunoCompanionHUD(
+                tracks=tracks,
+                start_index=start_idx,
+                theme_key=self.current_theme,
+                on_track_done=on_done_cb,
+                parent=self,
+            )
+        else:
+            self.suno_hud.apply_theme(self.current_theme)
+            self.suno_hud.update_tracks(tracks, start_index=start_idx, on_track_done=on_done_cb)
+
+        self.suno_hud.show()
+        self.suno_hud.raise_()
+        self.suno_hud.activateWindow()
+        self.status_bar.showMessage("🚀 Suno Quick-Paste Companion HUD opened (Always-On-Top)", 3500)
+
+    def _sync_suno_engine_preference(self):
+        """Sync preferred Suno Engine character limit from Settings into Visual Studio & Tools Panel."""
+        eng = config_manager.get("suno_engine", "Suno v4 / v3.5 (200 chars)")
+        if hasattr(self, "visual_studio") and hasattr(self.visual_studio, "vs_engine_combo"):
+            for i in range(self.visual_studio.vs_engine_combo.count()):
+                txt = self.visual_studio.vs_engine_combo.itemText(i)
+                if ("400" in eng and "400" in txt) or ("350" in eng and "Udio" in eng and "Udio" in txt) or ("350" in eng and "v4.5" in eng and "v4.5" in txt) or ("200" in eng and "200" in txt) or ("120" in eng and "120" in txt):
+                    self.visual_studio.vs_engine_combo.setCurrentIndex(i)
+                    break
+        if hasattr(self, "tools_panel") and hasattr(self.tools_panel, "combo_suno_engine"):
+            for i in range(self.tools_panel.combo_suno_engine.count()):
+                txt = self.tools_panel.combo_suno_engine.itemText(i)
+                if ("120" in eng and "120" in txt) or ("350" in eng and "350" in txt) or ("200" in eng and "200" in txt):
+                    self.tools_panel.combo_suno_engine.setCurrentIndex(i)
+                    break
+
     def _open_settings(self):
         dlg = SettingsDialog(self, is_dark=self.is_dark_theme)
         if dlg.exec() == QDialog.DialogCode.Accepted:
@@ -1932,8 +2029,11 @@ class MainWindow(QMainWindow):
             idx = self.header_model_combo.findText(cur_model)
             if idx >= 0:
                 self.header_model_combo.setCurrentIndex(idx)
+            self._sync_suno_engine_preference()
+            if getattr(self, "suno_hud", None):
+                self.suno_hud._refresh_account_strip()
             self._update_status_bar()
-            self.status_bar.showMessage("Settings saved successfully", 3000)
+            self.status_bar.showMessage("Settings & Suno Account Profile saved successfully", 3000)
 
     def _on_header_model_changed(self, new_model: str):
         config_manager.set("gemini_model", new_model)
@@ -1965,6 +2065,7 @@ class MainWindow(QMainWindow):
 
         # Apply saved theme ID (preserving all 5 themes across restarts)
         self._apply_all_themes(self.current_theme)
+        self._sync_suno_engine_preference()
 
     def _check_updates_startup(self):
         """Silently queries update manifest in background after boot without interrupting user workflow."""

@@ -48,6 +48,21 @@ GEMINI_MODELS = [
     "gemini-3.5-flash",
 ]
 
+# Suno Account Plans & Engine Limits (Local Profile & Credit Estimator — never stores passwords/cookies)
+SUNO_PLANS = {
+    "Free (50 cr/day — Personal)": {"monthly_credits": 50, "commercial": False, "badge": "Free • Personal Only"},
+    "Pro (2,500 cr/mo — Commercial)": {"monthly_credits": 2500, "commercial": True, "badge": "Pro • Commercial Rights"},
+    "Premier (10,000 cr/mo — Commercial)": {"monthly_credits": 10000, "commercial": True, "badge": "Premier • Commercial Rights"},
+}
+
+SUNO_ENGINES = [
+    "Suno v6 Master (400 chars)",
+    "Suno v4.5 (350 chars)",
+    "Suno v4 / v3.5 (200 chars)",
+    "Suno v3 (120 chars)",
+    "Udio v1.5 (350 chars)",
+]
+
 DEFAULT_CONFIG = {
     "gemini_api_key": "",
     "gemini_api_keys": [],
@@ -61,6 +76,11 @@ DEFAULT_CONFIG = {
     "auto_count_syllables": True,
     "auto_check_updates": True,
     "update_url": DEFAULT_UPDATE_URL,
+    "suno_plan": "Pro (2,500 cr/mo — Commercial)",
+    "suno_engine": "Suno v4 / v3.5 (200 chars)",
+    "suno_account_handle": "",
+    "suno_credits_remaining": 2500,
+    "suno_create_url": "https://suno.com/create",
     "last_lyrics": "",
     "last_title": "Untitled Song",
     "history": []
@@ -228,6 +248,27 @@ class ConfigManager:
 
     def get_history(self):
         return self.config.get("history", [])
+
+    def get_suno_profile(self) -> dict:
+        """Return local Suno account profile & credit estimator settings."""
+        plan = self.config.get("suno_plan", "Pro (2,500 cr/mo — Commercial)")
+        plan_info = SUNO_PLANS.get(plan, {"monthly_credits": 2500, "commercial": True, "badge": "Pro"})
+        return {
+            "plan": plan,
+            "engine": self.config.get("suno_engine", "Suno v4 / v3.5 (200 chars)"),
+            "handle": self.config.get("suno_account_handle", ""),
+            "credits_remaining": int(self.config.get("suno_credits_remaining", plan_info["monthly_credits"])),
+            "commercial": plan_info["commercial"],
+            "create_url": self.config.get("suno_create_url", "https://suno.com/create"),
+        }
+
+    def consume_suno_credits(self, amount: int = 10) -> int:
+        """Decrement local Suno credit estimator when a track is marked created in Suno."""
+        cur = int(self.config.get("suno_credits_remaining", 2500))
+        new_val = max(0, cur - max(0, int(amount)))
+        self.config["suno_credits_remaining"] = new_val
+        self.save()
+        return new_val
 
 # Global singleton
 config_manager = ConfigManager()
