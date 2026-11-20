@@ -108,6 +108,14 @@ def main():
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
 
+    # Enable Chromium WebEngine OpenGL context sharing and preload widgets BEFORE QApplication creation
+    # Required by QtWebEngine on Windows to prevent "QtWebEngineWidgets must be imported or Qt.AA_ShareOpenGLContexts must be set"
+    try:
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+        from PyQt6.QtWebEngineWidgets import QWebEngineView  # Preloads Chromium OpenGL hooks
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(APP_VERSION)

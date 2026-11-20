@@ -422,6 +422,7 @@ class SunoBrowserView(QWidget):
             self.browser_layout.addWidget(self.web_view, stretch=1)
             self._mount_account_profile(self.current_account_slot)
         except Exception as e:
+            self._browser_initialized = False
             self.lbl_browser_placeholder.show()
             self.lbl_browser_placeholder.setText(
                 f"⚠️ Embedded WebEngine unavailable ({e}).\n"
@@ -456,6 +457,10 @@ class SunoBrowserView(QWidget):
             self.web_profile = profile
             self.web_page = page
             self.web_view.urlChanged.connect(lambda u: self.txt_url.setText(u.toString()))
+            self.web_view.loadProgress.connect(
+                lambda p: self.lbl_download_status.setText(f"🌐 Loading Suno website: {p}%")
+                if p < 100 else self.lbl_download_status.setText(f"✅ Suno Ready • {slot_name} • 1-Click Auto-Fill Armed")
+            )
             target_url = self.txt_url.text().strip() or "https://suno.com/create"
             self.web_view.setUrl(QUrl(target_url))
             self.web_view.setZoomFactor(self._zoom_factor)
