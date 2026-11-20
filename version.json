@@ -1,23 +1,25 @@
 {
-  "version": "2.2.0",
+  "version": "2.3.0",
   "name": "SMG Suno Studio Pro",
-  "title_kh": "SMG Suno Studio Pro v2.2.0 — ស្ទូឌីយោនិពន្ធចម្រៀងអាជីព ៥ ផ្នែក និងប្រព័ន្ធគ្មានទំនុកស្ទួន",
-  "title_en": "SMG Suno Studio Pro v2.2.0 — Complete 5-Stage Pro DAW Studio & Zero-Repeat Human Lyric Engine",
-  "release_date": "2026-11-19",
+  "title_kh": "SMG Suno Studio Pro v2.3.0 — ស្ទូឌីយោ Suno Browser, Downloader គ្មានដែនកំណត់ និង Style Limit 1000 តួអក្សរ",
+  "title_en": "SMG Suno Studio Pro v2.3.0 — Suno Browser Studio, Unlimited MP3/WAV Downloader & Suno v6 Pro 1000-Char Engine",
+  "release_date": "2026-11-20",
   "min_os_version": "Windows 10 / 11 (64-bit)",
-  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_v2.2.0_Setup.exe",
-  "installer_name": "SMG_Suno_Studio_Pro_v2.2.0_Setup.exe",
-  "file_size_mb": 64.8,
+  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_v2.3.0_Setup.exe",
+  "installer_name": "SMG_Suno_Studio_Pro_v2.3.0_Setup.exe",
+  "file_size_mb": 209.6,
   "changelog_kh": [
-    "💾 បន្ថែមប្រព័ន្ធរក្សាទុកឯកសារគម្រោង .smgsong (Ctrl+S / Ctrl+O) ភ្ជាប់ទំនុកច្រៀង, Multi-Takes, BPM, Key និង Style Prompt",
-    "🧠 ប្រព័ន្ធ Batch Pro គ្មានបទស្ទួន (Persistent Memory Vault) និងរបៀបនិពន្ធបែបមនុស្សពិត (Auto-Humanize + Anti-Cliché)",
-    "✍️ ធ្វើទំនើបកម្ម Wizard, Visual Arranger, Editor និង Clone ជាមួយ DAW Section Jump, A/B Compare, Custom Presets និង Originality Meter",
-    "🛡️ បញ្ចូល Runtime DLLs, SSL Certificates និង Khmer Fonts ពេញលេញ ដើម្បីដំណើរការរលូនគ្មាន Error លើគ្រប់កុំព្យូទ័រ Windows"
+    "🌐 បន្ថែមផ្ទាំងទី ៦ Suno Browser Studio ភ្ជាប់ Login Profile ច្រើនគណនី និងមុខងារ 1-Click Auto-Fill ទំនុកច្រៀង/Style ព្រមទាំង Full Screen (F11/Esc)",
+    "📥 បន្ថែមប្រព័ន្ធ Suno Downloader ទាញយកចម្រៀង MP3, Lossless WAV (PCM), MP4 Video និង 4K Artwork ដោយគ្មានដែនកំណត់ចំនួនបទក្នុងមួយខែ",
+    "🚀 គាំទ្រកម្រិត Style Limit 1,000 តួអក្សរសម្រាប់ Suno v6 Pro / Max / v5 លើ Batch Studio Pro, Visual Studio និង Gemini AI Generator",
+    "🎨 ធ្វើទំនើបកម្មរូបរាងទាំង ៥ (Obsidian, Cyber Blue, Emerald, Sunset Amber, Canvas Light) ឱ្យច្បាស់ត្រជាក់ភ្នែក និងងាយស្រួលមើលគ្រប់ប៊ូតុង",
+    "🛡️ ពង្រឹងប្រព័ន្ធ Build EXE និង Inno Setup ដោយបញ្ចូល Chromium WebEngine, VC++ Runtimes និង SoundFile DLLs ដើម្បីដំណើរការរលូនគ្មាន Error លើគ្រប់កុំព្យូទ័រ"
   ],
   "changelog_en": [
-    "💾 Native .smgsong Studio Project Save/Open (Ctrl+S / Ctrl+O) with Windows Explorer file association & cross-stage state sync",
-    "🧠 Batch Studio Pro Zero-Repeat Memory Vault, Human Story DNA slots, strict AI-cliché banlist & Auto-Humanize engine",
-    "✍️ Upgraded Wizard, Visual Arranger, Editor & Song DNA Cloner with DAW Section Jump Bar, A/B Take Compare, Custom User Presets, Energy Curve & Originality Meter",
-    "🛡️ Hardened Windows x64 standalone build with bundled VC++ runtime DLLs, SSL certifi bundle, QtMultimedia/PIL/NumPy & Khmer fonts for zero-error execution on any PC"
+    "🌐 Added 6th Studio Tab: Embedded Suno Browser Workstation with multi-account login profiles, 1-click Title/Style/Lyrics React auto-fill, and Dock Collapse / Theater Full Screen mode (F11 / Esc)",
+    "📥 Added Suno Music Downloader Studio: Unlimited in-browser / local MP3, Studio WAV (PCM), MP4 video, and 4K album art downloads with zero monthly song limits",
+    "🚀 Supported Suno v6 Pro / Max / v5 1,000-character Style Limit across Batch Studio Pro, Visual Studio, Suno Browser Studio, and Gemini Generation Worker",
+    "🎨 Enhanced all 5 Studio Themes (Obsidian Violet, Cyber Blue, Emerald, Sunset Amber, Canvas Light) with high-contrast sharp typography, responsive hover effects, and clean clear controls",
+    "🛡️ Hardened Windows x64 Standalone EXE and Inno Setup Windows installer with full PyQt6 WebEngine, Chromium runtime dependencies (icudtl.dat, pak), VC++ 2015-2022 DLLs, and libsndfile for zero error on other PCs"
   ]
 }

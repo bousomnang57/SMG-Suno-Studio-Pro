@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller Production Spec for SMG Suno Studio Pro v2.2.0
+PyInstaller Production Spec for SMG Suno Studio Pro v2.3.0
 Hardened for zero-error standalone execution on ANY Windows 10/11 (x64) PC:
-- Bundles all app.* and google.genai submodules
-- Bundles PyQt6 QtWidgets, QtGui, QtCore, QtSvg, QtMultimedia + Qt plugins
-- Bundles Pillow (PIL), NumPy, fpdf2, edge_tts/aiohttp, pywin32 (SAPI TTS)
+- Bundles all app.*, google.genai, and mutagen submodules
+- Bundles PyQt6 QtWidgets, QtGui, QtCore, QtSvg, QtMultimedia + QtWebEngine (Chromium runtime, pak, locales)
+- Bundles Pillow (PIL), NumPy, fpdf2, edge_tts/aiohttp, soundfile (libsndfile DLLs), pywin32
 - Bundles certifi CA certificates for resilient HTTPS/Gemini/Auto-Updater calls
 - Bundles VC++ 2015-2022 runtime DLLs (vcruntime140, vcruntime140_1, msvcp140)
 - Bundles assets/ (icons, SVGs, Khmer fonts) and version.json
@@ -14,17 +14,18 @@ import os
 import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_dynamic_libs
+from PyInstaller.utils.hooks.qt import pyqt6_library_info
 
 block_cipher = None
 base_dir = Path(os.path.abspath('.'))
 
-# ── 1. Data Files (Assets, Khmer Fonts, Version Manifest, SSL Certs, FPDF) ──
+# ── 1. Data Files (Assets, Khmer Fonts, Version Manifest, SSL Certs, FPDF, SoundFile, WebEngine) ──
 datas = [
     (str(base_dir / 'assets'), 'assets'),
     (str(base_dir / 'version.json'), '.'),
 ]
 
-for pkg in ('certifi', 'fpdf', 'imageio_ffmpeg'):
+for pkg in ('certifi', 'fpdf', 'imageio_ffmpeg', '_soundfile_data'):
     try:
         datas.extend(collect_data_files(pkg))
     except Exception:
@@ -48,11 +49,20 @@ for dll_name in _dll_names:
             _added_dlls.add(dll_name.lower())
             break
 
-for dyn_pkg in ('PIL', 'numpy'):
+for dyn_pkg in ('PIL', 'numpy', '_soundfile_data'):
     try:
         binaries.extend(collect_dynamic_libs(dyn_pkg))
     except Exception:
         pass
+
+# ── 2b. Explicit Chromium WebEngine Process & Resources (Prevents Blank WebEngine on Other PCs) ──
+if pyqt6_library_info.version is not None:
+    try:
+        web_bins, web_datas = pyqt6_library_info.collect_qtwebengine_files()
+        binaries.extend(web_bins)
+        datas.extend(web_datas)
+    except Exception as e:
+        print(f"Notice: WebEngine collection via hook info: {e}")
 
 # ── 3. Explicit Hidden Imports (Zero ModuleNotFoundError on Clean PCs) ──
 hiddenimports = [
@@ -129,8 +139,8 @@ hiddenimports = [
     'xml.etree.ElementTree',
 ]
 
-# Auto-collect all internal app modules + google.genai + edge_tts submodules
-for sub_pkg in ('app', 'google.genai', 'edge_tts'):
+# Auto-collect all internal app modules + google.genai + edge_tts + mutagen submodules
+for sub_pkg in ('app', 'google.genai', 'edge_tts', 'mutagen'):
     try:
         hiddenimports.extend(collect_submodules(sub_pkg))
     except Exception:

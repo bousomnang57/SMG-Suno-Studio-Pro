@@ -57,12 +57,13 @@ def _install_crash_logger():
 
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtGui import QFont, QIcon, QFontDatabase
 
 # Preload Chromium WebEngine OpenGL context sharing BEFORE any QApplication or Qt widget creation
 # Crucial on Windows to prevent "QtWebEngineWidgets must be imported or Qt.AA_ShareOpenGLContexts must be set before a QCoreApplication instance is created"
 try:
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     from PyQt6.QtWebEngineWidgets import QWebEngineView
 except Exception:
@@ -119,6 +120,7 @@ def main():
     # Enable Chromium WebEngine OpenGL context sharing and preload widgets BEFORE QApplication creation
     # Required by QtWebEngine on Windows to prevent "QtWebEngineWidgets must be imported or Qt.AA_ShareOpenGLContexts must be set"
     try:
+        QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
         from PyQt6.QtWebEngineWidgets import QWebEngineView  # Preloads Chromium OpenGL hooks
     except Exception:

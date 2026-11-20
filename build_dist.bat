@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set "APP_VERSION=2.2.0"
+set "APP_VERSION=2.3.0"
 
 echo =====================================================================
 echo    SMG Suno Studio Pro v%APP_VERSION% - Production Release Builder
@@ -23,12 +23,19 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-:: 3. Mirror assets & version.json at root of dist bundle for icon/shortcut/fallback resolution
+:: 3. Mirror assets, version.json & qt.conf at root of dist bundle for icon/shortcut/fallback resolution
 if not exist "dist\SMG Suno Studio Pro\assets" (
     echo [*] Mirroring assets directory to dist bundle root...
     xcopy /E /I /Y "assets" "dist\SMG Suno Studio Pro\assets" >nul
 )
 copy /Y "version.json" "dist\SMG Suno Studio Pro\version.json" >nul
+
+if not exist "dist\SMG Suno Studio Pro\qt.conf" (
+    (
+        echo [Paths]
+        echo Prefix = PyQt6/Qt6
+    ) > "dist\SMG Suno Studio Pro\qt.conf"
+)
 
 :: 4. Smoke-Test the compiled frozen EXE (verifies zero missing DLLs/imports on clean startup)
 echo [*] Running frozen EXE smoke test...

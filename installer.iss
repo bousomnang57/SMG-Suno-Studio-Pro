@@ -1,9 +1,9 @@
 ; Script generated for Inno Setup 7
-; SMG Suno Studio Pro v2.2.0 — Global Music Studio Windows Installer
-; Optimized for all Windows 10/11 (x64) PCs with built-in Khmer Fonts & .smgsong Association
+; SMG Suno Studio Pro v2.3.0 — Global Music Studio Windows Installer
+; Optimized for all Windows 10/11 (x64) PCs with built-in Khmer Fonts, WebEngine & .smgsong Association
 
 #define MyAppName "SMG Suno Studio Pro"
-#define MyAppVersion "2.2.0"
+#define MyAppVersion "2.3.0"
 #define MyAppPublisher "SMG Studio"
 #define MyAppExeName "SMG Suno Studio Pro.exe"
 #define MyAppId "{{C287895A-8E41-432D-8C56-9D3A4B8E17F0}"
@@ -21,7 +21,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist_installer
-OutputBaseFilename=SMG_Suno_Studio_Pro_v2.2.0_Setup
+OutputBaseFilename=SMG_Suno_Studio_Pro_v2.3.0_Setup
 SetupIconFile=assets\logo.ico
 UninstallDisplayIcon={app}\assets\logo.ico
 Compression=lzma2/ultra64

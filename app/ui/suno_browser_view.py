@@ -1068,12 +1068,19 @@ class SunoBrowserView(QWidget):
                 padding: 3px 6px;
                 font-size: 10.5px;
             }}
+            QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus {{
+                border: 1px solid {acc};
+            }}
         """)
 
         btn_qss = (
-            f"background: {t['bg_btn']}; color: {pri}; border: 1px solid {border}; border-radius: 5px; font-weight: 700; font-size: 10px; padding: 2px 7px;"
+            f"QPushButton {{ background: {t['bg_btn']}; color: {pri}; border: 1px solid {border}; border-radius: 5px; font-weight: 700; font-size: 10px; padding: 2px 7px; }}"
+            f"QPushButton:hover {{ background: {t.get('bg_btn_hover', border)}; border-color: {acc}; color: #ffffff; }}"
+            f"QPushButton:pressed {{ background: {t.get('bg_btn_secondary', card)}; }}"
             if is_dark else
-            "background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 5px; font-weight: 700; font-size: 10px; padding: 2px 7px;"
+            "QPushButton { background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 5px; font-weight: 700; font-size: 10px; padding: 2px 7px; }"
+            "QPushButton:hover { background: #f8fafc; border-color: #2563eb; color: #1d4ed8; }"
+            "QPushButton:pressed { background: #e2e8f0; }"
         )
         for b in [
             self.btn_toggle_dock, self.btn_nav_create, self.btn_nav_library, self.btn_nav_account,
