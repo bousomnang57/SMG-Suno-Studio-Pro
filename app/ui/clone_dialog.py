@@ -140,7 +140,7 @@ class SongDNAClonerView(QWidget):
         title_vbox = QVBoxLayout()
         title_vbox.setSpacing(2)
 
-        self.lbl_main_title = QLabel("🧬 Song DNA & Semantic Meaning Cloner (ម៉ាស៊ីនក្លូនបទចម្រៀងស្របន័យ)")
+        self.lbl_main_title = QLabel("🧬 Song DNA & Semantic Meaning Cloner")
         self.lbl_main_title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         title_vbox.addWidget(self.lbl_main_title)
 
@@ -234,14 +234,14 @@ class SongDNAClonerView(QWidget):
 
         self.combo_target_genre = QComboBox()
         self.combo_target_genre.addItems([
+            "Global Commercial Radio Pop",
+            "80s Synthwave & Retro Pop",
+            "Acoustic Fingerpicked Indie Ballad",
+            "EDM Club Festival Drop",
             "Khmer 60s Sentimental Ballad",
             "Khmer Romvong Folk Festive",
             "Khmer Modern Trap / Hip-Hop 808",
             "Modern Khmer Acoustic Pop & R&B",
-            "Global Commercial Radio Pop",
-            "80s Synthwave & Retro Pop",
-            "Acoustic Fingerpicked Indie Ballad",
-            "EDM Club Festival Drop"
         ])
         self.combo_target_genre.setStyleSheet("padding: 4px 6px; font-size: 11px; min-width: 170px;")
         row1.addWidget(self.combo_target_genre)
@@ -252,8 +252,8 @@ class SongDNAClonerView(QWidget):
 
         self.combo_target_lang = QComboBox()
         self.combo_target_lang.addItems([
-            "🇰🇭 ខ្មែរ (Khmer)",
             "🇬🇧 English",
+            "🇰🇭 Khmer (ភាសាខ្មែរ)",
             "🌟 Both (50/50 Dual Engine)"
         ])
         self.combo_target_lang.setStyleSheet("padding: 4px 6px; font-size: 11px; min-width: 120px;")
@@ -265,7 +265,7 @@ class SongDNAClonerView(QWidget):
 
         self.spin_target_bpm = QSpinBox()
         self.spin_target_bpm.setRange(50, 190)
-        self.spin_target_bpm.setValue(74)
+        self.spin_target_bpm.setValue(120)
         self.spin_target_bpm.setSuffix(" BPM")
         self.spin_target_bpm.setStyleSheet("padding: 4px; font-size: 11px; font-weight: 700; min-width: 80px;")
         row1.addWidget(self.spin_target_bpm)
@@ -281,7 +281,7 @@ class SongDNAClonerView(QWidget):
         row1.addStretch()
 
         # Big Action Button
-        self.btn_generate_clone = QPushButton("⚡ បង្កើតបទក្លូនស្របន័យ (Clone Song)")
+        self.btn_generate_clone = QPushButton("⚡ Clone Song DNA")
         self.btn_generate_clone.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_generate_clone.setStyleSheet("""
             QPushButton {
@@ -704,7 +704,7 @@ class SongDNAClonerView(QWidget):
         return max(0, min(100, int(round((1.0 - combined_overlap) * 100))))
 
     def _on_clone_success(self, title: str, style: str, lyrics: str):
-        self.btn_generate_clone.setText("⚡ បង្កើតបទក្លូនស្របន័យ (Clone Song)")
+        self.btn_generate_clone.setText("⚡ Clone Song DNA")
         self.btn_generate_clone.setEnabled(True)
 
         if hasattr(self, "btn_auto_humanize") and self.btn_auto_humanize.isChecked() and lyrics.strip():
@@ -868,7 +868,7 @@ class SongDNAClonerView(QWidget):
         self.txt_clone_lyrics.setPlainText(updated)
 
     def _on_clone_error(self, err_msg: str):
-        self.btn_generate_clone.setText("⚡ បង្កើតបទក្លូនស្របន័យ (Clone Song)")
+        self.btn_generate_clone.setText("⚡ Clone Song DNA")
         self.btn_generate_clone.setEnabled(True)
         QMessageBox.warning(self, "Cloning Issue", f"Could not complete clone: {err_msg}")
 

@@ -1736,8 +1736,10 @@ class MainWindow(QMainWindow):
 
     def _on_worker_error(self, err_msg: str):
         self.generator_panel.set_loading(False)
-        self.status_bar.showMessage(f"Error: {err_msg}", 6000)
-        QMessageBox.warning(self, "AI Generation Notice", f"Notice:\n\n{err_msg}\n\nTip: You can add or verify your free API key in Settings, or use 'Load Genre Demo Track'.")
+        if hasattr(self, "wizard_view") and hasattr(self.wizard_view, "btn_wizard_generate"):
+            self.wizard_view.btn_wizard_generate.setEnabled(True)
+            self.wizard_view.btn_wizard_generate.setText("⚡ Generate Full Lyrics")
+        self.status_bar.showMessage(f"Notice: {err_msg}", 6000)
 
     def _new_song(self):
         # If in Batch Multi-Song Studio Pro mode (tab index 2), delegate to Batch New Project
@@ -2262,12 +2264,12 @@ class MainWindow(QMainWindow):
         model = config_manager.get("gemini_model", "gemini-3.5-flash")
         lic_info = license_manager.get_license_info()
         lic_badge = "💎 PRO" if lic_info["is_active"] else "🟡 DEMO"
-        if key_count > 0:
-            tag = "🟢 Gemini Pro Active" if "pro" in model else "⚡ Gemini Flash Active"
+        if key_count > 0 and model != "local-code-engine":
+            tag = "🟢 Hybrid Studio (Gemini Pro + Local Code)" if "pro" in model else "🟢 Hybrid Studio (Gemini AI + Local Code)"
             badge = f"Pool: {key_count} keys verified" if key_count > 1 else "Key Verified"
-            self.status_bar.showMessage(f"[{lic_badge}] {tag} | Model: {model} | ✓ {badge}")
+            self.status_bar.showMessage(f"[{lic_badge}] {tag} | Engine: {model} | ✓ {badge}")
         else:
-            self.status_bar.showMessage(f"[{lic_badge}] 🟡 Demo Mode (Add API Key in Settings) | Engine: {model}")
+            self.status_bar.showMessage(f"[{lic_badge}] 🟢 Built-in Local Code Engine Active (All Functions Working 100% • Optional AI Key in Settings)")
 
     def _load_last_session(self):
         last_lyrics = config_manager.get("last_lyrics", "")

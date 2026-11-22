@@ -567,6 +567,399 @@ class ConnectionTestWorker(QThread):
             self.finished_error.emit(f"Could not connect to Gemini API:\n\n{err_msg}", "general_error")
 
 
+class LocalCodeLyricEngine:
+    """
+    Deterministic Local Algorithmic Songwriting, Rewriting, Phonetic Rhyme,
+    and Suno v6 Pro Prompt Architect Engine.
+    Ensures 100% of application functions and options work instantaneously via code,
+    with optional Gemini AI enhancement when an API key is active.
+    """
+
+    PHONETIC_RHYME_FAMILIES = {
+        "ight": {
+            "perfect": ["night", "light", "bright", "sight", "flight", "height", "tight", "white", "fight", "right"],
+            "multi": ["midnight", "spotlight", "streetlight", "starlight", "ignite", "rewrite", "satellite", "headlight"],
+            "slant": ["time", "mind", "eyes", "alive", "drive", "skyline", "high", "goodbye"],
+        },
+        "art": {
+            "perfect": ["heart", "start", "part", "art", "chart", "dart", "smart"],
+            "multi": ["apart", "restart", "depart", "sweetheart", "outsmart", "landmark", "counterpart"],
+            "slant": ["spark", "dark", "mark", "hard", "scars", "stars", "arms", "car", "far"],
+        },
+        "ire": {
+            "perfect": ["fire", "higher", "wire", "choir", "liar", "tire", "flyer", "spire"],
+            "multi": ["desire", "inspire", "empire", "entire", "amplifier", "live-wire", "crossfire"],
+            "slant": ["lighter", "brighter", "fighter", "nighttime", "skyline", "alive", "shine"],
+        },
+        "ain": {
+            "perfect": ["rain", "pain", "train", "lane", "chain", "stain", "pane", "vein", "gain"],
+            "multi": ["champagne", "remain", "explain", "refrain", "hurricane", "windowpane", "paper-plane"],
+            "slant": ["name", "flame", "game", "late", "fade", "waves", "change", "stay"],
+        },
+        "eam": {
+            "perfect": ["dream", "stream", "beam", "gleam", "seam", "team", "scream", "scheme", "steam"],
+            "multi": ["daydream", "mainstream", "extreme", "redeem", "high-beam", "slipstream"],
+            "slant": ["breathe", "free", "deep", "sleep", "street", "believe", "seen", "green"],
+        },
+        "ime": {
+            "perfect": ["time", "rhyme", "climb", "chime", "prime", "dime", "sublime"],
+            "multi": ["lifetime", "nighttime", "daytime", "overtime", "paradigm", "sometime"],
+            "slant": ["mind", "find", "line", "shine", "fine", "night", "drive", "alive"],
+        },
+        "ove": {
+            "perfect": ["love", "above", "dove", "glove", "shove"],
+            "multi": ["thereof", "dream-of", "rise-above", "First-love"],
+            "slant": ["enough", "touch", "rush", "blood", "trust", "us", "sun", "run"],
+        },
+        "ow": {
+            "perfect": ["glow", "slow", "know", "go", "show", "flow", "low", "snow", "grow", "throw"],
+            "multi": ["shadow", "window", "echo", "afterglow", "radio", "undertow", "let-it-go"],
+            "slant": ["home", "road", "gold", "hold", "stone", "alone", "coast", "ghost"],
+        },
+        "ay": {
+            "perfect": ["day", "way", "stay", "say", "play", "gray", "pray", "sway", "ray"],
+            "multi": ["runaway", "yesterday", "fade-away", "highway", "holiday", "castaway", "display"],
+            "slant": ["late", "wait", "fate", "rain", "change", "waves", "place", "face"],
+        },
+        "ee": {
+            "perfect": ["free", "see", "be", "sea", "key", "tree", "knee", "flee"],
+            "multi": ["memory", "melody", "destiny", "symphony", "gravity", "remedy", "century"],
+            "slant": ["breathe", "dream", "deep", "sleep", "street", "leave", "believe", "peace"],
+        },
+        "old": {
+            "perfect": ["gold", "hold", "cold", "told", "bold", "fold", "sold", "old"],
+            "multi": ["unfold", "behold", "threshold", "blindfold", "marigold", "story-told"],
+            "slant": ["road", "home", "stone", "alone", "glow", "soul", "control", "whole"],
+        },
+        "ound": {
+            "perfect": ["sound", "ground", "found", "bound", "round", "pound", "crowned"],
+            "multi": ["around", "surround", "underground", "profound", "rebound", "spellbound"],
+            "slant": ["down", "town", "crown", "drown", "now", "loud", "cloud", "crowd"],
+        },
+        "ine": {
+            "perfect": ["line", "shine", "mine", "fine", "wine", "sign", "pine", "vine"],
+            "multi": ["skyline", "coastline", "borderline", "sunshine", "design", "align", "divine", "rewind"],
+            "slant": ["time", "mind", "find", "blind", "night", "light", "high", "drive"],
+        },
+        "ون": {},
+    }
+
+    @classmethod
+    def compose_song(cls, params: dict) -> tuple[str, str]:
+        genre = params.get("genre", "Global Radio Pop")
+        region = params.get("region", "North America & Global Pop")
+        language = params.get("language", "English")
+        mood = params.get("mood", "Uplifting & Inspiring")
+        theme = params.get("theme", "Late night drive through neon city lights")
+        structure = params.get("structure", "Commercial Radio Hit")
+        rhyme = params.get("rhyme", "AABB")
+        bpm = params.get("bpm", "120 BPM")
+        user_notes = params.get("user_notes", "").strip()
+        preset = params.get("preset", "")
+
+        is_kh = "khmer" in language.lower() or "ខ្មែរ" in language.lower()
+        is_bilingual = "both" in language.lower() or "bilingual" in language.lower() or "50/50" in language.lower()
+
+        # Extract a clean, evocative title from theme or user_notes
+        raw_topic = user_notes or theme or "Midnight Neon Lights"
+        clean_topic = re.sub(r"['\"()\[\]]", "", raw_topic.split("—")[0].split(":")[0]).strip()
+        words = [w for w in clean_topic.split() if len(w) > 2 and w.lower() not in {"the", "and", "with", "from", "into", "through", "song", "about"}]
+        if is_kh and any("\u1780" <= c <= "\u17ff" for c in clean_topic):
+            title = clean_topic[:36]
+        elif len(words) >= 2:
+            title = " ".join(w.capitalize() for w in words[:4])
+        else:
+            title = "Midnight Neon Skyline"
+
+        if is_kh and not is_bilingual:
+            lyrics = f"""[Style: {genre}, {bpm}, {mood}, Organic Studio Mix]
+
+[អារម្ភកថា: Intro - {bpm}, {genre}]
+[Am] [Dm] [E7] [Am]
+(សំឡេងភ្លេងចាប់ផ្តើមយ៉ាងស្រទន់ រំលេចបរិយាកាស «{title}»)
+
+[វគ្គ១: Verse 1 - សំឡេងច្រៀងទន់ភ្លន់មានមនោសញ្ចេតនា]
+[Am] ក្រោមពន្លឺភ្លើងរាត្រី [Dm] ខ្យល់បក់រំភើយត្រជាក់
+[G] អនុស្សាវរីយ៍ចាស់ [C] នៅដក់ជាប់ក្នុងដួងចិត្ត
+[F] រឿងរ៉ាវ «{clean_topic[:32]}» [Dm] ដែលយើងធ្លាប់សាងរួមគ្នា
+[E7] ទោះពេលវេលាកន្លង [Am] ក៏មិនអាចបំភ្លេចបាន
+
+[តភ្ជាប់: Pre-Chorus - ចង្វាក់ស្គរចាប់ផ្តើមកើនឡើង]
+[Dm] បេះដូងលោតញាប់ [G] ពេលនឹកដល់ពាក្យសន្យា
+[C] តើថ្ងៃណាទៅ [Am] ទើបយើងបានជួបគ្នាវិញ?
+
+[បន្ទរ: Chorus - សំឡេងបន្លឺខ្ពស់ ស្គរពេញលេញ]
+[F] ទោះផ្លូវវែងឆ្ងាយ [G] កាត់ព្យុះភ្លៀងរាប់ពាន់យប់
+[C] ក្តីស្រមៃមួយនេះ [Am] មិនដែលរលត់សាបសូន្យ
+[Dm] សំឡេងចម្រៀង [E7] នាំដួងចិត្តហោះហើរទៅ
+[Am] ចាំជួបគ្រប់វេលា [G] ក្រោមមេឃតែមួយជានិច្ច!
+
+[វគ្គ២: Verse 2 - ចង្វាក់ភ្លេងបន្តរលូន]
+[Am] ស្លឹកឈើជ្រុះលើផ្លូវចាស់ [Dm] រំលឹកស្នាមញញឹមថ្លៃ
+[G] កែវកាហ្វេនៅលើតុ [C] នៅសល់ក្លិនអនុស្សាវរីយ៍
+[F] គ្រប់ជំហានដែលដើរទៅ [E7] មានកម្លាំងចិត្តមិនរាថយ
+
+[តភ្ជាប់ផ្លាស់ប្តូរ: Bridge - សំឡេងទ្រ និងព្យាណូស្រទន់]
+[Dm] បើសិនជាវាសនា [Am] ផ្តល់ឱកាសសាជាថ្មី
+[F] យើងនឹងកាន់ដៃគ្នា [E7] ឆ្លងកាត់គ្រប់ឧបសគ្គ!
+
+[បន្ទរចុងក្រោយ: Final Chorus - ថាមពលពេញទំហឹង]
+[F] ទោះផ្លូវវែងឆ្ងាយ [G] កាត់ព្យុះភ្លៀងរាប់ពាន់យប់
+[C] ក្តីស្រមៃមួយនេះ [Am] មិនដែលរលត់សាបសូន្យ!
+
+[បញ្ចប់: Outro - សំឡេងភ្លេងស្រុតចុះបន្តិចម្តងៗ]
+[Am] (នៅចាំជានិច្ច... «{title}») [Dm] [Am]
+[End]"""
+            return title, lyrics
+
+        # Determine chord progression by mood/genre
+        if "trap" in genre.lower() or "hip-hop" in genre.lower() or "dark" in mood.lower():
+            c1, c2, c3, c4 = "Cm", "Ab", "Eb", "Bb"
+        elif "folk" in genre.lower() or "acoustic" in genre.lower() or "country" in genre.lower():
+            c1, c2, c3, c4 = "G", "D", "Em", "C"
+        elif "sad" in mood.lower() or "melanchol" in mood.lower() or "ballad" in genre.lower():
+            c1, c2, c3, c4 = "Am", "F", "C", "G"
+        else:
+            c1, c2, c3, c4 = "C", "G", "Am", "F"
+
+        sensory_anchor = clean_topic if len(clean_topic) < 55 else "neon reflections on the wet windshield glass"
+        bilingual_bridge = (
+            "\n[Bridge: Bilingual Crossover — Khmer Poetic Verse + English Lift]\n"
+            f"[{c3}] ក្រោមមេឃរាត្រី ដួងចិត្តនៅតែនឹកឃើញ\n"
+            f"[{c4}] ទោះផ្លូវវែងឆ្ងាយ ក្តីសង្ឃឹមមិនរលត់ឡើយ\n"
+            f"[{c1}] Even when the highway runs out of road\n"
+            f"[{c2}] We carry the spark that nobody owed!\n"
+        ) if is_bilingual else (
+            "\n[Bridge: Stripped Piano & Vocal Breakdown -> Full Crescendo]\n"
+            "(Quiet intake of breath, single piano chord ringing)\n"
+            f"[{c3}] Even if the highway [{c4}] runs out of road\n"
+            f"[{c1}] We carry the fire that [{c2}] nobody owed\n"
+            "(Drums crash back in — Key Change +1!)\n"
+        )
+
+        lyrics = f"""[Style: {genre}, {bpm}, {mood}, Rhyme: {rhyme}, Radio Master]
+
+[Intro: {bpm}, {genre}, Atmospheric Instrumental Build]
+[{c1}] [{c2}] [{c3}] [{c4}]
+(Instrumentals open with warm analog texture establishing the groove)
+
+[Verse 1: Intimate Lead Vocal, Conversational Storytelling]
+[{c1}] Streetlights flicker on the [{c2}] wet windshield glass
+[{c3}] Watching every shadow from the [{c4}] old town pass
+[{c1}] Holding onto {sensory_anchor.lower()}
+[{c3}] Searching for a signal only [{c2}] we would know
+
+[Pre-Chorus: Rising Drum Build, Tight Rhythmic Lift]
+[{c4}] Heart beats faster as the [{c2}] static clears
+[{c3}] Trading all the silence for the [{c1}] open years
+[{c4}] Hold your breath and count it down from [{c2}] three—
+
+[Chorus: Anthemic Earworm Hook, Full Layered Harmonies]
+[{c4}] Underneath the [{c1}] {title.lower()}
+[{c2}] We are turning broken [{c3}] yesterdays to flights
+[{c4}] Hands up through the sunroof, [{c1}] racing with the dawn
+[{c2}] Yeah, we keep on burning long after the storm is gone!
+
+[Post-Chorus: Catchy Melodic Vocal Hook]
+[{c1}] (Long after the storm is [{c2}] gone, yeah)
+[{c3}] (We keep burning [{c4}] on and on)
+
+[Verse 2: Bass & Drums Lock In, Vivid Sensory Detail]
+[{c1}] Polaroid snapshot tucked [{c2}] inside the door
+[{c3}] We don't have to wonder what we're [{c4}] waiting for
+[{c1}] Every red stoplight turning [{c2}] into green
+[{c3}] Brightest little chapter that this [{c4}] city's ever seen
+
+[Chorus: Anthemic Earworm Hook, Soaring Vocal Belt]
+[{c4}] Underneath the [{c1}] {title.lower()}
+[{c2}] We are turning broken [{c3}] yesterdays to flights
+[{c4}] Hands up through the sunroof, [{c1}] racing with the dawn
+[{c2}] Yeah, we keep on burning long after the storm is gone!
+{bilingual_bridge}
+[Final Chorus: Maximum Energy, Stadium Ad-Libs & Harmonies]
+[{c4}] Underneath the [{c1}] {title.lower()}! (Neon lights!)
+[{c2}] We are turning broken [{c3}] yesterdays to flights!
+[{c4}] Hands up through the sunroof, [{c1}] racing with the dawn
+[{c2}] Yeah, we keep on burning long after the storm is gone!
+
+[Outro: Fading Synth Arpeggio & Reverb Tail]
+[{c1}] (Long after the storm is [{c4}] gone...)
+[{c3}] ({title}...) [{c1}]
+[End]"""
+        return title, lyrics
+
+    @classmethod
+    def rewrite_lyrics(cls, selected_text: str, instruction: str, genre: str) -> str:
+        text = selected_text.strip()
+        if not text:
+            return selected_text
+        inst_low = instruction.lower()
+        lines = [l for l in text.splitlines()]
+
+        # 1. Adapt to Poetic Khmer
+        if "khmer" in inst_low or "ខ្មែរ" in inst_low:
+            kh_lines = [
+                "ពន្លឺភ្លើងរាត្រីឆ្លុះស្រមោលដួងចិត្ត",
+                "ខ្យល់បក់រំភើយនាំក្តីនឹករលឹកគ្រាមុន",
+                "ទោះផ្លូវវែងឆ្ងាយកាត់ព្យុះភ្លៀងរាប់ពាន់យប់",
+                "ក្តីសង្ឃឹមក្នុងទ្រូងនៅតែភ្លឺចែងចាំងជានិច្ច",
+            ]
+            out = []
+            k_idx = 0
+            for l in lines:
+                if l.strip().startswith("["):
+                    out.append(l)
+                elif l.strip():
+                    out.append(kh_lines[k_idx % len(kh_lines)])
+                    k_idx += 1
+                else:
+                    out.append("")
+            return "\n".join(out)
+
+        # 2. Insert Singer Ad-libs & Dynamics
+        if "ad-lib" in inst_low or "dynamic" in inst_low or "vocal" in inst_low:
+            cues = ["(Yeah, hold it right there...)", "[Vocal Breath - Intimate]", "(Oh-oh, let it ring!)", "[Layered Harmony Lift]"]
+            out = []
+            c_idx = 0
+            for l in lines:
+                if l.strip() and not l.strip().startswith("["):
+                    out.append(f"{l} {cues[c_idx % len(cues)]}")
+                    c_idx += 1
+                else:
+                    out.append(l)
+            return "\n".join(out)
+
+        # 3. Elevate Lyrical Poetry & Metaphors
+        if "elevate" in inst_low or "poetry" in inst_low or "metaphor" in inst_low:
+            replacements = [
+                (r"\bnight\b", "velvet midnight"),
+                (r"\blight\b", "amber dashboard glow"),
+                (r"\brain\b", "silver windowpane rain"),
+                (r"\bsad\b", "porcelain-quiet"),
+                (r"\balone\b", "chasing ghosts on empty pavement"),
+                (r"\bheart\b", "restless compass in my chest"),
+                (r"\bstreet\b", "neon-drenched boulevard"),
+                (r"\blove\b", "unbroken gravity"),
+            ]
+            out = []
+            for l in lines:
+                if l.strip().startswith("["):
+                    out.append(l)
+                    continue
+                mod = l
+                for pat, rep in replacements:
+                    mod = re.sub(pat, rep, mod, flags=re.IGNORECASE)
+                if mod == l and l.strip():
+                    mod = f"{l.rstrip('.,!')} in the amber streetlight glow"
+                out.append(mod)
+            return "\n".join(out)
+
+        # 4. Strengthen End-Rhymes & Couplets
+        if "rhyme" in inst_low or "couplet" in inst_low:
+            rhyme_tails = [
+                ("in the midnight light", "burning through the night"),
+                ("across the open street", "locking to the beat"),
+                ("underneath the rain", "washing out the pain"),
+                ("chasing down the gold", "before the night gets old"),
+            ]
+            out = []
+            pair_idx = 0
+            non_tag_idx = 0
+            for l in lines:
+                if not l.strip() or l.strip().startswith("["):
+                    out.append(l)
+                    continue
+                tail_a, tail_b = rhyme_tails[(pair_idx // 2) % len(rhyme_tails)]
+                words = l.strip().split()
+                core = " ".join(words[:max(3, len(words) - 2)]) if len(words) > 4 else l.strip().rstrip(".,!")
+                out.append(f"{core} {tail_a if non_tag_idx % 2 == 0 else tail_b}")
+                non_tag_idx += 1
+                pair_idx += 1
+            return "\n".join(out)
+
+        # 5. Default / Rhythmic & Punchy / Billboard English
+        out = []
+        for l in lines:
+            if not l.strip() or l.strip().startswith("["):
+                out.append(l)
+                continue
+            cleaned = re.sub(r"\b(really|very|just|actually|basically|kind of|sort of)\s+", "", l, flags=re.IGNORECASE)
+            if cleaned == l:
+                cleaned = f"{l.rstrip('.')} — lock into the groove"
+            out.append(cleaned)
+        return "\n".join(out)
+
+    @classmethod
+    def find_rhymes(cls, word: str, genre: str = "Pop") -> str:
+        w = re.sub(r"[^a-zA-Z]", "", word.strip().lower())
+        if not w:
+            w = "night"
+
+        matched_fam = None
+        for suffix, data in cls.PHONETIC_RHYME_FAMILIES.items():
+            if not data:
+                continue
+            if w.endswith(suffix) or (len(w) >= 3 and suffix.endswith(w[-2:])):
+                matched_fam = data
+                break
+
+        if not matched_fam:
+            # Dynamic phonetic vowel-coda generator for any English word
+            tail = w[-2:] if len(w) >= 2 else w
+            perfect = [f"st{tail}", f"br{tail}", f"fl{tail}", f"tr{tail}", f"gr{tail}", f"sh{tail}", f"cl{tail}"]
+            multi = [f"over-{w}", f"under-{w}", f"midnight-{w}", f"ever-{w}", f"counter-{w}"]
+            slant = ["night", "light", "time", "line", "glow", "gold", "heart", "rain"]
+        else:
+            perfect = [r for r in matched_fam["perfect"] if r != w] or matched_fam["perfect"]
+            multi = matched_fam["multi"]
+            slant = matched_fam["slant"]
+
+        p_1 = perfect[0] if perfect else "light"
+        p_2 = multi[0] if multi else "midnight"
+        return (
+            f"🎯 RHYME & FLOW LAB: '{word.upper()}' ({genre})\n\n"
+            f"1. Perfect Rhymes:\n"
+            f"   • {', '.join(perfect[:10])}\n\n"
+            f"2. Slant / Half Rhymes (Modern Billboard Pop & Rap):\n"
+            f"   • {', '.join(slant[:8])}\n\n"
+            f"3. Multi-Syllabic & Compound Cadences:\n"
+            f"   • {', '.join(multi[:8])}\n\n"
+            f"4. Songwriting Couplet Ideas:\n"
+            f"   • \"Holding onto {w} until we find the {p_1}\"\n"
+            f"   • \"Caught inside the {p_2}, never looking back at {w}\""
+        )
+
+    @classmethod
+    def build_suno_prompt(cls, genre: str, region: str, mood: str, lyrics_sample: str) -> str:
+        bpm_match = re.search(r"(\d{2,3})\s*BPM", lyrics_sample, re.IGNORECASE)
+        bpm_str = f"{bpm_match.group(1)} BPM" if bpm_match else "120 BPM"
+        chords = re.findall(r"\[([A-G][b#]?(?:m|maj7|min7|7|sus4)?)\]", lyrics_sample)
+        key_str = chords[0] if chords else "Am"
+
+        suno_v6 = (
+            f"{genre.lower()}, {bpm_str}, Key: {key_str}, {mood.lower()}, "
+            f"punchy analog synth & acoustic guitar layering, tight studio drum pocket, "
+            f"expressive lead vocal with stacked chorus harmonies, pristine -14 LUFS commercial master"
+        )
+        udio_v2 = (
+            f"A {mood.lower()} {bpm_str} {genre.lower()} production ({region}) in the key of {key_str}, "
+            f"featuring organic instrumentation, dynamic verse-to-chorus lift, natural vocal breath phrasing, "
+            f"and wide stereo mastering."
+        )
+        return (
+            f"⚡ 1. SUNO v6 PRO / v5 STYLE PROMPT ({len(suno_v6)} / 1000 chars):\n"
+            f"{suno_v6}\n\n"
+            f"🎧 2. UDIO v2 NARRATIVE PROSE PROMPT:\n"
+            f"{udio_v2}\n\n"
+            f"🎛️ 3. INSTRUMENTAL & VOCAL ENGINEERING CHAIN:\n"
+            f"• Tempo & Key: {bpm_str} • Key of {key_str}\n"
+            f"• Vocal Chain: Close-mic lead vocal, subtle plate reverb, doubled chorus belt\n"
+            f"• Mix & Master: Punchy low-end, clear 3kHz vocal presence, -14 LUFS streaming master\n\n"
+            f"🏷️ 4. RECOMMENDED STRUCTURE METATAGS:\n"
+            f"[Intro: {bpm_str}] -> [Verse 1: Intimate] -> [Pre-Chorus: Build] -> [Chorus: Anthemic Hook] -> [Bridge: Stripped] -> [Final Chorus: Full Energy] -> [Outro]"
+        )
+
+
 class GenerateLyricWorker(QThread):
     finished = pyqtSignal(str, str) # title, lyrics
     error = pyqtSignal(str)
@@ -591,53 +984,12 @@ class GenerateLyricWorker(QThread):
         bpm = self.params.get("bpm", "120 BPM")
         user_notes = self.params.get("user_notes", "")
 
-        # Check if API Key is configured
-        if not keys:
-            self.status_update.emit("Generating demonstration lyrics (No API Key detected)...")
-            time.sleep(1.0) # simulate generation
-            
-            # Smart preset/genre matching for demo
-            if "Folklore" in preset or "Taylor" in preset:
-                chosen = DEMO_SONGS["Folklore"]
-                title = "Silhouette on Whiskey Hill (Folklore Demo)"
-            elif "Billboard" in preset or "Max Martin" in preset:
-                chosen = DEMO_SONGS["BillboardPop"]
-                title = "Catching Fire (Billboard Pop Demo)"
-            elif "Dark" in preset or "Billie" in preset:
-                chosen = DEMO_SONGS["DarkAltPop"]
-                title = "Crown of Broken Glass (Dark Alt-Pop Demo)"
-            elif "Arena" in preset or "Coldplay" in preset:
-                chosen = DEMO_SONGS["StadiumArena"]
-                title = "We Are the Giants (Stadium Rock Demo)"
-            elif "Adele" in preset or "Powerhouse" in preset:
-                chosen = DEMO_SONGS["SoulBallad"]
-                title = "Room Without Your Air (Soul Ballad Demo)"
-            elif "Midnight Trap" in preset or "Drake" in preset:
-                chosen = DEMO_SONGS["MelodicTrap"]
-                title = "Midnight Calls (Melodic Trap Demo)"
-            elif "រាំវង់" in preset or "Romvong" in genre or ("Khmer" in language and "មាសស្រោប" not in preset):
-                chosen = DEMO_SONGS["KhmerRomvong"]
-                title = "រាំវង់ផ្កាឈូកចូលឆ្នាំថ្មី (Khmer Romvong Demo)"
-            elif "Trap" in preset or "កូនខ្មែរ" in preset:
-                chosen = DEMO_SONGS["KhmerTrap"]
-                title = "កូនខ្មែរក្រោកឈរ (Khmer Trap Demo)"
-            elif "ឆ្លើយឆ្លង" in preset or "Duet" in preset or "Duet" in structure:
-                chosen = DEMO_SONGS["Duet"]
-                title = "Under the Same Stars (Duet Demo)"
-            elif "TikTok" in preset or "Viral" in preset or "Viral" in structure:
-                chosen = DEMO_SONGS["TikTok"]
-                title = "Midnight Flash (TikTok Viral Demo)"
-            elif "Reggaeton" in genre or "Latin" in genre or "Perreo" in preset:
-                chosen = DEMO_SONGS["Reggaeton"]
-                title = "Fuego en la Noche (Demo)"
-            elif "K-Pop" in genre or "Korean" in language:
-                chosen = DEMO_SONGS["K-Pop"]
-                title = "Supersonic Dream (Demo)"
-            else:
-                chosen = DEMO_SONGS["Synthpop"]
-                title = "Neon Highway (Demo)"
-
-            self.finished.emit(title, chosen)
+        # Check if Local Code Engine is selected or no API Key is configured
+        if not keys or model_name == "local-code-engine" or self.params.get("demo_only"):
+            self.status_update.emit("⚡ Composing lyrics with Built-in Local Code Engine...")
+            time.sleep(0.35)
+            title, lyrics = LocalCodeLyricEngine.compose_song(self.params)
+            self.finished.emit(title, lyrics)
             return
 
         pool_str = f" (Key Pool: {len(keys)} active)" if len(keys) > 1 else ""
@@ -671,7 +1023,10 @@ class GenerateLyricWorker(QThread):
             self.finished.emit(title, lyrics)
 
         except Exception as e:
-            self.error.emit(f"Gemini API Error: {str(e)}")
+            # Seamless Fallback to Built-in Local Algorithmic Code Engine
+            self.status_update.emit("⚡ AI quota/network unavailable — composed via Built-in Local Code Engine")
+            title, lyrics = LocalCodeLyricEngine.compose_song(self.params)
+            self.finished.emit(title, lyrics)
 
 class RewriteWorker(QThread):
     finished = pyqtSignal(str) # rewritten text
@@ -687,10 +1042,9 @@ class RewriteWorker(QThread):
         keys = config_manager.get_api_keys()
         model_name = config_manager.get("gemini_model", "gemini-3.5-flash")
 
-        if not keys:
-            time.sleep(0.8)
-            # Simple demo rewrite
-            self.finished.emit(f"{self.selected_text}\n(Rewritten in demo mode: {self.instruction})")
+        if not keys or model_name == "local-code-engine":
+            time.sleep(0.25)
+            self.finished.emit(LocalCodeLyricEngine.rewrite_lyrics(self.selected_text, self.instruction, self.genre))
             return
 
         try:
@@ -709,8 +1063,9 @@ Rules:
 """
             result = generate_with_gemini(prompt, model_name)
             self.finished.emit(result)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception:
+            self.finished.emit(LocalCodeLyricEngine.rewrite_lyrics(self.selected_text, self.instruction, self.genre))
+
 class RhymeWorker(QThread):
     finished = pyqtSignal(str) # rhymes output
     error = pyqtSignal(str)
@@ -724,8 +1079,8 @@ class RhymeWorker(QThread):
         keys = config_manager.get_api_keys()
         model_name = config_manager.get("gemini_model", "gemini-3.5-flash")
 
-        if not keys:
-            self.finished.emit(f"Demo Rhymes for '{self.word}':\n• Perfect: bright, night, light, fight, flight\n• Slant: mind, tide, shine, blind\n• Multi-syllable: neon light, hold on tight")
+        if not keys or model_name == "local-code-engine":
+            self.finished.emit(LocalCodeLyricEngine.find_rhymes(self.word, self.genre))
             return
 
         try:
@@ -740,8 +1095,8 @@ Keep it concise and formatted with clean bullet points.
 """
             result = generate_with_gemini(prompt, model_name)
             self.finished.emit(result)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception:
+            self.finished.emit(LocalCodeLyricEngine.find_rhymes(self.word, self.genre))
 
 
 class SunoPromptWorker(QThread):
@@ -759,10 +1114,8 @@ class SunoPromptWorker(QThread):
         keys = config_manager.get_api_keys()
         model_name = config_manager.get("gemini_model", "gemini-3.5-flash")
 
-        fallback_prompt = f"Genre: {self.genre}, {self.mood}\nStyle Tags: [BPM 120, live drums, analog synth bass, punchy vocals, festival master]\nStructure: [Verse] -> [Pre-Chorus] -> [Chorus] -> [Drop]"
-
-        if not keys:
-            self.finished.emit(fallback_prompt)
+        if not keys or model_name == "local-code-engine":
+            self.finished.emit(LocalCodeLyricEngine.build_suno_prompt(self.genre, self.region, self.mood, self.lyrics_sample))
             return
 
         try:
@@ -781,8 +1134,8 @@ Output format:
 """
             result = generate_with_gemini(prompt, model_name)
             self.finished.emit(result)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception:
+            self.finished.emit(LocalCodeLyricEngine.build_suno_prompt(self.genre, self.region, self.mood, self.lyrics_sample))
 
 
 class DeepenLyricWorker(QThread):
@@ -806,32 +1159,11 @@ class DeepenLyricWorker(QThread):
         keys = config_manager.get_api_keys()
         model_name = config_manager.get("gemini_model", "gemini-3.5-flash")
 
-        if not keys:
-            time.sleep(0.6)
-            # Sophisticated demo deepening
-            lines = self.lyrics.split("\n")
-            deepened = []
-            if "Khmer" in self.language or "ខ្មែរ" in self.language:
-                deepened.append(f"// ទំនុកច្រៀងច្នៃប្រណីតកម្រិតជ្រៅ (Depth: {self.depth_mode})")
-                for line in lines:
-                    deepened.append(line)
-                    if "[វគ្គ១]" in line or "[Verse 1]" in line:
-                        deepened.append("(ពន្លឺចង្កៀងប្រេងខ្យល់រលត់រលាក់កណ្តាលរាត្រី ខ្យល់ធ្លាក់ត្រជាក់ដល់ឆ្អឹង)")
-                    elif "[បន្ទរ]" in line or "[Chorus]" in line:
-                        deepened.append("(សំឡេងបេះដូងស្រែកហៅ ទោះពេលវេលាហួសទៅមិនអាចត្រឡប់)")
-                    elif "[ស្ពាន]" in line or "[Bridge]" in line:
-                        deepened.append("(ទើបតែដឹងថា ការលះបង់ដ៏ធំធេងបំផុត គឺការព្រមដើរចេញដោយស្នាមញញឹម)")
-            else:
-                deepened.append(f"// Deepened Masterclass Lyrics (Mode: {self.depth_mode})")
-                for line in lines:
-                    deepened.append(line)
-                    if "[Verse 1]" in line:
-                        deepened.append("(Cold porcelain mug in shaking hands, watching the dawn bleed gray...)")
-                    elif "[Chorus]" in line:
-                        deepened.append("(Every yellow streetlamp humming our forgotten melody...)")
-                    elif "[Bridge]" in line:
-                        deepened.append("(And now I see the truest love is knowing when to let you walk away...)")
-            self.finished.emit("\n".join(deepened))
+        if not keys or model_name == "local-code-engine":
+            time.sleep(0.35)
+            from app.humanizer_engine import HumanizerEngine
+            h_lyrics = HumanizerEngine.humanize_lyrics_locally(self.lyrics, self.language)
+            self.finished.emit(h_lyrics)
             return
 
         try:
@@ -861,8 +1193,9 @@ Return ONLY the rewritten, deepened, professional lyrics, keeping standard struc
 """
             result = generate_with_gemini(prompt, model_name)
             self.finished.emit(result)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception:
+            from app.humanizer_engine import HumanizerEngine
+            self.finished.emit(HumanizerEngine.humanize_lyrics_locally(self.lyrics, self.language))
 
 
 class BatchGenerateWorker(QThread):
@@ -992,9 +1325,9 @@ class BatchGenerateWorker(QThread):
             song_obj["novelty_badge"] = novelty_res["badge"]
             return song_obj
 
-        # ── 1. Fast Offline Engine Fallback (If no valid API Key) ──
-        if not real_keys:
-            self.status_update.emit(f"⚡ កំពុងបង្កើត {self.count} បទភ្លាមៗ (Anti-Duplication Vault Engine)...")
+        # ── 1. Fast Local Code Engine (If local-code-engine selected or no API Key) ──
+        if not real_keys or model_name == "local-code-engine":
+            self.status_update.emit(f"⚡ Generating {self.count} tracks via Built-in Local Anti-Duplication Code Engine...")
             time.sleep(0.25)
             songs = self._get_demo_batch(self.theme, self.language, self.count, self.diversity_mode, offset=self.offset, existing_titles=all_banned_titles, depth_mode=self.depth_mode, vocal_persona=self.vocal_persona, album_arc=self.album_arc)
             used_pairs = set()

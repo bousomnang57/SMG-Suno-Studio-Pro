@@ -41,11 +41,12 @@ APP_VERSION = "2.4.0"
 APP_TITLE = f"{APP_NAME} v{APP_VERSION}"
 DEFAULT_UPDATE_URL = "https://raw.githubusercontent.com/bousomnang57/SMG-Suno-Studio-Pro/main/version.json"
 
-# Canonical Gemini Model Catalog (Tested & Verified Active Quota)
+# Canonical Hybrid Engine Catalog (Gemini AI + Built-in Local Algorithmic Code Engine)
 GEMINI_MODELS = [
     "gemini-flash-lite-latest",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
+    "local-code-engine",
 ]
 
 # Suno Account Plans & Engine Limits (Local Profile & Credit Estimator — never stores passwords/cookies)
