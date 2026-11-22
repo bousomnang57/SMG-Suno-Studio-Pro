@@ -147,6 +147,8 @@ class MainWindow(QMainWindow):
         from app.ui.clone_dialog import SongDNAClonerView
         self.clone_view = SongDNAClonerView(parent=self, is_dark=self.is_dark_theme)
         self.clone_view.send_to_editor_requested.connect(self._load_cloned_song_into_editor)
+        self.clone_view.send_to_suno_requested.connect(self._load_cloned_song_into_suno)
+        self.clone_view.send_to_batch_requested.connect(self._load_cloned_song_into_batch)
         self.stack.addWidget(self.clone_view)
 
         # View 5: Native Embedded Suno Browser Studio (Account Switcher, Auto-Fill, Downloads)
@@ -2059,6 +2061,28 @@ class MainWindow(QMainWindow):
         self._sync_style_and_production_state(style_prompt=style_prompt, bpm=bpm)
         self._set_studio_mode(3)
         self.status_bar.showMessage(f"Loaded cloned track (Lyrics + Style Prompt + BPM) into Editor: '{title}'", 4000)
+
+    def _load_cloned_song_into_suno(self, title: str, style: str, lyrics: str):
+        self.editor_panel.set_title(title)
+        self.editor_panel.set_lyrics(lyrics)
+        self._sync_style_and_production_state(style_prompt=style)
+        if hasattr(self, "suno_browser_view"):
+            self.suno_browser_view.load_tracks([{
+                "title": title,
+                "style_prompt": style,
+                "lyrics": lyrics,
+            }])
+        self._set_studio_mode(5)
+        self.status_bar.showMessage(f"🚀 Sent cloned song '{title}' to Suno Browser Studio!", 4000)
+
+    def _load_cloned_song_into_batch(self, theme: str, style: str):
+        if hasattr(self, "batch_view"):
+            if hasattr(self.batch_view, "txt_theme"):
+                self.batch_view.txt_theme.setPlainText(theme)
+            if hasattr(self.batch_view, "txt_story_seed") and style:
+                self.batch_view.txt_story_seed.setPlainText(f"Cloned sonic DNA: {style}")
+        self._set_studio_mode(2)
+        self.status_bar.showMessage(f"⚡ Loaded cloned DNA into Batch Studio Pro: '{theme}'", 4000)
 
     def _open_suno_hud(self):
         """Launch or refresh the Always-On-Top Floating Suno Quick-Paste Companion HUD."""

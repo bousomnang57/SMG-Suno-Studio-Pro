@@ -109,6 +109,8 @@ class CloneWorker(QThread):
 
 class SongDNAClonerView(QWidget):
     send_to_editor_requested = pyqtSignal(str, str) # title, lyrics
+    send_to_suno_requested = pyqtSignal(str, str, str) # title, style, lyrics
+    send_to_batch_requested = pyqtSignal(str, str) # theme, style
 
     def __init__(self, initial_lyrics: str = "", initial_title: str = "", parent=None, is_dark: bool = True):
         super().__init__(parent)
@@ -370,9 +372,35 @@ class SongDNAClonerView(QWidget):
         l_layout.setContentsMargins(10, 10, 10, 10)
         l_layout.setSpacing(6)
 
-        lbl_l_title = QLabel("❸ REFERENCE SONG & EXTRACTED DNA")
+        l_top_row = QHBoxLayout()
+        l_top_row.setSpacing(4)
+        lbl_l_title = QLabel("❸ REFERENCE SONG & DNA")
         lbl_l_title.setStyleSheet("font-weight: 800; font-size: 11.5px; color: #38bdf8; letter-spacing: 0.3px;")
-        l_layout.addWidget(lbl_l_title)
+        l_top_row.addWidget(lbl_l_title)
+        l_top_row.addStretch()
+
+        self.btn_ref_paste = QPushButton("📋 Paste")
+        self.btn_ref_paste.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ref_paste.setToolTip("Paste reference song lyrics from clipboard")
+        self.btn_ref_paste.setStyleSheet("font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;")
+        self.btn_ref_paste.clicked.connect(self._paste_reference_clipboard)
+        l_top_row.addWidget(self.btn_ref_paste)
+
+        self.btn_ref_pull_editor = QPushButton("⚡ Editor")
+        self.btn_ref_pull_editor.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ref_pull_editor.setToolTip("Pull current song lyrics from the Lyric Editor Workbench")
+        self.btn_ref_pull_editor.setStyleSheet("font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;")
+        self.btn_ref_pull_editor.clicked.connect(self._pull_reference_from_editor)
+        l_top_row.addWidget(self.btn_ref_pull_editor)
+
+        self.btn_ref_random = QPushButton("🎲 Random Hit")
+        self.btn_ref_random.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ref_random.setToolTip("Pick a random famous reference track and clone its DNA")
+        self.btn_ref_random.setStyleSheet("font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;")
+        self.btn_ref_random.clicked.connect(self._pick_random_reference_preset)
+        l_top_row.addWidget(self.btn_ref_random)
+
+        l_layout.addLayout(l_top_row)
 
         # Extracted DNA Capsule
         self.dna_capsule = QFrame()
@@ -442,6 +470,27 @@ class SongDNAClonerView(QWidget):
         self.btn_copy_style.setStyleSheet("background: #1e1b4b; color: #a5b4fc; border: 1px solid #4338ca; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
         self.btn_copy_style.clicked.connect(self._copy_style)
         sp_row.addWidget(self.btn_copy_style)
+
+        self.btn_lock_all_meter = QPushButton("🔒 Lock 100% Meter")
+        self.btn_lock_all_meter.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lock_all_meter.setToolTip("1-Click Auto-Lock: Match every cloned line's syllable count to the reference song for 100% karaoke sing-along fit")
+        self.btn_lock_all_meter.setStyleSheet("background: #082f49; color: #38bdf8; border: 1px solid #0284c7; font-weight: 800; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+        self.btn_lock_all_meter.clicked.connect(self._auto_lock_all_syllable_meter)
+        sp_row.addWidget(self.btn_lock_all_meter)
+
+        self.btn_scrub_copyright = QPushButton("🛡️ Scrub 100% Safe")
+        self.btn_scrub_copyright.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_scrub_copyright.setToolTip("1-Click Copyright De-Overlap Scrubber: Replace any shared reference words with syllable-matched poetic synonyms")
+        self.btn_scrub_copyright.setStyleSheet("background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 800; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+        self.btn_scrub_copyright.clicked.connect(self._auto_scrub_copyright_overlaps)
+        sp_row.addWidget(self.btn_scrub_copyright)
+
+        self.btn_swap_chords = QPushButton("🎹 Swap Chords")
+        self.btn_swap_chords.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_swap_chords.setToolTip("Rotate inline chord progression to a fresh harmonic palette")
+        self.btn_swap_chords.setStyleSheet("background: #4a044e; color: #f0abfc; border: 1px solid #a21caf; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+        self.btn_swap_chords.clicked.connect(self._rotate_clone_chords)
+        sp_row.addWidget(self.btn_swap_chords)
         r_layout.addLayout(sp_row)
 
         # 4-Flavor Quick Switch Ribbon (Optional selector)
@@ -514,6 +563,12 @@ class SongDNAClonerView(QWidget):
         self.table_twin.verticalHeader().setVisible(False)
         self.view_tabs.addTab(self.table_twin, "🪞 Twin Prompter && Cadence")
 
+        # Tab 3: Visual DNA & Copyright Clearance Audit Report
+        self.txt_dna_audit = QTextEdit()
+        self.txt_dna_audit.setReadOnly(True)
+        self.txt_dna_audit.setFont(QFont("Consolas", 10))
+        self.view_tabs.addTab(self.txt_dna_audit, "🧬 DNA && Copyright Audit")
+
         r_layout.addWidget(self.view_tabs, stretch=1)
 
         # Action Toolbar at bottom of clone
@@ -526,11 +581,25 @@ class SongDNAClonerView(QWidget):
         self.btn_copy_clone.clicked.connect(self._copy_lyrics)
         act_row.addWidget(self.btn_copy_clone)
 
-        self.btn_send_editor = QPushButton("✍️ Send to Editor Workbench")
+        self.btn_send_editor = QPushButton("✍️ Send to Editor")
         self.btn_send_editor.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_send_editor.setStyleSheet("background: #2563eb; color: #ffffff; font-weight: 800; font-size: 11px; padding: 6px 12px; border-radius: 5px;")
         self.btn_send_editor.clicked.connect(self._send_to_editor)
         act_row.addWidget(self.btn_send_editor)
+
+        self.btn_send_suno = QPushButton("🚀 Send to Suno")
+        self.btn_send_suno.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_send_suno.setToolTip("Load cloned Title, Style Prompt & Lyrics directly into Suno Browser Studio [Mode 5]")
+        self.btn_send_suno.setStyleSheet("background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 800; font-size: 10.5px; padding: 5px 10px; border-radius: 5px;")
+        self.btn_send_suno.clicked.connect(self._send_to_suno_tab)
+        act_row.addWidget(self.btn_send_suno)
+
+        self.btn_send_batch = QPushButton("⚡ 20x in Batch")
+        self.btn_send_batch.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_send_batch.setToolTip("Send cloned DNA theme & style into Batch Studio Pro to generate a 20-song album")
+        self.btn_send_batch.setStyleSheet("background: #2e1065; color: #d8b4fe; border: 1px solid #7c3aed; font-weight: 800; font-size: 10.5px; padding: 5px 10px; border-radius: 5px;")
+        self.btn_send_batch.clicked.connect(self._send_to_batch_tab)
+        act_row.addWidget(self.btn_send_batch)
 
         self.btn_clone_vocal = QPushButton("🎤 Vocal")
         self.btn_clone_vocal.setToolTip("Audition cloned lyrics with Neural Scratch Vocalist")
@@ -803,6 +872,11 @@ class SongDNAClonerView(QWidget):
                 st = "font-size: 10px; font-weight: 800; color: #fca5a5; background: #450a0a; padding: 2px 6px; border-radius: 4px; border: 1px solid #dc2626;" if self.is_dark else "font-size: 10px; font-weight: 800; color: #b91c1c; background: #fee2e2; padding: 2px 6px; border-radius: 4px; border: 1px solid #fca5a5;"
             self.lbl_originality_badge.setText(tag)
             self.lbl_originality_badge.setStyleSheet(st)
+            if hasattr(self, "txt_dna_audit"):
+                mode_title = CLONE_MODES.get(self.active_mode_key, {}).get("title", "1:1 Parallel Twin")
+                self.txt_dna_audit.setPlainText(
+                    CloneEngine.build_dna_audit_report(ref, clone, orig_pct, mode_title)
+                )
 
         details = comp.get("details", [])
         self.table_twin.setRowCount(0)
@@ -914,6 +988,85 @@ class SongDNAClonerView(QWidget):
             QApplication.clipboard().setText(style)
             self.btn_copy_style.setText("✓ Copied!")
             QTimer.singleShot(1500, lambda: self.btn_copy_style.setText("📋 Copy Style") if hasattr(self, "btn_copy_style") else None)
+
+    def _paste_reference_clipboard(self):
+        clip = QApplication.clipboard().text().strip()
+        if clip:
+            self.txt_reference.setPlainText(clip)
+            self._analyze_reference()
+            self._load_instant_clone_preview()
+
+    def _pull_reference_from_editor(self):
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, "editor_panel"):
+                ed_lyrics = parent.editor_panel.get_lyrics().strip()
+                ed_title = parent.editor_panel.get_title().strip()
+                if ed_lyrics:
+                    self.reference_title = ed_title or "Editor Song"
+                    self.txt_reference.setPlainText(ed_lyrics)
+                    self._analyze_reference()
+                    self._load_instant_clone_preview()
+                return
+            parent = parent.parent()
+
+    def _pick_random_reference_preset(self):
+        import random
+        keys = list(FAMOUS_SONG_PRESETS.keys())
+        if not keys:
+            return
+        cur = self.combo_presets.currentText()
+        choices = [k for k in keys if k != cur] or keys
+        picked = random.choice(choices)
+        idx = self.combo_presets.findText(picked)
+        if idx >= 0:
+            self.combo_presets.setCurrentIndex(idx)
+
+    def _auto_lock_all_syllable_meter(self):
+        ref = self.txt_reference.toPlainText().strip()
+        clone = self.txt_clone_lyrics.toPlainText().strip()
+        if not ref or not clone:
+            return
+        locked = CloneEngine.lock_all_lines_to_reference_meter(ref, clone)
+        self.txt_clone_lyrics.setPlainText(locked)
+        if hasattr(self, "btn_lock_all_meter"):
+            self.btn_lock_all_meter.setText("✓ 100% Meter Locked!")
+            QTimer.singleShot(1500, lambda: self.btn_lock_all_meter.setText("🔒 Lock 100% Meter") if hasattr(self, "btn_lock_all_meter") else None)
+
+    def _auto_scrub_copyright_overlaps(self):
+        ref = self.txt_reference.toPlainText().strip()
+        clone = self.txt_clone_lyrics.toPlainText().strip()
+        if not ref or not clone:
+            return
+        scrubbed = CloneEngine.scrub_copyright_overlaps(ref, clone)
+        self.txt_clone_lyrics.setPlainText(scrubbed)
+        if hasattr(self, "btn_scrub_copyright"):
+            self.btn_scrub_copyright.setText("✓ 100% Copyright Safe!")
+            QTimer.singleShot(1500, lambda: self.btn_scrub_copyright.setText("🛡️ Scrub 100% Safe") if hasattr(self, "btn_scrub_copyright") else None)
+
+    def _rotate_clone_chords(self):
+        clone = self.txt_clone_lyrics.toPlainText().strip()
+        if not clone:
+            return
+        rotated = CloneEngine.rotate_chord_progression(clone, step=1)
+        self.txt_clone_lyrics.setPlainText(rotated)
+        if hasattr(self, "btn_swap_chords"):
+            self.btn_swap_chords.setText("✓ Chords Swapped!")
+            QTimer.singleShot(1400, lambda: self.btn_swap_chords.setText("🎹 Swap Chords") if hasattr(self, "btn_swap_chords") else None)
+
+    def _send_to_suno_tab(self):
+        lyrics = self.txt_clone_lyrics.toPlainText().strip()
+        if not lyrics:
+            return
+        title = self.generated_title or "Semantic Clone"
+        style = self.txt_clone_style.text().strip() or f"{self.combo_target_genre.currentText()}, {self.spin_target_bpm.value()} BPM"
+        self.send_to_suno_requested.emit(title, style, lyrics)
+
+    def _send_to_batch_tab(self):
+        dna = CloneEngine.extract_song_dna(self.txt_reference.toPlainText())
+        theme = f"{dna.get('thesis', 'Emotional Pop Hit')} ({self.combo_target_genre.currentText()})"
+        style = self.txt_clone_style.text().strip()
+        self.send_to_batch_requested.emit(theme, style)
 
     def _copy_lyrics(self):
         lyrics = self.txt_clone_lyrics.toPlainText().strip()
@@ -1205,6 +1358,43 @@ class SongDNAClonerView(QWidget):
                 self.btn_copy_style.setStyleSheet(f"background: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
             else:
                 self.btn_copy_style.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+
+        for ref_b in [getattr(self, "btn_ref_paste", None), getattr(self, "btn_ref_pull_editor", None), getattr(self, "btn_ref_random", None)]:
+            if ref_b:
+                if is_dark:
+                    ref_b.setStyleSheet(f"background: {t['bg_card_alt']}; color: {t['text_accent']}; border: 1px solid {t['border']}; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;")
+                else:
+                    ref_b.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;")
+
+        if hasattr(self, "btn_lock_all_meter"):
+            if is_dark:
+                self.btn_lock_all_meter.setStyleSheet("background: #082f49; color: #38bdf8; border: 1px solid #0284c7; font-weight: 800; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+            else:
+                self.btn_lock_all_meter.setStyleSheet("background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; font-weight: 800; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+
+        if hasattr(self, "btn_scrub_copyright"):
+            if is_dark:
+                self.btn_scrub_copyright.setStyleSheet("background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 800; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+            else:
+                self.btn_scrub_copyright.setStyleSheet("background: #dcfce7; color: #047857; border: 1px solid #86efac; font-weight: 800; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+
+        if hasattr(self, "btn_swap_chords"):
+            if is_dark:
+                self.btn_swap_chords.setStyleSheet("background: #4a044e; color: #f0abfc; border: 1px solid #a21caf; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+            else:
+                self.btn_swap_chords.setStyleSheet("background: #fdf4ff; color: #86198f; border: 1px solid #f0abfc; font-weight: 700; font-size: 10px; padding: 4px 8px; border-radius: 4px;")
+
+        if hasattr(self, "btn_send_suno"):
+            if is_dark:
+                self.btn_send_suno.setStyleSheet("background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 800; font-size: 10.5px; padding: 5px 10px; border-radius: 5px;")
+            else:
+                self.btn_send_suno.setStyleSheet("background: #dcfce7; color: #047857; border: 1px solid #86efac; font-weight: 800; font-size: 10.5px; padding: 5px 10px; border-radius: 5px;")
+
+        if hasattr(self, "btn_send_batch"):
+            if is_dark:
+                self.btn_send_batch.setStyleSheet("background: #2e1065; color: #d8b4fe; border: 1px solid #7c3aed; font-weight: 800; font-size: 10.5px; padding: 5px 10px; border-radius: 5px;")
+            else:
+                self.btn_send_batch.setStyleSheet("background: #faf5ff; color: #6d28d9; border: 1px solid #d8b4fe; font-weight: 800; font-size: 10.5px; padding: 5px 10px; border-radius: 5px;")
 
         if hasattr(self, "btn_clone_vocal"):
             if is_dark:
