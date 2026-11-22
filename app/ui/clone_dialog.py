@@ -611,7 +611,7 @@ class SongDNAClonerView(QWidget):
         lang = self.combo_target_lang.currentText() if hasattr(self, "combo_target_lang") else "🇬🇧 English"
         persona = (self.combo_persona.currentData() if hasattr(self, "combo_persona") else None) or self.active_persona_key
         res = CloneEngine.generate_offline_clone(ref_lyrics, self.active_mode_key, genre, lang, persona)
-        self._on_clone_success(res["title"], res["style"], res["lyrics"])
+        self._on_clone_success(res["title"], res["style"], res["lyrics"], apply_humanize=False)
 
     def _on_persona_changed(self):
         pk = self.combo_persona.currentData()
@@ -735,11 +735,11 @@ class SongDNAClonerView(QWidget):
         combined_overlap = (0.45 * uni_overlap) + (0.55 * bi_overlap)
         return max(0, min(100, int(round((1.0 - combined_overlap) * 100))))
 
-    def _on_clone_success(self, title: str, style: str, lyrics: str):
+    def _on_clone_success(self, title: str, style: str, lyrics: str, apply_humanize: bool = True):
         self.btn_generate_clone.setText("⚡ Clone Song DNA")
         self.btn_generate_clone.setEnabled(True)
 
-        if hasattr(self, "btn_auto_humanize") and self.btn_auto_humanize.isChecked() and lyrics.strip():
+        if apply_humanize and hasattr(self, "btn_auto_humanize") and self.btn_auto_humanize.isChecked() and lyrics.strip():
             from app.humanizer_engine import HumanizerEngine
             lang_txt = self.combo_target_lang.currentText()
             lang = "Khmer" if ("Khmer" in lang_txt or "ខ្មែរ" in lang_txt) else "English"
@@ -750,7 +750,9 @@ class SongDNAClonerView(QWidget):
         self.generated_lyrics = lyrics
 
         self.txt_clone_style.setText(style)
+        self.txt_clone_lyrics.blockSignals(True)
         self.txt_clone_lyrics.setPlainText(lyrics)
+        self.txt_clone_lyrics.blockSignals(False)
 
         # Analyze Hit score & Sing-Along Fit
         analysis = HitAnalyzer.analyze(lyrics, self.spin_target_bpm.value())
@@ -803,6 +805,8 @@ class SongDNAClonerView(QWidget):
             self.lbl_originality_badge.setStyleSheet(st)
 
         details = comp.get("details", [])
+        self.table_twin.setRowCount(0)
+        self.table_twin.clearContents()
         self.table_twin.setRowCount(len(details))
 
         for row, d in enumerate(details):
