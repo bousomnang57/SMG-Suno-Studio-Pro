@@ -13,7 +13,7 @@ import math
 from typing import Optional, List, Dict
 
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QHBoxLayout
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from PyQt6.QtCore import Qt, QRectF, QPointF, pyqtSignal
 from PyQt6.QtGui import (
     QPainter, QColor, QPen, QBrush, QLinearGradient,
@@ -574,10 +574,16 @@ class FLParametricEQWidget(QWidget):
             {"id": 7, "name": "Air", "type": "high_shelf", "freq": 12000.0, "gain": 2.0, "q": 0.707, "color": "#a855f7"},
         ]
         self._dragging_band: Optional[int] = None
+        self.spectrum_db: Optional[np.ndarray] = None
         self.is_dark: bool = True
         self.bg_color = QColor("#0b1120")
         self.grid_color = QColor("#1e293b")
         self.text_color = QColor("#94a3b8")
+
+    def set_spectrum_data(self, spec_db: Optional[np.ndarray]):
+        """Sets real-time or track FFT spectrum profile for background overlay."""
+        self.spectrum_db = spec_db
+        self.update()
 
     def set_band_gains(self, gains: List[float]):
         for i, g in enumerate(gains[:len(self.bands)]):
@@ -642,6 +648,22 @@ class FLParametricEQWidget(QWidget):
             p.drawLine(26, y, w - 10, y)
             p.setPen(self.text_color)
             p.drawText(3, y + 3, f"{db_val:+}dB" if db_val != 0 else " 0dB")
+
+        # Draw Background FFT Spectrum Analyzer Bars (if loaded)
+        spec = self.spectrum_db
+        if spec is None or len(spec) == 0:
+            # Default subtle musical spectrum silhouette
+            t_idx = np.linspace(0.0, 1.0, 72)
+            spec = -4.0 + 5.5 * np.sin(t_idx * math.pi * 1.1) - 3.5 * (t_idx ** 1.6) + 1.4 * np.cos(t_idx * 18.0)
+        n_bars = len(spec)
+        bar_freqs = np.logspace(math.log10(22.0), math.log10(19500.0), n_bars)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(QColor(16, 185, 129, 34)))
+        for bi in range(n_bars):
+            bx = int(self._freq_to_x(float(bar_freqs[bi]), w))
+            by = int(self._gain_to_y(float(spec[bi]), h))
+            bh = max(2, (h - 18) - by)
+            p.drawRoundedRect(bx - 2, by, 4, bh, 1, 1)
 
         # Calculate Composite 7-Band Magnitude Response Curve
         n_pts = 180
@@ -721,3 +743,132 @@ class FLParametricEQWidget(QWidget):
 
     def mouseReleaseEvent(self, event):
         self._dragging_band = None
+
+
+class RibbonTileButton(QPushButton):
+    """
+    Professional DAW Ribbon Action Tile with a colored rounded-square badge on top
+    (e.g. '+', 'F+', 'AI', 'AN', 'T', 'TR', 'EX', 'OD') and a crisp label below,
+    matching the reference image's Auto Studio ribbon.
+    """
+
+    def __init__(self, badge_text: str, badge_color: str, label_text: str, parent=None):
+        super().__init__(parent)
+        self.badge_text = badge_text
+        self.badge_color = QColor(badge_color)
+        self.label_text = label_text
+        self.is_dark = True
+        self._hovered = False
+
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(84, 46)
+        self.setToolTip(f"{label_text}")
+
+    def apply_theme(self, is_dark: bool):
+        self.is_dark = is_dark
+        self.update()
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        if self._hovered or self.isDown():
+            bg = QColor(56, 189, 248, 28) if self.is_dark else QColor(37, 99, 235, 18)
+            border = self.badge_color
+            p.setBrush(QBrush(bg))
+            p.setPen(QPen(border, 1.2))
+            p.drawRoundedRect(1, 1, w - 2, h - 2, 6, 6)
+
+        # Top Colored Rounded-Square Badge
+        bw, bh = 22, 18
+        bx = (w - bw) / 2.0
+        by = 4.0
+        badge_rect = QRectF(bx, by, bw, bh)
+        p.setBrush(QBrush(self.badge_color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(badge_rect, 4, 4)
+
+        p.setFont(QFont("Segoe UI", 7, QFont.Weight.Black))
+        p.setPen(QColor("#ffffff"))
+        p.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, self.badge_text)
+
+        # Bottom Label
+        p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        txt_col = QColor("#e2e8f0") if self.is_dark else QColor("#1e293b")
+        if not self.isEnabled():
+            txt_col = QColor("#64748b")
+        p.setPen(txt_col)
+        lbl_rect = QRectF(2, 24, w - 4, 20)
+        p.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, self.label_text)
+
+
+class StereoPhaseCorrelationMeter(QWidget):
+    """
+    Visual Stereo Phase Correlation & Mono-Compatibility Bar (-1.0 Out-of-Phase to +1.0 Mono-Safe)
+    for Tab 4 (Stereo, Reverb & Trim).
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(28)
+        self.correlation: float = 0.84
+        self.is_dark: bool = True
+
+    def set_correlation(self, corr: float):
+        self.correlation = max(-1.0, min(1.0, float(corr)))
+        self.update()
+
+    def apply_theme(self, theme_dict: dict):
+        self.is_dark = theme_dict.get("is_dark", True)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        bg = QColor("#0f172a") if self.is_dark else QColor("#f1f5f9")
+        border = QColor("#334155") if self.is_dark else QColor("#cbd5e1")
+        txt_col = QColor("#e2e8f0") if self.is_dark else QColor("#0f172a")
+
+        p.fillRect(0, 0, w, h, bg)
+        p.setPen(QPen(border, 1))
+        p.drawRoundedRect(0, 0, w - 1, h - 1, 5, 5)
+
+        # Center 0.0 mark
+        mid_x = w // 2
+        p.setPen(QPen(border, 1, Qt.PenStyle.DashLine))
+        p.drawLine(mid_x, 3, mid_x, h - 3)
+
+        # Draw Correlation Fill Bar from center
+        norm = (self.correlation + 1.0) / 2.0  # 0..1
+        pos_x = int(28 + norm * (w - 56))
+        bar_col = QColor("#16a34a") if self.correlation >= 0.15 else (QColor("#f59e0b") if self.correlation >= -0.1 else QColor("#ef4444"))
+
+        fill_left = min(mid_x, pos_x)
+        fill_w = max(4, abs(pos_x - mid_x))
+        p.fillRect(fill_left, 6, fill_w, h - 12, bar_col)
+
+        # Marker thumb
+        p.setBrush(QBrush(QColor("#ffffff")))
+        p.setPen(QPen(bar_col, 2))
+        p.drawEllipse(QPointF(pos_x, h / 2.0), 5.0, 5.0)
+
+        p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        p.setPen(txt_col)
+        p.drawText(6, h - 9, "-1.0")
+        p.drawText(w - 30, h - 9, "+1.0")
+        status = f"Phase: {self.correlation:+.2f} (Mono-Safe)" if self.correlation >= 0.0 else f"Phase: {self.correlation:+.2f} (Wide/Cancel)"
+        p.drawText(QRectF(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, status)
+

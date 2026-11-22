@@ -40,6 +40,8 @@ from app.ui.waveform_widget import (
     WaveformEditorPane,
     CompactHorizontalLevelMeter,
     FLParametricEQWidget,
+    RibbonTileButton,
+    StereoPhaseCorrelationMeter,
 )
 
 
@@ -71,6 +73,7 @@ class MasterWorker(QThread):
                 de_harsh_amount=self.params.get("de_harsh_amount", 70.0),
                 de_box_amount=self.params.get("de_box_amount", 80.0),
                 de_phase_amount=self.params.get("de_phase_amount", 50.0),
+                de_esser_amount=self.params.get("de_esser_amount", 55.0),
                 harmonic_exciter=self.params.get("harmonic_exciter", 35.0),
                 eq_sub_cut_hz=self.params.get("eq_sub_cut_hz", 30.0),
                 eq_low_gain=self.params.get("eq_low_gain", 1.2),
@@ -210,32 +213,40 @@ class AudioMasteringView(QWidget):
         # ── LEFT PANEL: Suno & Audio Batch Queue + 1-Click Auto Export Setup ──
         left_panel = QFrame()
         left_panel.setObjectName("masterLeftPanel")
-        left_panel.setMinimumWidth(335)
-        left_panel.setMaximumWidth(430)
+        left_panel.setMinimumWidth(425)
+        left_panel.setMaximumWidth(475)
         l_layout = QVBoxLayout(left_panel)
-        l_layout.setContentsMargins(8, 8, 8, 8)
-        l_layout.setSpacing(6)
+        l_layout.setContentsMargins(8, 6, 8, 6)
+        l_layout.setSpacing(5)
 
         q_group = QGroupBox("Suno && Audio Batch Queue")
         q_group.setStyleSheet("font-size: 10.5px; font-weight: 800;")
         qg_layout = QVBoxLayout(q_group)
         qg_layout.setContentsMargins(6, 8, 6, 6)
-        qg_layout.setSpacing(5)
+        qg_layout.setSpacing(4)
 
         lbl_drag_hint = QLabel("Drag & Drop Suno MP3/WAV/FLAC files here, or click Add Audio")
         lbl_drag_hint.setStyleSheet("font-size: 9.5px; color: #64748b; font-weight: 600;")
         qg_layout.addWidget(lbl_drag_hint)
 
-        # 6-Column Batch Queue Table
+        # 6-Column Batch Queue Table (Sized for zero header/title truncation)
         self.table_queue = QTableWidget(0, 6)
         self.table_queue.setHorizontalHeaderLabels(["Sel", "Track / AI Auto Title", "BPM / Key", "LUFS", "Score", "Status"])
-        self.table_queue.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_queue.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.table_queue.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_queue.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_queue.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_queue.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        hdr = self.table_queue.horizontalHeader()
+        hdr.setMinimumSectionSize(24)
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.table_queue.setColumnWidth(0, 26)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.table_queue.setColumnWidth(2, 86)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.table_queue.setColumnWidth(3, 74)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.table_queue.setColumnWidth(4, 38)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.table_queue.setColumnWidth(5, 48)
         self.table_queue.verticalHeader().setVisible(False)
+        self.table_queue.verticalHeader().setDefaultSectionSize(22)
         self.table_queue.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table_queue.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table_queue.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -524,38 +535,33 @@ class AudioMasteringView(QWidget):
 
     # ── Top 4-Tab Ribbon Builders ──
 
-    def _make_badge_tool_button(self, badge_txt: str, badge_bg: str, label_txt: str, slot_fn) -> QPushButton:
-        btn = QPushButton(f"[{badge_txt}]  {label_txt}")
-        btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setFixedHeight(36)
-        btn.setStyleSheet(
-            f"QPushButton {{ font-size: 10px; font-weight: 800; padding: 4px 9px; border-radius: 5px; "
-            f"border-left: 4px solid {badge_bg}; }}"
-        )
+    def _make_badge_tool_button(self, badge_txt: str, badge_bg: str, label_txt: str, slot_fn) -> RibbonTileButton:
+        btn = RibbonTileButton(badge_txt, badge_bg, label_txt, self)
         btn.clicked.connect(slot_fn)
         return btn
 
     def _create_ribbon_auto_studio(self) -> QWidget:
         w = QWidget()
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(8, 4, 8, 4)
-        lay.setSpacing(6)
+        lay.setContentsMargins(10, 2, 10, 2)
+        lay.setSpacing(8)
 
         self.btn_ribbon_add = self._make_badge_tool_button("+", "#2563eb", "Add Audio", self._browse_audio_file)
         self.btn_ribbon_folder = self._make_badge_tool_button("F+", "#0284c7", "Add Folder", self._browse_audio_folder)
-        self.btn_ribbon_demo = self._make_badge_tool_button("🎵", "#6366f1", "Demo Track", self.load_demo_suno_track)
         self.btn_ribbon_auto_all = self._make_badge_tool_button("AI", "#16a34a", "1-Click Auto All", self._start_1click_auto_all)
         self.btn_ribbon_analyze = self._make_badge_tool_button("AN", "#9333ea", "AI Analyze", self._analyze_current_track)
         self.btn_ribbon_title = self._make_badge_tool_button("T", "#d97706", "Auto Title AI", self._generate_ai_titles)
         self.btn_ribbon_trim = self._make_badge_tool_button("TR", "#0891b2", "Auto Trim", self._auto_trim_current)
         self.btn_ribbon_export = self._make_badge_tool_button("EX", "#059669", "Export Master", self._render_master_b)
-        self.btn_ribbon_out_dir = self._make_badge_tool_button("OD", "#475569", "Output Folder", self._open_output_folder)
+        self.btn_ribbon_out_dir = self._make_badge_tool_button("OD", "#334155", "Output Folder", self._open_output_folder)
+        self.btn_ribbon_demo = self._make_badge_tool_button("🎵", "#6366f1", "Demo Track", self.load_demo_suno_track)
 
-        for b in [
-            self.btn_ribbon_add, self.btn_ribbon_folder, self.btn_ribbon_demo,
-            self.btn_ribbon_auto_all, self.btn_ribbon_analyze, self.btn_ribbon_title,
-            self.btn_ribbon_trim, self.btn_ribbon_export, self.btn_ribbon_out_dir
-        ]:
+        self.ribbon_tile_buttons = [
+            self.btn_ribbon_add, self.btn_ribbon_folder, self.btn_ribbon_auto_all,
+            self.btn_ribbon_analyze, self.btn_ribbon_title, self.btn_ribbon_trim,
+            self.btn_ribbon_export, self.btn_ribbon_out_dir, self.btn_ribbon_demo
+        ]
+        for b in self.ribbon_tile_buttons:
             lay.addWidget(b)
         lay.addStretch(1)
         return w
@@ -699,11 +705,11 @@ class AudioMasteringView(QWidget):
         issues_group = QGroupBox("Detected Suno Artifacts && Mix Issues")
         issues_group.setStyleSheet("font-size: 10px; font-weight: 800;")
         ig_lay = QVBoxLayout(issues_group)
-        ig_lay.setContentsMargins(6, 8, 6, 6)
+        ig_lay.setContentsMargins(6, 6, 6, 4)
         self.txt_issues = QTextEdit()
         self.txt_issues.setReadOnly(True)
-        self.txt_issues.setMaximumHeight(74)
-        self.txt_issues.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #b45309;")
+        self.txt_issues.setFixedHeight(62)
+        self.txt_issues.setStyleSheet("font-size: 9px; font-weight: 700; color: #d97706;")
         self.txt_issues.setText(
             "[!] Inter-Sample Clipping / Hot Peaks (-0.2 dBTP, 0 clipped samples) --> Apply 4x True-Peak Brickwall Limiter\n"
             "[*] Muddy / Boxy Low-Mid Buildup 200-500Hz (Index 46/100) --> Surgical Parametric EQ cut around 250Hz & 500Hz"
@@ -714,12 +720,12 @@ class AudioMasteringView(QWidget):
         crit_group = QGroupBox("AI Mastering Engineer Critique")
         crit_group.setStyleSheet("font-size: 10px; font-weight: 800;")
         cg_lay = QVBoxLayout(crit_group)
-        cg_lay.setContentsMargins(6, 8, 6, 6)
-        cg_lay.setSpacing(5)
+        cg_lay.setContentsMargins(6, 6, 6, 5)
+        cg_lay.setSpacing(4)
 
         self.txt_critique = QTextEdit()
         self.txt_critique.setReadOnly(True)
-        self.txt_critique.setStyleSheet("font-size: 9.5px; line-height: 1.35;")
+        self.txt_critique.setStyleSheet("font-size: 9px;")
         self.txt_critique.setText(
             "[Local Studio AI (Offline DSP + Music Intelligence)]\n"
             "• Track Profile: EDM / Dance Pop | 128 BPM | Key of C# Major | Mood: Vibrant, Euphoric & High-Energy.\n"
@@ -788,10 +794,16 @@ class AudioMasteringView(QWidget):
         self.lbl_title_craft_desc.setStyleSheet("font-size: 9px; color: #64748b; font-weight: 600;")
         tg_lay.addWidget(self.lbl_title_craft_desc)
 
-        # 5-Item Visible Clickable ListWidget (Matches Reference Image!)
+        # 5-Item Visible Clickable ListWidget (All 5 titles visible at once with zero scrollbar!)
         self.list_ai_titles = QListWidget()
-        self.list_ai_titles.setFixedHeight(98)
-        self.list_ai_titles.setStyleSheet("QListWidget { font-size: 9.5px; font-weight: 600; } QListWidget::item { padding: 1px 4px; }")
+        self.list_ai_titles.setFixedHeight(102)
+        self.list_ai_titles.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_ai_titles.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.list_ai_titles.setSpacing(0)
+        self.list_ai_titles.setStyleSheet(
+            "QListWidget { font-size: 9.5px; font-weight: 600; padding: 2px; } "
+            "QListWidget::item { height: 18px; padding: 0px 4px; margin: 0px; }"
+        )
         default_titles = [
             "★ [Best AI Pick] Skyline Fever",
             "2. Electric Paradise",
@@ -821,8 +833,9 @@ class AudioMasteringView(QWidget):
         tg_lay.addWidget(lbl_heard)
 
         self.txt_musical_theme = QTextEdit()
-        self.txt_musical_theme.setFixedHeight(42)
-        self.txt_musical_theme.setStyleSheet("font-size: 9.5px;")
+        self.txt_musical_theme.setFixedHeight(34)
+        self.txt_musical_theme.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.txt_musical_theme.setStyleSheet("font-size: 9px;")
         self.txt_musical_theme.setText("Genre: EDM / Dance Pop | Mood: Vibrant, Euphoric & High-Energy")
         tg_lay.addWidget(self.txt_musical_theme)
 
@@ -858,12 +871,18 @@ class AudioMasteringView(QWidget):
         layout.setSpacing(6)
 
         top_row = QHBoxLayout()
-        lbl_eq_title = QLabel("FL Studio Parametric EQ 2 — 7-Band Logarithmic Curve & Surgical Filter")
-        lbl_eq_title.setStyleSheet("font-size: 10.5px; font-weight: 800; color: #0284c7;")
+        top_row.setSpacing(6)
+        lbl_eq_title = QLabel("FL Studio Parametric EQ 2 — 7-Band Curve & Live Spectrum")
+        lbl_eq_title.setStyleSheet("font-size: 10px; font-weight: 800; color: #0284c7;")
         top_row.addWidget(lbl_eq_title)
         top_row.addStretch()
 
-        top_row.addWidget(QLabel("EQ Preset:"))
+        top_row.addWidget(QLabel("Mode:"))
+        self.combo_eq_mode = QComboBox()
+        self.combo_eq_mode.addItems(["Stereo (L+R)", "Mid Only (Vocal)", "Side Only (Width)"])
+        top_row.addWidget(self.combo_eq_mode)
+
+        top_row.addWidget(QLabel("Preset:"))
         self.combo_eq_preset = QComboBox()
         self.combo_eq_preset.addItems([
             "Suno AI De-Box & Air (Default)",
@@ -874,6 +893,19 @@ class AudioMasteringView(QWidget):
         ])
         self.combo_eq_preset.currentIndexChanged.connect(self._on_eq_preset_changed)
         top_row.addWidget(self.combo_eq_preset)
+
+        self.btn_eq_match_ref = QPushButton("🎯 Match Reference")
+        self.btn_eq_match_ref.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_eq_match_ref.setToolTip("Load a commercial reference song (.mp3/.wav) and auto-match the 7-Band EQ curve & LUFS target")
+        self.btn_eq_match_ref.setStyleSheet("background: #7c3aed; color: #ffffff; font-weight: 800; font-size: 9.5px; padding: 3px 8px; border-radius: 4px;")
+        self.btn_eq_match_ref.clicked.connect(self._match_reference_track)
+        top_row.addWidget(self.btn_eq_match_ref)
+
+        btn_eq_render = QPushButton("⚡ Apply EQ && Render B")
+        btn_eq_render.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_eq_render.setStyleSheet("background: #16a34a; color: #ffffff; font-weight: 800; font-size: 9.5px; padding: 3px 9px; border-radius: 4px;")
+        btn_eq_render.clicked.connect(self._render_master_b)
+        top_row.addWidget(btn_eq_render)
         layout.addLayout(top_row)
 
         # Interactive FL Parametric EQ 2 Curve Visualizer
@@ -1018,6 +1050,15 @@ class AudioMasteringView(QWidget):
         l_deai.addWidget(self.slider_exciter, 3, 1)
         l_deai.addWidget(self.lbl_exciter_val, 3, 2)
 
+        l_deai.addWidget(QLabel("Dynamic Vocal De-Esser (5.8kHz Sibilance):"), 4, 0)
+        self.slider_deesser = QSlider(Qt.Orientation.Horizontal)
+        self.slider_deesser.setRange(0, 100)
+        self.slider_deesser.setValue(55)
+        self.lbl_deesser_val = QLabel("55%")
+        self.slider_deesser.valueChanged.connect(lambda v: self.lbl_deesser_val.setText(f"{v}%"))
+        l_deai.addWidget(self.slider_deesser, 4, 1)
+        l_deai.addWidget(self.lbl_deesser_val, 4, 2)
+
         layout.addWidget(g_deai, stretch=1)
 
         # Right Group: Multiband Dynamics & Mono Bass Maker
@@ -1063,6 +1104,12 @@ class AudioMasteringView(QWidget):
         l_mb.addWidget(self.slider_mono_bass, 3, 1)
         l_mb.addWidget(self.lbl_mono_bass, 3, 2)
 
+        btn_deai_render = QPushButton("⚡ Apply Multiband && De-AI to Render B")
+        btn_deai_render.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_deai_render.setStyleSheet("background: #16a34a; color: #ffffff; font-weight: 800; font-size: 9.5px; padding: 5px 10px; border-radius: 4px;")
+        btn_deai_render.clicked.connect(self._render_master_b)
+        l_mb.addWidget(btn_deai_render, 4, 0, 1, 3)
+
         layout.addWidget(g_mb, stretch=1)
         return widget
 
@@ -1075,11 +1122,11 @@ class AudioMasteringView(QWidget):
         layout.setSpacing(12)
 
         # Left Group: Stereo Imaging, Reverb & Analog Warmth
-        g_st = QGroupBox("Mid-Side Stereo Imager, Glue Reverb & Tape Warmth")
+        g_st = QGroupBox("Mid-Side Stereo Imager, Glue Reverb && Tape Warmth")
         g_st.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_st = QGridLayout(g_st)
         l_st.setContentsMargins(8, 10, 8, 8)
-        l_st.setVerticalSpacing(8)
+        l_st.setVerticalSpacing(6)
 
         l_st.addWidget(QLabel("Mid-Side Stereo Width (50% - 200%):"), 0, 0)
         self.slider_width = QSlider(Qt.Orientation.Horizontal)
@@ -1108,10 +1155,14 @@ class AudioMasteringView(QWidget):
         l_st.addWidget(self.slider_tape, 2, 1)
         l_st.addWidget(self.lbl_tape_val, 2, 2)
 
+        l_st.addWidget(QLabel("Stereo Phase Correlation Meter:"), 3, 0)
+        self.phase_meter = StereoPhaseCorrelationMeter(self)
+        l_st.addWidget(self.phase_meter, 3, 1, 1, 2)
+
         layout.addWidget(g_st, stretch=1)
 
         # Right Group: Precision Auto-Trim Silence & Fade Designer
-        g_tr = QGroupBox("Precision Auto-Trim Silence & Fade Designer")
+        g_tr = QGroupBox("Precision Auto-Trim Silence && Fade Designer")
         g_tr.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_tr = QGridLayout(g_tr)
         l_tr.setContentsMargins(8, 10, 8, 8)
@@ -1199,11 +1250,25 @@ class AudioMasteringView(QWidget):
         layout.addWidget(g_lim, stretch=1)
 
         # Right Group: Direct Export & Ecosystem Bridges
-        g_exp = QGroupBox("Direct Export & Studio Ecosystem Bridges")
+        g_exp = QGroupBox("Reference Track Matcher && Studio Export Bridges")
         g_exp.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_exp = QVBoxLayout(g_exp)
         l_exp.setContentsMargins(8, 10, 8, 8)
-        l_exp.setSpacing(6)
+        l_exp.setSpacing(5)
+
+        ref_row = QHBoxLayout()
+        self.btn_load_ref_track = QPushButton("🎯 Match Commercial Reference Track (.mp3/.wav)")
+        self.btn_load_ref_track.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_load_ref_track.setStyleSheet(
+            "background: #7c3aed; color: white; font-weight: 800; font-size: 9.5px; padding: 5px 8px; border-radius: 4px;"
+        )
+        self.btn_load_ref_track.clicked.connect(self._match_reference_track)
+        ref_row.addWidget(self.btn_load_ref_track)
+        l_exp.addLayout(ref_row)
+
+        self.lbl_ref_match_status = QLabel("Reference Target: Built-in Suno Pro Curve (-13.0 LUFS / -1.0 dBTP)")
+        self.lbl_ref_match_status.setStyleSheet("font-size: 9px; color: #0284c7; font-weight: 700;")
+        l_exp.addWidget(self.lbl_ref_match_status)
 
         meta_row = QHBoxLayout()
         meta_row.addWidget(QLabel("Artist Tag:"))
@@ -1413,6 +1478,12 @@ class AudioMasteringView(QWidget):
         try:
             samples, sr = AudioMasteringEngine.load_audio(self.current_input_path)
             self.waveform_pane.set_audio_data(samples, sr, is_mastered=self.is_ab_mastered)
+            if hasattr(self, "eq_curve_widget"):
+                spec = AudioMasteringEngine.compute_spectrum_profile(samples, sr)
+                self.eq_curve_widget.set_spectrum_data(spec)
+            if hasattr(self, "phase_meter"):
+                corr = AudioMasteringEngine.measure_phase_correlation(samples)
+                self.phase_meter.set_correlation(corr)
             dur = len(samples) / float(sr)
             self.spin_trim_out.setValue(round(dur, 2))
         except Exception as e:
@@ -1597,6 +1668,7 @@ class AudioMasteringView(QWidget):
             "de_harsh_amount": float(self.slider_deharsh.value()),
             "de_box_amount": float(self.slider_debox.value()),
             "de_phase_amount": float(self.slider_dephase.value()),
+            "de_esser_amount": float(self.slider_deesser.value()) if hasattr(self, "slider_deesser") else 55.0,
             "harmonic_exciter": float(self.slider_exciter.value()),
             "eq_sub_cut_hz": 30.0,
             "eq_low_gain": float(self.slider_low.slider_widget.value()),
@@ -1916,6 +1988,35 @@ class AudioMasteringView(QWidget):
         except Exception as e:
             self.lbl_status.setText(f"Auto-trim error: {e}")
 
+    def _match_reference_track(self, ref_path: Optional[str] = None):
+        """Matches the 7-Band FL Parametric EQ 2 and loudness target to a commercial reference track."""
+        if not self.current_input_path or not Path(self.current_input_path).exists():
+            self.load_demo_suno_track()
+
+        if not ref_path:
+            ref_path, _ = QFileDialog.getOpenFileName(
+                self, "Select Commercial Reference Track (.mp3 / .wav / .flac)", "",
+                "Audio Files (*.mp3 *.wav *.flac *.m4a *.ogg)"
+            )
+        if not ref_path or not Path(ref_path).exists():
+            return
+
+        try:
+            match_res = AudioMasteringEngine.compute_reference_eq_match(self.current_input_path, ref_path)
+            gains = match_res["eq_gains"]
+            for idx, g_val in enumerate(gains[:len(self.eq_slider_cols)]):
+                self.eq_slider_cols[idx].slider_widget.setValue(g_val)
+            self._sync_eq_sliders_to_curve()
+            if hasattr(self, "lbl_ref_match_status"):
+                self.lbl_ref_match_status.setText(
+                    f"✓ Matched Reference: {match_res['ref_name']} ({match_res['ref_lufs']:.1f} LUFS / {match_res['ref_tp']:.1f} dBTP | {match_res['ref_bpm']} BPM)"
+                )
+            self.lbl_status.setText(
+                f"🎯 Matched 7-Band FL Parametric EQ 2 & Loudness to Reference: {match_res['ref_name']} ({match_res['ref_lufs']:.1f} LUFS)"
+            )
+        except Exception as e:
+            self.lbl_status.setText(f"Reference match error: {e}")
+
     def _export_format(self, fmt: str):
         if fmt == "mp3":
             self.combo_format.setCurrentIndex(3)
@@ -1977,6 +2078,11 @@ class AudioMasteringView(QWidget):
             self.horiz_meter.apply_theme(t)
         if hasattr(self, "eq_curve_widget"):
             self.eq_curve_widget.apply_theme(t)
+        if hasattr(self, "phase_meter"):
+            self.phase_meter.apply_theme(t)
+        if hasattr(self, "ribbon_tile_buttons"):
+            for rbtn in self.ribbon_tile_buttons:
+                rbtn.apply_theme(is_dark)
 
         btn_bg = t.get("bg_btn", "#151f38") if is_dark else "#ffffff"
         btn_hover = t.get("bg_btn_hover", "#1e2d4f") if is_dark else "#f1f5f9"
@@ -2026,10 +2132,10 @@ class AudioMasteringView(QWidget):
             QHeaderView::section {{
                 background-color: {bg_card if is_dark else '#f1f5f9'};
                 color: {txt_sec if is_dark else '#334155'};
-                font-size: 9.5px;
+                font-size: 9px;
                 font-weight: 800;
                 border: 1px solid {border};
-                padding: 3px;
+                padding: 2px 2px;
             }}
             QTabWidget::pane {{
                 border: 1px solid {border};

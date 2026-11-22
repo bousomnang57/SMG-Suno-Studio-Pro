@@ -386,6 +386,89 @@ class AudioMasteringEngine:
         return round(float(min(24.0, max(3.0, dr))), 1)
 
     @staticmethod
+    def measure_phase_correlation(signal: np.ndarray) -> float:
+        """Computes stereo phase correlation in [-1.0, +1.0] (+1 = mono-compatible, <0 = out-of-phase)."""
+        if len(signal) == 0 or signal.ndim < 2 or signal.shape[1] < 2:
+            return 1.0
+        l_ch = signal[:, 0].astype(np.float64)
+        r_ch = signal[:, 1].astype(np.float64)
+        denom = float(np.sqrt(np.sum(l_ch ** 2) * np.sum(r_ch ** 2)))
+        if denom < 1e-12:
+            return 1.0
+        corr = float(np.sum(l_ch * r_ch) / denom)
+        return round(max(-1.0, min(1.0, corr)), 2)
+
+    @staticmethod
+    def compute_spectrum_profile(signal: np.ndarray, sr: int, n_bins: int = 90) -> np.ndarray:
+        """Computes logarithmic 20Hz-20kHz FFT magnitude spectrum normalized to [-14, +12] dB for EQ display."""
+        if len(signal) == 0:
+            return np.zeros(n_bins, dtype=np.float32)
+        mono = np.mean(signal, axis=1) if signal.ndim == 2 else signal
+        chunk = mono[:min(len(mono), sr * 15)]
+        fft_mag = np.abs(np.fft.rfft(chunk)) / max(1, len(chunk))
+        freqs = np.fft.rfftfreq(len(chunk), 1.0 / sr)
+        log_edges = np.logspace(math.log10(20.0), math.log10(min(20000.0, sr * 0.49)), n_bins + 1)
+        band_db = np.zeros(n_bins, dtype=np.float32)
+        for i in range(n_bins):
+            mask = (freqs >= log_edges[i]) & (freqs < log_edges[i + 1])
+            if np.count_nonzero(mask) > 0:
+                val = float(np.mean(fft_mag[mask]))
+                band_db[i] = 20.0 * math.log10(max(1e-7, val))
+            else:
+                band_db[i] = band_db[i - 1] if i > 0 else -60.0
+        med = float(np.median(band_db))
+        norm_db = np.clip((band_db - med) * 0.45, -13.5, 11.5)
+        return norm_db
+
+    @staticmethod
+    def compute_reference_eq_match(source_path: str | Path, ref_path: str | Path) -> Dict:
+        """
+        Analyzes a commercial Reference Track against the current Suno track and computes
+        7-band FL Parametric EQ 2 matching gains, reference LUFS, and True-Peak target.
+        """
+        src_sig, src_sr = AudioMasteringEngine.load_audio(source_path)
+        ref_sig, ref_sr = AudioMasteringEngine.load_audio(ref_path)
+
+        ref_lufs = AudioMasteringEngine.measure_lufs(ref_sig, ref_sr)
+        ref_tp = AudioMasteringEngine.measure_true_peak(ref_sig)
+        ref_bpm, ref_key = AudioMasteringEngine.estimate_bpm_and_key(ref_sig, ref_sr)
+
+        center_freqs = [30.0, 90.0, 250.0, 480.0, 1800.0, 4500.0, 12000.0]
+        src_mono = np.mean(src_sig, axis=1) if src_sig.ndim == 2 else src_sig
+        ref_mono = np.mean(ref_sig, axis=1) if ref_sig.ndim == 2 else ref_sig
+
+        src_fft = np.abs(np.fft.rfft(src_mono[:min(len(src_mono), src_sr * 20)]))
+        src_f = np.fft.rfftfreq(min(len(src_mono), src_sr * 20), 1.0 / src_sr)
+        ref_fft = np.abs(np.fft.rfft(ref_mono[:min(len(ref_mono), ref_sr * 20)]))
+        ref_f = np.fft.rfftfreq(min(len(ref_mono), ref_sr * 20), 1.0 / ref_sr)
+
+        src_db = []
+        ref_db = []
+        for cf in center_freqs:
+            s_mask = (src_f >= cf * 0.7) & (src_f <= cf * 1.35)
+            r_mask = (ref_f >= cf * 0.7) & (ref_f <= cf * 1.35)
+            s_val = float(np.mean(src_fft[s_mask])) if np.count_nonzero(s_mask) > 0 else 1e-5
+            r_val = float(np.mean(ref_fft[r_mask])) if np.count_nonzero(r_mask) > 0 else 1e-5
+            src_db.append(20.0 * math.log10(max(1e-7, s_val)))
+            ref_db.append(20.0 * math.log10(max(1e-7, r_val)))
+
+        src_mean = sum(src_db) / len(src_db)
+        ref_mean = sum(ref_db) / len(ref_db)
+        matched_gains = []
+        for s_v, r_v in zip(src_db, ref_db):
+            diff = ((r_v - ref_mean) - (s_v - src_mean)) * 0.55
+            matched_gains.append(int(round(max(-8.0, min(8.0, diff)))))
+
+        return {
+            "ref_name": Path(ref_path).name,
+            "ref_lufs": round(ref_lufs, 1),
+            "ref_tp": round(ref_tp, 1),
+            "ref_bpm": ref_bpm,
+            "ref_key": ref_key,
+            "eq_gains": matched_gains,
+        }
+
+    @staticmethod
     def detect_silence(signal: np.ndarray, sr: int, threshold_db: float = -52.0) -> Tuple[float, float]:
         """Detects lead-in silence (head) and tail silence in seconds."""
         if len(signal) == 0:
@@ -569,6 +652,7 @@ class AudioMasteringEngine:
         lufs = AudioMasteringEngine.measure_lufs(data, sr)
         tp = AudioMasteringEngine.measure_true_peak(data)
         dr = AudioMasteringEngine.measure_dynamic_range(data)
+        phase_corr = AudioMasteringEngine.measure_phase_correlation(data)
         head_silence, tail_silence = AudioMasteringEngine.detect_silence(data, sr)
         artifacts = AudioMasteringEngine.scan_suno_artifacts(data, sr)
         bpm, key = AudioMasteringEngine.estimate_bpm_and_key(data, sr)
@@ -592,6 +676,7 @@ class AudioMasteringEngine:
             "target_lufs": -13.0,
             "true_peak": tp,
             "dynamic_range": dr,
+            "phase_correlation": phase_corr,
             "head_silence": head_silence,
             "tail_silence": tail_silence,
             "bpm": bpm,
@@ -620,6 +705,7 @@ class AudioMasteringEngine:
         de_harsh_amount: float = 70.0,
         de_box_amount: float = 80.0,
         de_phase_amount: float = 50.0,
+        de_esser_amount: float = 55.0,
         harmonic_exciter: float = 35.0,
         eq_sub_cut_hz: float = 30.0,
         eq_low_gain: float = 1.2,
@@ -723,6 +809,12 @@ class AudioMasteringEngine:
             if abs(box_cut_db) > 0.1:
                 f_debox = AudioBiquadFilter("peaking", 350.0, float(sr), q=2.8, gain_db=box_cut_db)
                 data = f_debox.process(data)
+
+            # Dynamic Vocal De-Esser (5.8 kHz vocal sibilance control)
+            if de_esser_amount > 5.0:
+                de_ess_cut_db = -2.5 * (float(de_esser_amount) / 100.0)
+                f_deess = AudioBiquadFilter("peaking", 5800.0, float(sr), q=3.2, gain_db=de_ess_cut_db)
+                data = f_deess.process(data)
 
             # High-frequency Harmonic Air Exciter (>10 kHz soft harmonic generation)
             if harmonic_exciter > 5.0:

@@ -28,6 +28,8 @@ from app.ui.waveform_widget import (
     StereoLevelMeter,
     CompactHorizontalLevelMeter,
     FLParametricEQWidget,
+    RibbonTileButton,
+    StereoPhaseCorrelationMeter,
     WaveformEditorPane,
 )
 from app.ui.audio_mastering_view import AudioMasteringView
@@ -102,12 +104,17 @@ def test_mastering_dsp_engine(tmp_path: Path):
     assert isinstance(key, str) and len(key) > 0
     print(f"  ✓ estimate_bpm_and_key verified: {bpm} BPM, Key of {key}")
 
-    # 6. Full Automated Analysis Report
+    # 6. Full Automated Analysis Report & Reference EQ Matcher
     report = AudioMasteringEngine.analyze_track_full(test_wav)
     assert report["bpm"] == bpm
     assert report["key"] == key
+    assert "phase_correlation" in report
     assert 40 <= report["score"] <= 100
-    print(f"  ✓ analyze_track_full verified: Studio Score={report['score']}/100, Target={report['target_score']}/100")
+    spec_prof = AudioMasteringEngine.compute_spectrum_profile(audio, sr)
+    assert len(spec_prof) == 90
+    ref_match = AudioMasteringEngine.compute_reference_eq_match(test_wav, test_wav)
+    assert len(ref_match["eq_gains"]) == 7
+    print(f"  ✓ analyze_track_full, compute_spectrum_profile & compute_reference_eq_match verified")
 
     # 7. Full Mastering Chain Processing (WAV and MP3 outputs)
     out_wav = str(tmp_path / "mastered_output.wav")
@@ -227,14 +234,15 @@ def test_audio_mastering_view(tmp_path: Path):
     view._apply_active_title_to_track()
     assert view.tracks[0]["title"] == view.txt_active_title.text()
 
-    # Test Pro DAW Chain Presets & Loudness-Matched A/B Toggle
+    # Test Pro DAW Chain Presets, Reference Track Matcher & Loudness-Matched A/B Toggle
     view._on_daw_chain_preset_changed(1)
+    view._match_reference_track(test_wav)
     view.chk_loudness_match_ab.setChecked(True)
     view._set_ab_mode(False)
     assert view.is_ab_mastered is False
     view._set_ab_mode(True)
     assert view.is_ab_mastered is True
-    print("  ✓ Live A/B Monitor toggle, Loudness-Matched A/B, and Pro DAW chain presets verified")
+    print("  ✓ Live A/B Monitor toggle, Reference Track Matcher, Loudness-Matched A/B, and Pro DAW chain presets verified")
 
     # Test 5 Themes Adaptation
     themes = ["obsidian", "cyber_blue", "emerald", "sunset_amber", "canvas_light"]
