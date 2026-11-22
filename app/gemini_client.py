@@ -4,6 +4,7 @@ Integrates with `google-genai` SDK and provides mock demo fallback.
 """
 
 import time
+import re
 from PyQt6.QtCore import QThread, pyqtSignal
 from app.config import config_manager
 from app.music_data import ONE_CLICK_PRESETS
