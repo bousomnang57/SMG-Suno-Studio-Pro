@@ -319,7 +319,7 @@ class ToolsPanel(QWidget):
         self.sensory_content_layout.addLayout(grid_en)
 
         # Khmer Words Header & Grid
-        lbl_km = QLabel("ពាក្យ និងឃ្លារូបារម្មណ៍ខ្មែរ:")
+        lbl_km = QLabel("Khmer Sensory & Poetic Phrases:")
         lbl_km.setStyleSheet("font-weight: 700; color: #5eead4; font-size: 12px; margin-top: 8px;" if self.is_dark else "font-weight: 700; color: #1e293b; font-size: 12px; margin-top: 8px;")
         self.sensory_content_layout.addWidget(lbl_km)
 

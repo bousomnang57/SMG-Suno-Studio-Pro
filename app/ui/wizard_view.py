@@ -37,17 +37,17 @@ class SongCreationWizardView(QWidget):
         self.is_dark = False
         self.current_step = 0
 
-        # State stored across steps
-        self.state_genre = "Khmer pop ballad"
-        self.state_language = "Khmer (ភាសាខ្មែរ)"
-        self.state_mood = "ស្រណោះស្រណោក (Heartfelt & Nostalgic)"
-        self.state_theme = "រឿងស្នេហាបែកបាក់ នឹកអនុស្សាវរីយ៍ស្ទឹងសង្កែ"
-        self.state_bpm = 74
-        self.state_vocal = "Male Baritone / Sinn Sisamouth Style"
-        self.state_chords = "Khmer Sinn Sisamouth Sentimental (i - iv - V7 - i)"
-        self.state_structure = "Khmer Sinn Sisamouth Golden Classic (រចនាសម្ព័ន្ធមាស ៦០-៧០)"
+        # State stored across steps (Default: Clean English Radio Pop Workflow)
+        self.state_genre = "Global Radio Pop"
+        self.state_language = "English"
+        self.state_mood = "Uplifting & Inspiring"
+        self.state_theme = "Late night drive through neon city lights, chasing second chances"
+        self.state_bpm = 120
+        self.state_vocal = "Tenor / Modern Pop Vocal"
+        self.state_chords = "Billboard Pop Standard (I - V - vi - IV)"
+        self.state_structure = "Commercial Radio Hit (Intro-V1-Pre-Chorus-V2-Chorus-Bridge-Chorus)"
         self.state_rhyme = "AABB (Classic Couplets)"
-        self.current_title = "ស្នេហានៅស្ទឹងសង្កែ"
+        self.current_title = "Midnight Neon Lights"
         self.current_lyrics = ""
 
         self._init_ui()
@@ -61,11 +61,11 @@ class SongCreationWizardView(QWidget):
         title_box = QVBoxLayout()
         title_box.setSpacing(2)
 
-        self.main_title = QLabel("🗺️ ទិសដៅនៃការធ្វើបទចម្រៀង (Easy Songwriting Roadmap)")
+        self.main_title = QLabel("🗺️ Easy Songwriting Roadmap")
         self.main_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #1e293b;")
         title_box.addWidget(self.main_title)
 
-        self.sub_title = QLabel("បង្កើតបទចម្រៀងអាជីពយ៉ាងងាយស្រួល ៥ ជំហាន៖ ពីគំនិតដំបូង រហូតដល់ Suno AI និង DAW")
+        self.sub_title = QLabel("Create radio-ready songs in 5 guided steps — from initial concept and chords to Suno AI & DAW export")
         self.sub_title.setStyleSheet("font-size: 11.5px; color: #64748b;")
         title_box.addWidget(self.sub_title)
 
@@ -90,7 +90,7 @@ class SongCreationWizardView(QWidget):
         nav_layout = QHBoxLayout(self.nav_frame)
         nav_layout.setContentsMargins(0, 8, 0, 0)
 
-        self.btn_prev = QPushButton("⬅ ថយក្រោយ (Back)")
+        self.btn_prev = QPushButton("⬅ Back")
         self.btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_prev.setStyleSheet("background-color: #f1f5f9; color: #475569; font-weight: 600; padding: 8px 16px; border-radius: 6px;")
         self.btn_prev.setEnabled(False)
@@ -99,13 +99,13 @@ class SongCreationWizardView(QWidget):
 
         nav_layout.addStretch()
 
-        self.lbl_step_indicator = QLabel("ជំហាន ១ នៃ ៥ : ជ្រើសរើសទម្រង់បទ និងអារម្មណ៍")
+        self.lbl_step_indicator = QLabel("Step 1 of 5 : Select Sonic Vibe & Story Concept")
         self.lbl_step_indicator.setStyleSheet("color: #64748b; font-weight: 600; font-size: 12px;")
         nav_layout.addWidget(self.lbl_step_indicator)
 
         nav_layout.addStretch()
 
-        self.btn_next = QPushButton("បន្ទាប់ (Next Step) ➔")
+        self.btn_next = QPushButton("Next Step ➔")
         self.btn_next.setObjectName("primaryGenerateButton")
         self.btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_next.setStyleSheet("background: #2563eb; color: #ffffff; font-weight: 700; padding: 8px 20px; border-radius: 6px;")
@@ -124,11 +124,11 @@ class SongCreationWizardView(QWidget):
 
         self.step_buttons = []
         steps = [
-            "① គំនិតបទ (Vibe)",
-            "② ចង្វាក់ & Chords",
-            "③ ទំនុកច្រៀង (AI Studio)",
-            "④ ហាត់ច្រៀង (Vocal Booth)",
-            "⑤ ផលិត & Export"
+            "① Concept && Vibe",
+            "② Tempo && Chords",
+            "③ AI Lyrics Studio",
+            "④ Vocal Booth",
+            "⑤ Suno && Export"
         ]
         for i, text in enumerate(steps):
             btn = QPushButton(text)
@@ -158,18 +158,18 @@ class SongCreationWizardView(QWidget):
             btn.setStyleSheet(self._get_step_style(i == self.current_step))
 
         step_names = [
-            "ជ្រើសរើសទម្រង់បទ និងអារម្មណ៍",
-            "កំណត់ចង្វាក់ BPM & Chords",
-            "បង្កើតទំនុកច្រៀងជាមួយ Gemini AI",
-            "ហាត់ច្រៀង និងថតសាកល្បង (Audition)",
-            "ផលិត និង Export យកទៅប្រើប្រាស់"
+            "Select Sonic Vibe & Story Concept",
+            "Set Tempo (BPM), Drum Groove & Chord Progression",
+            "Generate & Refine Lyrics with Gemini AI",
+            "Singer Teleprompter & Vocal Scratchpad",
+            "Suno AI Station & Multi-Format Export"
         ]
-        self.lbl_step_indicator.setText(f"ជំហាន {self.current_step + 1} នៃ ៥ : {step_names[self.current_step]}")
+        self.lbl_step_indicator.setText(f"Step {self.current_step + 1} of 5 : {step_names[self.current_step]}")
         self.btn_prev.setEnabled(self.current_step > 0)
         if self.current_step == 4:
-            self.btn_next.setText("✍️ បើកបន្ទប់កែច្នៃពេញលេញ ➔")
+            self.btn_next.setText("✍️ Open Full Lyric Editor ➔")
         else:
-            self.btn_next.setText("បន្ទាប់ (Next Step) ➔")
+            self.btn_next.setText("Next Step ➔")
 
     def _jump_to_step(self, step_idx: int):
         self.current_step = step_idx
@@ -191,23 +191,23 @@ class SongCreationWizardView(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        self.step1_header = QLabel("ជំហានទី ១ : តើអ្នកចង់ធ្វើបទចម្រៀងប្រភេទអ្វី? (Select Sonic Vibe & Story)")
+        self.step1_header = QLabel("Step 1 : Choose Your Musical Style & Song Concept")
         self.step1_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #1e293b;")
         layout.addWidget(self.step1_header)
 
-        # 8 Rich Genre Cards Grid (4x2)
+        # 8 Rich Genre Cards Grid (4x2) — Clean English-First Order
         grid_genres = QGridLayout()
         grid_genres.setSpacing(8)
 
         genres = [
-            ("💖 បទមនោសញ្ចេតនា ៦០", "Khmer 60s/70s Golden Ballad, acoustic Sinn Sisamouth", "Khmer pop ballad"),
-            ("💃 រាំវង់ & កន្ត្រឹម បុណ្យទាន", "Festive Khmer Romvong & Kantrum folk dance", "Khmer Romvong"),
-            ("🎤 រ៉េប & ត្រេប កូនខ្មែរ", "Modern Khmer Trap / Hip-Hop with heavy 808 sub", "Khmer Trap"),
-            ("🇰🇭 បទសម័យមនោសញ្ចេតនា", "Modern Khmer Acoustic Pop & R&B (Kmeng Khmer style)", "Khmer Acoustic Pop"),
             ("🌟 Global Radio Pop", "Catchy international earworm Billboard radio pop", "Global Radio Pop"),
-            ("⚡ EDM & Club Festival", "Mainstage festival drop with euphoric synths", "EDM Dance"),
-            ("🎸 Acoustic Folk & Indie", "Delicate fingerpicked acoustic guitar ballad", "Acoustic Indie"),
-            ("🌃 80s Synthwave & Retro", "Analog Moog bass, LinnDrum, retro neon pop", "Synthwave Pop")
+            ("🌃 80s Synthwave && Retro", "Analog Moog bass, LinnDrum, retro neon synth-pop", "Synthwave Pop"),
+            ("🎸 Acoustic Folk && Indie", "Warm fingerpicked acoustic guitar and intimate vocal", "Acoustic Indie"),
+            ("⚡ EDM && Club Festival", "Mainstage festival drop with euphoric synths", "EDM Dance"),
+            ("🔥 Modern Hip-Hop && Trap", "Melodic 808 sub-bass bounce with crisp trap hi-hats", "Modern Trap"),
+            ("🎷 Late-Night R&&B Soul", "Lush Rhodes chords, neo-soul groove and silky vocals", "Modern R&B"),
+            ("💖 Golden Vintage Ballad", "60s/70s nostalgic orchestral ballad (World / Khmer Classic)", "Khmer pop ballad"),
+            ("💃 Festive World Folk Dance", "Upbeat celebratory acoustic rhythm (Romvong / World Folk)", "Khmer Romvong")
         ]
 
         self.genre_buttons = []
@@ -245,19 +245,19 @@ class SongCreationWizardView(QWidget):
         layout.addLayout(grid_genres)
 
         # Story Seed Quick Inspiration Pills
-        self.lbl_story_seeds = QLabel("💡 គំនិតរឿងរ៉ាវបំផុសអារម្មណ៍ភ្លាមៗ (Quick Story Seeds):")
+        self.lbl_story_seeds = QLabel("💡 Quick Story Seeds (Click to auto-fill concept):")
         self.lbl_story_seeds.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b;")
         layout.addWidget(self.lbl_story_seeds)
 
         seeds_row = QHBoxLayout()
         seeds_row.setSpacing(6)
         story_presets = [
-            ("💔 បែកបាក់ / Heartbreak", "រឿងស្នេហាបែកបាក់ នឹកអនុស្សាវរីយ៍ស្ទឹងសង្កែ"),
-            ("🌊 ស្ទឹងសង្កែ / Memories", "ដំណើរតាមដងស្ទឹងសង្កែ នឹកគ្រាធ្លាប់មានគ្នា"),
-            ("🏙️ រាត្រីភ្នំពេញ / Night Drive", "រាត្រីភ្នំពេញ ភ្លើងពណ៌រំលេចភាពឯកាក្នុងបេះដូង"),
-            ("🎉 ជួបជុំ / Festive Reunion", "ជួបជុំបងប្អូនស្រុកកំណើតក្នុងរដូវបុណ្យទាន"),
-            ("☕ កាហ្វេនឹកអតីត / Nostalgia", "អង្គុយហាងកាហ្វេភ្លៀងធ្លាក់ នឹកស្នេហាគ្រាដំបូង"),
-            ("🚀 តស៊ូជីវិត / Ambition", "ការតស៊ូជម្នះឧបសគ្គក្នុងជីវិតដើម្បីសម្រេចក្ដីស្រមៃ")
+            ("🌃 Midnight Drive", "Late night drive through neon city lights, chasing second chances"),
+            ("💔 Heartbreak", "Bittersweet heartbreak after a summer romance fades away"),
+            ("☕ Rainy Cafe", "Sitting in a rainy coffee shop remembering our first conversation"),
+            ("🚀 Chasing Dreams", "Rising from nothing and overcoming every doubt to reach the stage"),
+            ("🌊 Coastal Memories", "Walking along the ocean shore where we promised never to part"),
+            ("🎉 Electric Night", "Dancing under festival lights like tomorrow never comes")
         ]
         self.seed_buttons = []
         for label, val in story_presets:
@@ -273,29 +273,29 @@ class SongCreationWizardView(QWidget):
         input_row = QHBoxLayout()
         input_row.setSpacing(8)
 
-        self.input_theme = QLineEdit("រឿងស្នេហាបែកបាក់ នឹកអនុស្សាវរីយ៍ស្ទឹងសង្កែ")
-        self.input_theme.setPlaceholderText("ឧ. ស្នេហាដំបូង, ការតស៊ូជីវិត, បែកបាក់ឯកា...")
+        self.input_theme = QLineEdit("Late night drive through neon city lights, chasing second chances")
+        self.input_theme.setPlaceholderText("Enter song topic, story concept, or emotional hook...")
         self.input_theme.setStyleSheet("padding: 7px 10px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 6px;")
         input_row.addWidget(self.input_theme, stretch=2)
 
         self.combo_mood = QComboBox()
         self.combo_mood.addItems([
-            "ស្រណោះស្រណោក (Heartfelt & Nostalgic)",
-            "ផ្អែមល្ហែម ស្នេហ៍ដំបូង (Romantic & Sweet)",
-            "ក្ដៅសាច់ រំភើបញាក់ (Energetic & Hype)",
-            "លើកទឹកចិត្ត ក្ដីសង្ឃឹម (Uplifting & Inspiring)",
-            "សោកសៅ ឈឺចាប់ (Sad & Melancholic)",
-            "រាំសប្បាយ បុណ្យទាន (Festive & Joyful)"
+            "Uplifting & Inspiring",
+            "Heartfelt & Nostalgic",
+            "Romantic & Intimate",
+            "Energetic & Euphoric",
+            "Sad & Melancholic",
+            "Dark & Cinematic"
         ])
         self.combo_mood.setStyleSheet("padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
         input_row.addWidget(self.combo_mood, stretch=1)
 
-        # Language Selector
+        # Language Selector (Default: English)
         self.combo_lang = QComboBox()
         self.combo_lang.addItems([
-            "🇰🇭 ខ្មែរ (Khmer)",
             "🇬🇧 English",
-            "🌟 Both (50/50 Dual Engine)"
+            "🇰🇭 Khmer (ភាសាខ្មែរ)",
+            "🌟 Bilingual (50/50 Dual Engine)"
         ])
         self.combo_lang.setStyleSheet("padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
         self.combo_lang.currentTextChanged.connect(self._on_language_changed)
@@ -400,17 +400,17 @@ class SongCreationWizardView(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        self.step2_header = QLabel("ជំហានទី ២ : កំណត់ចង្វាក់ភ្លេង (BPM), ស្គរ Rhythm Groove និង Chords")
+        self.step2_header = QLabel("Step 2 : Set Tempo (BPM), Rhythm Groove & Chord Progression")
         self.step2_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #1e293b;")
         layout.addWidget(self.step2_header)
 
         # 1. BPM & Rhythm Groove Engine Box
-        self.bpm_box = QGroupBox("១. ល្បឿនចង្វាក់ភ្លេង និង ស្គរ Rhythm Groove (Tempo & Live Drum Loop)")
+        self.bpm_box = QGroupBox("1. Tempo (BPM) && Live Drum Groove")
         b_layout = QVBoxLayout(self.bpm_box)
         b_layout.setSpacing(6)
 
         bpm_header_row = QHBoxLayout()
-        self.lbl_bpm_display = QLabel("ល្បឿនបច្ចុប្បន្ន: 74 BPM (ចង្វាក់ Ballad ស្រទន់)")
+        self.lbl_bpm_display = QLabel("Current Tempo: 120 BPM (Modern Pop / Dance Groove)")
         self.lbl_bpm_display.setStyleSheet("font-weight: 700; color: #2563eb; font-size: 12.5px;")
         bpm_header_row.addWidget(self.lbl_bpm_display)
         bpm_header_row.addStretch()
@@ -423,7 +423,9 @@ class SongCreationWizardView(QWidget):
         self.combo_w_groove = QComboBox()
         self.combo_w_groove.addItems(RhythmEngine.get_available_grooves())
         self.combo_w_groove.setStyleSheet("padding: 4px 8px; font-size: 11px; font-weight: 600; min-width: 170px;")
-        self.combo_w_groove.setCurrentText("🇰🇭 Romvong (74 BPM)")
+        if self.combo_w_groove.count() > 0:
+            pop_idx = next((i for i in range(self.combo_w_groove.count()) if "Pop" in self.combo_w_groove.itemText(i) or "120" in self.combo_w_groove.itemText(i)), 0)
+            self.combo_w_groove.setCurrentIndex(pop_idx)
         self.combo_w_groove.currentTextChanged.connect(self._on_wizard_groove_changed)
         bpm_header_row.addWidget(self.combo_w_groove)
 
@@ -456,46 +458,46 @@ class SongCreationWizardView(QWidget):
 
         self.bpm_slider = QSlider(Qt.Orientation.Horizontal)
         self.bpm_slider.setRange(50, 180)
-        self.bpm_slider.setValue(74)
+        self.bpm_slider.setValue(120)
         self.bpm_slider.valueChanged.connect(self._set_bpm_val)
         b_layout.addWidget(self.bpm_slider)
         layout.addWidget(self.bpm_box)
 
         # 2. Singer Vocal Range & Key
-        self.vocal_box = QGroupBox("២. កម្រិតសំឡេងអ្នកច្រៀង (Vocal Type & Key Matching)")
+        self.vocal_box = QGroupBox("2. Vocal Range && Key Matching")
         v_layout = QVBoxLayout(self.vocal_box)
         v_layout.setSpacing(5)
 
         self.combo_vocal = QComboBox()
         self.combo_vocal.addItems(list(VOCAL_RANGES.keys()))
-        self.combo_vocal.setCurrentIndex(1) # Default to Baritone (Sinn Sisamouth)
+        self.combo_vocal.setCurrentIndex(0)
         self.combo_vocal.setStyleSheet("padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
         v_layout.addWidget(self.combo_vocal)
 
-        self.lbl_vocal_info = QLabel("Key ស័ក្តិសម: G Major, A Major, Bb Major, F Minor (ស័ក្តិសមបទស៊ីន ស៊ីសាមុត)")
+        self.lbl_vocal_info = QLabel("Recommended Keys: C Major, G Major, A Minor, F Major (Radio Pop Standard)")
         self.lbl_vocal_info.setStyleSheet("color: #64748b; font-size: 11px;")
         v_layout.addWidget(self.lbl_vocal_info)
         layout.addWidget(self.vocal_box)
 
         # 3. Chord Progression & Audio Synth
-        self.prog_box = QGroupBox("៣. រូបមន្តគន្លង Chords (Chord Progression & Interactive Synth)")
+        self.prog_box = QGroupBox("3. Chord Progression && Interactive Audio Synth")
         p_layout = QVBoxLayout(self.prog_box)
         p_layout.setSpacing(6)
 
         self.combo_chords = QComboBox()
         self.combo_chords.addItems(list(CHORD_PROGRESSIONS.keys()))
-        self.combo_chords.setCurrentIndex(2) # Default to Sinn Sisamouth Sentimental
+        self.combo_chords.setCurrentIndex(0)
         self.combo_chords.setStyleSheet("padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
         self.combo_chords.currentTextChanged.connect(self._on_chord_selected)
         p_layout.addWidget(self.combo_chords)
 
-        self.lbl_chord_preview = QLabel("Chords: [Am] - [Dm] - [E7] - [Am] (មនោសញ្ចេតនាជ្រាលជ្រៅ)")
+        self.lbl_chord_preview = QLabel("Chords: [C] - [G] - [Am] - [F] (Uplifting Pop Anthem)")
         self.lbl_chord_preview.setStyleSheet("font-weight: 700; color: #2563eb; background: #eff6ff; padding: 6px 10px; border-radius: 6px;")
         p_layout.addWidget(self.lbl_chord_preview)
 
         # Synth audition row
         synth_row = QHBoxLayout()
-        self.btn_w_play_chords = QPushButton("🔊 ស្ដាប់ Chords (Audio Synth)")
+        self.btn_w_play_chords = QPushButton("🔊 Audition Chords (Audio Synth)")
         self.btn_w_play_chords.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_w_play_chords.setStyleSheet("background-color: #f5f3ff; color: #7c3aed; font-weight: 700; border: 1px solid #ddd6fe; border-radius: 6px; padding: 6px 12px;")
         self.btn_w_play_chords.clicked.connect(self._play_wizard_chords)
@@ -546,7 +548,7 @@ class SongCreationWizardView(QWidget):
     def _set_bpm_val(self, val: int):
         self.state_bpm = val
         self.bpm_slider.setValue(val)
-        self.lbl_bpm_display.setText(f"ល្បឿនបច្ចុប្បន្ន: {val} BPM")
+        self.lbl_bpm_display.setText(f"Current Tempo: {val} BPM")
 
     def _on_chord_selected(self, name: str):
         self.state_chords = name
@@ -562,7 +564,7 @@ class SongCreationWizardView(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        self.step3_header = QLabel("ជំហានទី ៣ : បង្កើតទំនុកច្រៀងអាជីពជាមួយ Gemini AI (AI Lyrics Studio)")
+        self.step3_header = QLabel("Step 3 : AI Lyrics Studio — Generate & Refine with Gemini")
         self.step3_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #1e293b;")
         layout.addWidget(self.step3_header)
 
@@ -583,28 +585,28 @@ class SongCreationWizardView(QWidget):
         a_layout = QVBoxLayout(self.action_card)
         a_layout.setSpacing(6)
 
-        self.lbl_gen_summary = QLabel("គំនិតបទ: Khmer pop ballad • 74 BPM • Am-Dm-E7-Am")
+        self.lbl_gen_summary = QLabel("Song Setup: Global Radio Pop • 120 BPM • C-G-Am-F")
         self.lbl_gen_summary.setStyleSheet("font-weight: 700; color: #1d4ed8; font-size: 11px;")
         self.lbl_gen_summary.setWordWrap(True)
         a_layout.addWidget(self.lbl_gen_summary)
 
         # Structure Blueprint Selector
-        lbl_st = QLabel("រចនាសម្ព័ន្ធបទ (Blueprint Architecture):")
+        lbl_st = QLabel("Song Structure Blueprint:")
         lbl_st.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #64748b;")
         a_layout.addWidget(lbl_st)
 
         self.combo_w_structure = QComboBox()
         self.combo_w_structure.addItems([
-            "Khmer Sinn Sisamouth Golden Classic (រចនាសម្ព័ន្ធមាស ៦០-៧០)",
             "Commercial Radio Hit (Intro-V1-Pre-Chorus-V2-Chorus-Bridge-Chorus)",
             "Suno Fast Hook (<2 Minutes High Impact)",
-            "Emotive Duet / Male-Female Dialogue"
+            "Emotive Duet / Male-Female Dialogue",
+            "Golden Vintage Classic (Intro-V1-V2-Chorus-Solo-V3-Outro)"
         ])
         self.combo_w_structure.setStyleSheet("padding: 4px; font-size: 11px;")
         a_layout.addWidget(self.combo_w_structure)
 
         # Big Trigger Button
-        self.btn_wizard_generate = QPushButton("⚡ បង្កើតទំនុកច្រៀងពេញលេញ (Generate Lyrics)")
+        self.btn_wizard_generate = QPushButton("⚡ Generate Full Lyrics")
         self.btn_wizard_generate.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_wizard_generate.setStyleSheet("""
             QPushButton {
@@ -624,7 +626,7 @@ class SongCreationWizardView(QWidget):
         a_layout.addWidget(self.btn_wizard_generate)
 
         # Humanize Button
-        self.btn_wizard_humanize = QPushButton("👤 Humanize & Add Breath Cues (កែសម្រួលបែបមនុស្សពិត)")
+        self.btn_wizard_humanize = QPushButton("👤 Humanize && Add Breath Cues")
         self.btn_wizard_humanize.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_wizard_humanize.setToolTip("Transform into a human masterpiece: inject natural breath pauses, sensory realism, and vulnerable bridge revelation")
         self.btn_wizard_humanize.setStyleSheet("""
@@ -661,7 +663,7 @@ class SongCreationWizardView(QWidget):
         self.lbl_w_hit_score.setStyleSheet("font-weight: 700; font-size: 11px; color: #64748b;")
         h_layout.addWidget(self.lbl_w_hit_score)
 
-        self.btn_w_open_hit_inspector = QPushButton("🔍 ពិនិត្យ Hit Potential & Vocal Safety លម្អិត")
+        self.btn_w_open_hit_inspector = QPushButton("🔍 Inspect Hit Potential && Vocal Safety")
         self.btn_w_open_hit_inspector.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_w_open_hit_inspector.setStyleSheet("background: #faf5ff; color: #7c3aed; border: 1px solid #d8b4fe; font-weight: 700; font-size: 10.5px; padding: 4px 8px; border-radius: 4px;")
         self.btn_w_open_hit_inspector.clicked.connect(self._open_hit_dialog)
@@ -677,7 +679,7 @@ class SongCreationWizardView(QWidget):
 
         # Toolstrip above lyrics editor
         t_row = QHBoxLayout()
-        self.lbl_step3_preview = QLabel("លទ្ធផលទំនុកច្រៀងដែលបានបង្កើត (Studio Lyrics Workbench):")
+        self.lbl_step3_preview = QLabel("Generated Lyrics Workbench:")
         self.lbl_step3_preview.setStyleSheet("font-weight: 700; font-size: 12px; color: #1e293b;")
         t_row.addWidget(self.lbl_step3_preview)
         t_row.addStretch()
@@ -713,7 +715,7 @@ class SongCreationWizardView(QWidget):
         right_col.addLayout(s3_style_row)
 
         self.txt_preview = QTextEdit()
-        self.txt_preview.setPlaceholderText("ទំនុកច្រៀងពេញលេញ (Intro, វគ្គ ១, វគ្គ ២, បន្ទរ, Outro) នឹងបង្ហាញនៅទីនេះបន្ទាប់ពីចុច Generate...")
+        self.txt_preview.setPlaceholderText("Full structured lyrics ([Intro], [Verse 1], [Pre-Chorus], [Chorus], [Bridge], [Outro]) will appear here after clicking Generate...")
         self.txt_preview.setFont(QFont("Segoe UI", 11))
         self.txt_preview.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; line-height: 1.4;")
         self.txt_preview.textChanged.connect(self._on_lyrics_edited)
@@ -748,7 +750,7 @@ class SongCreationWizardView(QWidget):
         vocal = self.combo_w_vocal.currentText() if hasattr(self, "combo_w_vocal") else "Auto"
         pov = self.combo_w_pov.currentText().split("(")[0].strip() if hasattr(self, "combo_w_pov") else "1st Person"
         if hasattr(self, "lbl_gen_summary"):
-            self.lbl_gen_summary.setText(f"គំនិតបទ: {self.state_genre} • {self.state_bpm} BPM • {vocal} • {pov}")
+            self.lbl_gen_summary.setText(f"Song Setup: {self.state_genre} • {self.state_bpm} BPM • {vocal} • {pov}")
         if hasattr(self, "txt_w_step3_style"):
             self.txt_w_step3_style.setText(self._build_wizard_style_prompt())
 
@@ -795,7 +797,7 @@ class SongCreationWizardView(QWidget):
         h_lyrics = HumanizerEngine.humanize_lyrics_locally(curr, lang)
         self.txt_preview.setPlainText(h_lyrics)
         self.btn_wizard_humanize.setText("✅ Human Breath & Soul Injected!")
-        QTimer.singleShot(2500, lambda: self.btn_wizard_humanize.setText("👤 Humanize & Add Breath Cues (កែសម្រួលបែបមនុស្សពិត)") if hasattr(self, "btn_wizard_humanize") else None)
+        QTimer.singleShot(2500, lambda: self.btn_wizard_humanize.setText("👤 Humanize && Add Breath Cues") if hasattr(self, "btn_wizard_humanize") else None)
 
     def _trigger_generate(self):
         theme = self.input_theme.text().strip() or "A bittersweet love story"
@@ -829,12 +831,12 @@ class SongCreationWizardView(QWidget):
                 f"{human_rule}"
             )
         }
-        self.btn_wizard_generate.setText("⏳ កំពុងបង្កើតជាមួយ Gemini...")
+        self.btn_wizard_generate.setText("⏳ Generating Lyrics with Gemini...")
         self.btn_wizard_generate.setEnabled(False)
         self.generate_requested.emit(params)
 
     def set_generated_lyrics(self, title: str, lyrics: str):
-        self.btn_wizard_generate.setText("⚡ បង្កើតទំនុកច្រៀងឡើងវិញ (Regenerate)")
+        self.btn_wizard_generate.setText("⚡ Regenerate Lyrics")
         self.btn_wizard_generate.setEnabled(True)
         self.current_title = title or "Untitled Song"
         self.current_lyrics = lyrics
@@ -848,7 +850,7 @@ class SongCreationWizardView(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        self.step4_header = QLabel("ជំហានទី ៤ : បន្ទប់ហាត់ច្រៀង និងថតសាកល្បងសំនៀង (Vocal Booth & Scratchpad)")
+        self.step4_header = QLabel("Step 4 : Vocal Booth — Singer Teleprompter & Melody Scratchpad")
         self.step4_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #1e293b;")
         layout.addWidget(self.step4_header)
 
@@ -862,7 +864,7 @@ class SongCreationWizardView(QWidget):
         p_layout.setContentsMargins(0, 0, 0, 0)
         p_layout.setSpacing(4)
 
-        lbl_pr_title = QLabel("🎤 អេក្រង់ច្រៀង (Singer Teleprompter View):")
+        lbl_pr_title = QLabel("🎤 Singer Teleprompter View:")
         lbl_pr_title.setStyleSheet("font-weight: 700; font-size: 11.5px; color: #1e293b;")
         p_layout.addWidget(lbl_pr_title)
 
@@ -881,11 +883,11 @@ class SongCreationWizardView(QWidget):
         c_layout.setSpacing(10)
 
         # 1. Metronome & Rhythm Loop
-        self.metro_box = QGroupBox("១. ចង្វាក់ភ្លេងហាត់ច្រៀង (Studio Rhythm Groove & Metronome)")
+        self.metro_box = QGroupBox("1. Studio Rhythm Groove && Metronome")
         m_layout = QVBoxLayout(self.metro_box)
         m_layout.setSpacing(6)
 
-        self.lbl_m_info = QLabel("បើកចង្វាក់ហាត់ច្រៀងតាម Tempo ដើម្បីពិនិត្យមើលព្យាង្គធ្លាក់ត្រូវចង្វាក់:")
+        self.lbl_m_info = QLabel("Audition your lyrics over a live drum groove or metronome click to verify syllable flow:")
         self.lbl_m_info.setStyleSheet("color: #64748b; font-size: 11px;")
         m_layout.addWidget(self.lbl_m_info)
 
@@ -905,11 +907,11 @@ class SongCreationWizardView(QWidget):
         c_layout.addWidget(self.metro_box)
 
         # 2. Microphone Scratchpad
-        self.voice_box = QGroupBox("២. ថតសាកល្បងសំនៀងភ្លេងតាម Mic (Melody Scratchpad)")
+        self.voice_box = QGroupBox("2. Microphone Melody Scratchpad")
         v_layout = QVBoxLayout(self.voice_box)
         v_layout.setSpacing(6)
 
-        self.v_desc = QLabel("ចុចច្រៀង ឬហួចសំនៀងភ្លេង (Humming) ទុកភ្លាមៗកុំឱ្យភ្លេច Melodies ពេលកំពុងសរសេរ:")
+        self.v_desc = QLabel("Record a quick vocal take or hum a topline melody idea straight from your microphone:")
         self.v_desc.setStyleSheet("color: #64748b; font-size: 11px;")
         v_layout.addWidget(self.v_desc)
 
@@ -919,7 +921,7 @@ class SongCreationWizardView(QWidget):
         self.btn_w_record.setStyleSheet("background-color: #fee2e2; color: #dc2626; font-weight: 700; border: 1px solid #fca5a5; border-radius: 6px; padding: 9px;")
         btn_row.addWidget(self.btn_w_record)
 
-        self.btn_w_play_rec = QPushButton("▶ ស្ដាប់សំនៀងថតឡើងវិញ")
+        self.btn_w_play_rec = QPushButton("▶ Play Recorded Take")
         self.btn_w_play_rec.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_w_play_rec.setEnabled(False)
         self.btn_w_play_rec.setStyleSheet("background: #f1f5f9; color: #334155; font-weight: 600; padding: 9px; border-radius: 6px;")
@@ -940,7 +942,7 @@ class SongCreationWizardView(QWidget):
     def _sync_teleprompter(self):
         curr = self.txt_preview.toPlainText().strip() if hasattr(self, "txt_preview") else ""
         if not curr:
-            curr = "(មិនទាន់មានទំនុកច្រៀងនៅឡើយទេ។ សូមបង្កើតនៅជំហានទី ៣ ជាមុនសិន។)"
+            curr = "(No lyrics generated yet. Generate or write your lyrics in Step 3 first.)"
         self.txt_teleprompter.setPlainText(curr)
 
     def _toggle_step4_groove(self):
@@ -966,7 +968,7 @@ class SongCreationWizardView(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        self.step5_header = QLabel("ជំហានទី ៥ : បញ្ចប់ការផលិត និង Export យកទៅប្រើប្រាស់ក្នុង Suno ឬ DAW")
+        self.step5_header = QLabel("Step 5 : Suno AI Ready-to-Paste Station & Multi-Format Export")
         self.step5_header.setStyleSheet("font-size: 15px; font-weight: 700; color: #1e293b;")
         layout.addWidget(self.step5_header)
 
@@ -1009,7 +1011,7 @@ class SongCreationWizardView(QWidget):
         b_layout = QVBoxLayout(self.bundle_card)
         b_layout.setSpacing(8)
 
-        self.lbl_b_title = QLabel("📦 មជ្ឈមណ្ឌល Export ឯកសារចម្រៀងអាជីព (Master Multi-Format Exporter)")
+        self.lbl_b_title = QLabel("📦 Master Multi-Format Exporter (DAW, Subtitles, Karaoke & Lead Sheets)")
         self.lbl_b_title.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #166534;")
         b_layout.addWidget(self.lbl_b_title)
 
@@ -1061,19 +1063,19 @@ class SongCreationWizardView(QWidget):
         layout.addWidget(self.bundle_card)
 
         # 3. Action to open in full editor or Batch Pro
-        self.lbl_step5_more = QLabel("ឬបន្តកែសម្រួល ឬផលិត ២០ បទប្លែកៗគ្នាភ្លាមៗ៖")
+        self.lbl_step5_more = QLabel("Continue editing or scale this concept to a 20-song batch:")
         self.lbl_step5_more.setStyleSheet("font-weight: 700; font-size: 11.5px; color: #64748b;")
         layout.addWidget(self.lbl_step5_more)
 
         w_actions = QHBoxLayout()
         w_actions.setSpacing(10)
-        self.btn_open_full = QPushButton("✍️ បើកបន្ទប់កែសម្រួលពេញលេញ (Open Full Editor Workbench)")
+        self.btn_open_full = QPushButton("✍️ Open Full Lyric Editor Workbench")
         self.btn_open_full.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_open_full.setStyleSheet("background: #eff6ff; color: #1d4ed8; font-weight: 700; border: 1px solid #bfdbfe; padding: 10px; border-radius: 8px;")
         self.btn_open_full.clicked.connect(lambda: self.open_editor_requested.emit())
         w_actions.addWidget(self.btn_open_full)
 
-        self.btn_w_batch = QPushButton("⚡ បង្កើត ២០ បទប្លែកៗគ្នាភ្លាមៗ (Produce 20 in Batch Pro)")
+        self.btn_w_batch = QPushButton("⚡ Produce 20 Variations in Batch Studio Pro")
         self.btn_w_batch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_w_batch.setStyleSheet("background: #faf5ff; color: #7c3aed; font-weight: 700; border: 1px solid #d8b4fe; padding: 10px; border-radius: 8px;")
         self.btn_w_batch.clicked.connect(self._emit_open_batch)

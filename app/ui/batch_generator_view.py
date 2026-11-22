@@ -869,7 +869,7 @@ class BatchGeneratorView(QWidget):
         self.selected_song = None
         self.worker = None
 
-        self.current_lang = "Both"
+        self.current_lang = "English"
         self.current_count = 20
         self.current_vocal = "Mixed"
         self.current_persona = "Natural Studio Vocal"
@@ -1237,18 +1237,18 @@ class BatchGeneratorView(QWidget):
         quick_layout.setSpacing(6)
 
         # ── 1. SONG THEME / MOOD ──
-        self.lbl_s1 = QLabel("🎵 1. THEME & MOOD • ប្រធានបទ")
+        self.lbl_s1 = QLabel("🎵 1. THEME & STYLE")
         self.lbl_s1.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
         quick_layout.addWidget(self.lbl_s1)
 
-        self.txt_theme = QTextEdit("sad song")
-        self.txt_theme.setPlaceholderText("ឧទាហរណ៍: sad song, heartbreak, midnight drive, ស្រណោះស្រណោក...")
+        self.txt_theme = QTextEdit("bittersweet heartbreak, late night drive")
+        self.txt_theme.setPlaceholderText("Example: sad song, heartbreak, midnight city drive, neon lights...")
         self.txt_theme.setFixedHeight(32)
         self.txt_theme.setStyleSheet("padding: 3px 6px; font-size: 11px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #f1f5f9;")
         quick_layout.addWidget(self.txt_theme)
 
         # 🎲 Anti-Cliché Concept Matrix Shuffler
-        self.btn_roll_concept = QPushButton("🎲 Shuffler: គំនិតថ្មីប្លែក (Anti-Cliché Metaphor)")
+        self.btn_roll_concept = QPushButton("🎲 Shuffler: Fresh Concept (Anti-Cliché Metaphor)")
         self.btn_roll_concept.setFixedHeight(26)
         self.btn_roll_concept.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_roll_concept.setToolTip("🎲 Dynamic Concept, Metaphor & Sensory Object Matrix:\nShuffles an unexpected atmosphere, tangible sensory anchor, and deep emotional conflict to guarantee 100% original, non-repetitive lyrics!")
@@ -1287,15 +1287,15 @@ class BatchGeneratorView(QWidget):
             quick_layout.addLayout(t_row)
 
         # ── 2. LYRICS LANGUAGE PILLS ──
-        self.lbl_s4 = QLabel("🌐 2. LYRICS LANGUAGE • ភាសា")
+        self.lbl_s4 = QLabel("🌐 2. LYRIC LANGUAGE")
         self.lbl_s4.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
         quick_layout.addWidget(self.lbl_s4)
 
         self.lang_buttons = {}
         langs_def_rows = [
             [
-                ("Khmer", "🇰🇭 ខ្មែរ", "បង្កើតបទចម្រៀងជាភាសាខ្មែរ ១០០% (Classical meters, Golden Era & Folk)"),
                 ("English", "🇬🇧 English", "Create 100% English songs (Billboard, Slant Rhymes & Conversational)"),
+                ("Khmer", "🇰🇭 Khmer", "Create 100% Khmer songs (Classical meters, Golden Era & Folk)"),
                 ("Both", "🌟 50/50 Fusion", "Bilingual crossover: Authentic Khmer verses + English chorus anthem")
             ],
             [
@@ -1320,14 +1320,14 @@ class BatchGeneratorView(QWidget):
             quick_layout.addLayout(l_row)
 
         # ── 3. VOCAL TYPE CHIPS ──
-        self.lbl_s5 = QLabel("🎙️ 3. VOCAL FILTER • សំឡេង")
+        self.lbl_s5 = QLabel("🎙️ 3. VOCAL DELIVERY")
         self.lbl_s5.setStyleSheet("font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px;")
         quick_layout.addWidget(self.lbl_s5)
 
         self.vocal_buttons = {}
         for row_vocs in [
-            [("Mixed", "🎙️ ទាំងអស់ (Mixed)"), ("Male", "👨 ប្រុស (Male)")],
-            [("Female", "👩 ស្រី (Female)"), ("Duet", "👥 ឆ្លើយឆ្លង (Duet)")]
+            [("Mixed", "🎙️ All (Mixed)"), ("Male", "👨 Male Solo")],
+            [("Female", "👩 Female Solo"), ("Duet", "👥 Duet / Dialogue")]
         ]:
             v_row = QHBoxLayout()
             v_row.setSpacing(4)
@@ -1349,12 +1349,12 @@ class BatchGeneratorView(QWidget):
 
         c_box = QVBoxLayout()
         c_box.setSpacing(2)
-        self.lbl_count = QLabel("ចំនួនបទ (Count):")
+        self.lbl_count = QLabel("Count:")
         self.lbl_count.setStyleSheet("font-size: 9.5px; font-weight: 700; color: #94a3b8;")
         c_box.addWidget(self.lbl_count)
         self.combo_count = QComboBox()
-        self.combo_count.addItems(["5 បទ", "10 បទ", "15 បទ", "20 បទ", "30 បទ"])
-        self.combo_count.setCurrentText("20 បទ")
+        self.combo_count.addItems(["5 Songs", "10 Songs", "15 Songs", "20 Songs", "30 Songs"])
+        self.combo_count.setCurrentText("20 Songs")
         self.combo_count.setFixedHeight(26)
         self.combo_count.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #a78bfa;")
         self.combo_count.currentTextChanged.connect(self._on_count_changed)
@@ -1562,7 +1562,7 @@ class BatchGeneratorView(QWidget):
 
         # ── PINNED BOTTOM ACTION FOOTER (ALWAYS VISIBLE AT 768p+) ──
         # ── PRIMARY ACTION BUTTON (TURBO) ──
-        self.btn_generate_batch = QPushButton("⚡ បង្កើតបទចម្រៀងថ្មី (Turbo Engine)")
+        self.btn_generate_batch = QPushButton("⚡ Generate 20 Songs (Turbo Engine)")
         self.btn_generate_batch.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_generate_batch.setFixedHeight(34)
         self.btn_generate_batch.setStyleSheet("""
@@ -1610,8 +1610,8 @@ class BatchGeneratorView(QWidget):
         sub_act_row = QHBoxLayout()
         sub_act_row.setSpacing(4)
 
-        self.btn_append = QPushButton("+ ថែម")
-        self.btn_append.setToolTip("បង្កើតបទចម្រៀងបន្ថែម (Append more tracks)")
+        self.btn_append = QPushButton("+ Add More")
+        self.btn_append.setToolTip("Generate and append more tracks to the current batch")
         self.btn_append.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_append.setFixedHeight(26)
         self.btn_append.setStyleSheet(self._btn_sub())
@@ -1635,7 +1635,7 @@ class BatchGeneratorView(QWidget):
         sub_act_row.addWidget(self.btn_save_all, 1)
 
         self.btn_clear_sidebar = QPushButton("🗑️ Clear")
-        self.btn_clear_sidebar.setToolTip("សម្អាតបទចម្រៀងទាំងអស់ចេញពី Grid")
+        self.btn_clear_sidebar.setToolTip("Clear all songs from the batch grid")
         self.btn_clear_sidebar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear_sidebar.setFixedHeight(26)
         self.btn_clear_sidebar.setStyleSheet(self._btn_clear_style())
@@ -1645,7 +1645,7 @@ class BatchGeneratorView(QWidget):
         left_container_layout.addLayout(sub_act_row)
 
         # Bottom Counter / Status
-        self.lbl_batch_stat = QLabel("សរុប 20 បទ (Khmer + EN)... ស្អាត Copy បានភ្លាមៗ")
+        self.lbl_batch_stat = QLabel("Total 20 Songs... Ready to Copy / Suno")
         self.lbl_batch_stat.setFixedHeight(22)
         self.lbl_batch_stat.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_batch_stat.setStyleSheet("color: #34d399; font-size: 10px; font-weight: 700; background: #064e3b; border-radius: 4px;")
@@ -1851,7 +1851,7 @@ class BatchGeneratorView(QWidget):
 
         # Quick Search Bar for instant filtering by title, genre, bpm, or lyrics
         self.txt_grid_search = QLineEdit()
-        self.txt_grid_search.setPlaceholderText("🔍 ស្វែងរក... (Search)")
+        self.txt_grid_search.setPlaceholderText("🔍 Search tracks...")
         self.txt_grid_search.setClearButtonEnabled(True)
         self.txt_grid_search.setMinimumWidth(95)
         self.txt_grid_search.setMaximumWidth(200)
@@ -2214,25 +2214,25 @@ class BatchGeneratorView(QWidget):
         if hasattr(self, "lbl_s1"):
             if mode_key == "English":
                 self.lbl_s1.setText("🎵 1. THEME & STYLE")
-                self.lbl_s2.setText("📖 2. STORY SEED & BACKSTORY")
-                self.lbl_s3.setText("💎 3. LYRIC ARCHITECTURE & METER")
-                self.lbl_s4.setText("🌐 4. LYRIC LANGUAGE")
-                self.lbl_s5.setText("🎙️ 5. VOCAL DELIVERY")
-                self.lbl_s6.setText("🎼 6. DIVERSITY & ANTI-DUPLICATION")
+                self.lbl_s4.setText("🌐 2. LYRIC LANGUAGE")
+                self.lbl_s5.setText("🎙️ 3. VOCAL DELIVERY")
+                self.lbl_s2.setText("📖 1. STORY SEED & BACKSTORY")
+                self.lbl_s3.setText("💎 2. LYRIC ARCHITECTURE & METER")
+                self.lbl_s6.setText("🎼 3. DIVERSITY & ANTI-DUPLICATION")
             elif mode_key == "Khmer":
                 self.lbl_s1.setText("🎵 1. ប្រធានបទ & អារម្មណ៍")
-                self.lbl_s2.setText("📖 2. ដំណើររឿងបទចម្រៀង")
-                self.lbl_s3.setText("💎 3. ជម្រៅអត្ថន័យ & កាព្យ")
-                self.lbl_s4.setText("🌐 4. ភាសាទំនុកច្រៀង")
-                self.lbl_s5.setText("🎙️ 5. តម្រងសំឡេងច្រៀង")
-                self.lbl_s6.setText("🎼 6. ភាពចម្រុះ និងការពារការជាន់គ្នា")
+                self.lbl_s4.setText("🌐 2. ភាសាទំនុកច្រៀង")
+                self.lbl_s5.setText("🎙️ 3. តម្រងសំឡេងច្រៀង")
+                self.lbl_s2.setText("📖 1. ដំណើររឿងបទចម្រៀង")
+                self.lbl_s3.setText("💎 2. ជម្រៅអត្ថន័យ & កាព្យ")
+                self.lbl_s6.setText("🎼 3. ភាពចម្រុះ និងការពារការជាន់គ្នា")
             else: # Both
-                self.lbl_s1.setText("🎵 1. THEME & MOOD • ប្រធានបទ")
-                self.lbl_s2.setText("📖 2. STORY SEED • ដំណើររឿង")
-                self.lbl_s3.setText("💎 3. LYRICAL DEPTH • ជម្រៅអត្ថន័យ")
-                self.lbl_s4.setText("🌐 4. LYRICS LANGUAGE • ភាសា")
-                self.lbl_s5.setText("🎙️ 5. VOCAL FILTER • សំឡេង")
-                self.lbl_s6.setText("🎼 6. DIVERSITY & ANTI-DUPLICATION")
+                self.lbl_s1.setText("🎵 1. THEME & MOOD")
+                self.lbl_s4.setText("🌐 2. LYRIC LANGUAGE")
+                self.lbl_s5.setText("🎙️ 3. VOCAL DELIVERY")
+                self.lbl_s2.setText("📖 1. STORY SEED")
+                self.lbl_s3.setText("💎 2. LYRICAL DEPTH")
+                self.lbl_s6.setText("🎼 3. DIVERSITY & ANTI-DUPLICATION")
 
         # 2. Update Theme Pills
         theme_presets = self.theme_pills_data.get(mode_key, self.theme_pills_data["Both"])
@@ -3576,6 +3576,10 @@ Genre: {next_song.get('genre', '')} ({next_song.get('bpm', '')}, Key: {next_song
                 data = json.load(f)
             songs = data.get("songs", [])
             if not isinstance(songs, list) or len(songs) == 0:
+                return False
+            saved_lang = data.get("language", "")
+            has_favorites = any(s.get("is_favorite", False) for s in songs)
+            if saved_lang != self.current_lang and not has_favorites:
                 return False
             saved_theme = data.get("theme", "")
             if saved_theme and hasattr(self, "txt_theme"):

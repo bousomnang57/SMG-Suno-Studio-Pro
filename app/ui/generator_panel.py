@@ -57,18 +57,18 @@ class GeneratorPanel(QWidget):
         p_layout.setContentsMargins(0, 0, 0, 0)
         p_layout.setSpacing(2)
 
-        lbl_p = QLabel("⚡ 1-CLICK FORMULA • រូបមន្តសម្រេច")
+        lbl_p = QLabel("⚡ 1-CLICK HIT PRESET")
         lbl_p.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #a5b4fc; letter-spacing: 0.5px;")
         p_layout.addWidget(lbl_p)
 
         self.preset_combo = _setup_combo(QComboBox())
-        self.preset_combo.addItem("— ជ្រើសរើសដោយសេរី (Custom Mode) —", None)
+        self.preset_combo.addItem("— Custom Song Setup —", None)
         for name in ONE_CLICK_PRESETS.keys():
             self.preset_combo.addItem(name, name)
         self.preset_combo.currentTextChanged.connect(self._on_preset_selected)
         p_layout.addWidget(self.preset_combo)
 
-        self.preset_desc = QLabel("ស្វ័យប្រវត្តិកំណត់ Region, Genre, BPM, Structure & Mood")
+        self.preset_desc = QLabel("Auto-configures Region, Genre, BPM, Structure & Mood")
         self.preset_desc.setStyleSheet("color: #64748b; font-size: 8.5px; line-height: 1.1;")
         self.preset_desc.setWordWrap(False)
         p_layout.addWidget(self.preset_desc)
@@ -80,7 +80,7 @@ class GeneratorPanel(QWidget):
         g_layout.setContentsMargins(0, 0, 0, 0)
         g_layout.setSpacing(2)
 
-        lbl_g = QLabel("🌍 1. STYLE & GENRE • តំបន់ & ចង្វាក់")
+        lbl_g = QLabel("🌍 1. STYLE & GENRE")
         lbl_g.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #38bdf8; letter-spacing: 0.5px;")
         g_layout.addWidget(lbl_g)
 
@@ -128,7 +128,7 @@ class GeneratorPanel(QWidget):
         l_layout.setContentsMargins(0, 0, 0, 0)
         l_layout.setSpacing(2)
 
-        lbl_l = QLabel("🗣️ 2. CADENCE & LANGUAGE • ភាសា")
+        lbl_l = QLabel("🗣️ 2. CADENCE & LANGUAGE")
         lbl_l.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #c084fc; letter-spacing: 0.5px;")
         l_layout.addWidget(lbl_l)
 
@@ -158,9 +158,10 @@ class GeneratorPanel(QWidget):
         self.concept_group = QFrame()
         c_layout = QVBoxLayout(self.concept_group)
         c_layout.setContentsMargins(0, 0, 0, 0)
-        c_layout.setSpacing(2)
+        c_layout.setSpacing(3)
+        c_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        lbl_c = QLabel("📖 3. STRUCTURE & MOOD • គ្រោង & រឿង")
+        lbl_c = QLabel("📖 3. STRUCTURE & MOOD")
         lbl_c.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #34d399; letter-spacing: 0.5px;")
         c_layout.addWidget(lbl_c)
 
@@ -182,8 +183,10 @@ class GeneratorPanel(QWidget):
 
         self.custom_notes = QTextEdit()
         self.custom_notes.setPlaceholderText("Custom story notes, phrases, artist vibes...")
-        self.custom_notes.setFixedHeight(28)
+        self.custom_notes.setFixedHeight(32)
         c_layout.addWidget(self.custom_notes)
+        for grp in [self.preset_group, self.genre_group, self.lang_group, self.concept_group]:
+            grp.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         layout.addWidget(self.concept_group)
 
         # ── Section 4: Primary Actions ──
@@ -401,7 +404,7 @@ class GeneratorPanel(QWidget):
 
     def _on_preset_selected(self, preset_name: str):
         if not preset_name or preset_name.startswith("—"):
-            self.preset_desc.setText("ជ្រើសរើសទម្រង់ខាងលើ ប្រព័ន្ធនឹងកំណត់ស្វ័យប្រវត្តិ។")
+            self.preset_desc.setText("Auto-configures Region, Genre, BPM, Structure & Mood")
             return
 
         preset = ONE_CLICK_PRESETS.get(preset_name)

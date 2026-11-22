@@ -153,7 +153,7 @@ class VisualStudioView(QWidget):
 
         # Main Title Header
         header_row = QHBoxLayout()
-        self.title_lbl = QLabel("🎨 Visual Arranger & Sound Designer (ស្ទូឌីយោច្នៃបទ)")
+        self.title_lbl = QLabel("🎨 Visual Arranger & Sound Designer")
         self.title_lbl.setStyleSheet("font-size: 18px; font-weight: 800; color: #1e293b;")
         header_row.addWidget(self.title_lbl)
         header_row.addStretch()
@@ -166,25 +166,25 @@ class VisualStudioView(QWidget):
         tab_layout.setContentsMargins(4, 4, 4, 4)
         tab_layout.setSpacing(6)
 
-        self.btn_tab_explore = QPushButton("🔍 ស្វែងរក (Explore)")
-        self.btn_tab_explore.setCheckable(True)
-        self.btn_tab_explore.setChecked(False)
-        self.btn_tab_explore.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_tab_explore.clicked.connect(lambda: self._switch_tab(0))
-
-        self.btn_tab_khmer = QPushButton("🇰🇭 តន្ត្រីខ្មែរ (Khmer Music)")
-        self.btn_tab_khmer.setCheckable(True)
-        self.btn_tab_khmer.setChecked(False)
-        self.btn_tab_khmer.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_tab_khmer.clicked.connect(lambda: self._switch_tab(1))
-
-        self.btn_tab_english = QPushButton("🌟 បទអង់គ្លេស (Billboard Hits)")
+        self.btn_tab_english = QPushButton("🌟 English Hits (Billboard)")
         self.btn_tab_english.setCheckable(True)
         self.btn_tab_english.setChecked(True)
         self.btn_tab_english.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_tab_english.clicked.connect(lambda: self._switch_tab(2))
 
-        for btn in [self.btn_tab_explore, self.btn_tab_khmer, self.btn_tab_english]:
+        self.btn_tab_explore = QPushButton("🔍 Explore Genres")
+        self.btn_tab_explore.setCheckable(True)
+        self.btn_tab_explore.setChecked(False)
+        self.btn_tab_explore.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_tab_explore.clicked.connect(lambda: self._switch_tab(0))
+
+        self.btn_tab_khmer = QPushButton("🇰🇭 World && Khmer Studio")
+        self.btn_tab_khmer.setCheckable(True)
+        self.btn_tab_khmer.setChecked(False)
+        self.btn_tab_khmer.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_tab_khmer.clicked.connect(lambda: self._switch_tab(1))
+
+        for btn in [self.btn_tab_english, self.btn_tab_explore, self.btn_tab_khmer]:
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
@@ -269,9 +269,9 @@ class VisualStudioView(QWidget):
         summary_row = QHBoxLayout()
         summary_row.setSpacing(8)
 
-        card1 = self._make_info_card("ស្វែងរកចង្វាក់", "រចនាបថពេញនិយម និងអារម្មណ៍ថ្មីៗ")
-        card2 = self._make_info_card("គំនិតអាល់ប៊ុម", "ច្នៃលក្ខណៈ ១០ គំរូសម្រាប់អាល់ប៊ុម")
-        card3 = self._make_info_card("ផែនការចេញបទ", "រៀបចំយុទ្ធសាស្ត្រចេញបទចម្រៀង")
+        card1 = self._make_info_card("Genre Explorer", "30+ trending production styles & sonic palettes")
+        card2 = self._make_info_card("Instant Chords", "Auto-matched harmonic progressions & BPM")
+        card3 = self._make_info_card("Suno v6 Ready", "1-click style prompt & section tag builder")
         summary_row.addWidget(card1)
         summary_row.addWidget(card2)
         summary_row.addWidget(card3)
@@ -279,13 +279,13 @@ class VisualStudioView(QWidget):
 
         # Genre Title
         g_head = QHBoxLayout()
-        self.lbl_g_head = QLabel("📈 ស្វែងរកចង្វាក់តន្ត្រីពិភពលោក (Global Genres)")
+        self.lbl_g_head = QLabel("📈 Explore Global Music Genres")
         self.lbl_g_head.setStyleSheet("font-size: 14px; font-weight: 700; color: #1e293b;")
         g_head.addWidget(self.lbl_g_head)
         g_head.addStretch()
         layout.addLayout(g_head)
 
-        self.sub_g = QLabel("មិនទាន់មានគំនិត? ជ្រើសរើសប្រភេទមួយ ប្រព័ន្ធនឹងរៀបចំ Style Prompt និង Chords ដោយស្វ័យប្រវត្តិ។")
+        self.sub_g = QLabel("Click any genre tile below to automatically configure your Suno Style Prompt, tempo, instruments, and chord progression.")
         self.sub_g.setStyleSheet("color: #64748b; font-size: 11.5px;")
         layout.addWidget(self.sub_g)
 
@@ -331,7 +331,7 @@ class VisualStudioView(QWidget):
         b_layout = QVBoxLayout(self.bottom_box)
         b_layout.setSpacing(6)
 
-        b_layout.addWidget(QLabel("ភាសាបទចម្រៀង (Song Language):"))
+        b_layout.addWidget(QLabel("Song Language:"))
         self.lang_picker = QComboBox()
         for l in LANGUAGES:
             self.lang_picker.addItem(f"{l['name']} ({l['native']})", l["name"])
@@ -339,9 +339,9 @@ class VisualStudioView(QWidget):
         self.lang_picker.currentIndexChanged.connect(lambda _: self._on_lang_changed())
         b_layout.addWidget(self.lang_picker)
 
-        b_layout.addWidget(QLabel("គំនិតរបស់អ្នក (ស្រេចចិត្ត):"))
+        b_layout.addWidget(QLabel("Custom Song Concept (Optional):"))
         self.explore_idea_input = QTextEdit()
-        self.explore_idea_input.setPlaceholderText("បញ្ចូលប្រធានបទ គំនិត ឬឃ្លាដែលអ្នកចង់ឱ្យមានក្នុងបទ...")
+        self.explore_idea_input.setPlaceholderText("Enter a song topic, storyline, or key lyric phrase...")
         self.explore_idea_input.setMaximumHeight(55)
         self.explore_idea_input.setStyleSheet("border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px; font-size: 11px;")
         b_layout.addWidget(self.explore_idea_input)
@@ -373,19 +373,19 @@ class VisualStudioView(QWidget):
 
         # Header with Randomize button
         top_bar = QHBoxLayout()
-        self.khmer_title = QLabel("🇰🇭 តន្ត្រីខ្មែរ (Khmer Music Studio)")
+        self.khmer_title = QLabel("🇰🇭 World & Khmer Heritage Music Studio")
         self.khmer_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #1e293b;")
         top_bar.addWidget(self.khmer_title)
         top_bar.addStretch()
 
-        self.btn_random_khmer = QPushButton("🎲 Auto-Pick Khmer (ចៃដន្យ)")
+        self.btn_random_khmer = QPushButton("🎲 Auto-Pick Khmer Preset")
         self.btn_random_khmer.setStyleSheet("background-color: #f1f5f9; color: #2563eb; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 12px; font-size: 11px;")
         self.btn_random_khmer.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_random_khmer.clicked.connect(self._auto_randomize_khmer)
         top_bar.addWidget(self.btn_random_khmer)
         layout.addLayout(top_bar)
 
-        self.sub_text_khmer = QLabel("គ្មានគំនិត? ចុចលើសាច់រឿង និងឧបករណ៍ភ្លេងខាងក្រោម — ប្រព័ន្ធនឹងរៀបចំ Style Prompt និង Chord Progression ដោយស្វ័យប្រវត្តិ!")
+        self.sub_text_khmer = QLabel("Pick a traditional or modern Khmer storyline and instrument palette — automatically configures your Style Prompt and chords.")
         self.sub_text_khmer.setStyleSheet("color: #64748b; font-size: 11.5px;")
         layout.addWidget(self.sub_text_khmer)
 
@@ -395,23 +395,23 @@ class VisualStudioView(QWidget):
         s_layout = QVBoxLayout(self.khmer_story_box)
         s_layout.setSpacing(8)
 
-        s_title = QLabel("❶ សាច់រឿងខ្មែរ (បទនេះនិយាយពីអ្វី?)")
+        s_title = QLabel("❶ Storylines & Themes")
         s_title.setStyleSheet("font-weight: 700; color: #1e293b; font-size: 12.5px;")
         s_layout.addWidget(s_title)
 
-        s_layout.addWidget(QLabel("រឿងស្នេហា • Love Stories:"))
+        s_layout.addWidget(QLabel("Love & Romance:"))
         s_layout.addWidget(self._create_pills_flow(
             KHMER_STUDIO_TAGS["storylines"]["love_stories"],
             lambda item: self._on_story_pill_clicked(item)
         ))
 
-        s_layout.addWidget(QLabel("ជីវិត និងគ្រួសារ • Life & Family:"))
+        s_layout.addWidget(QLabel("Life, Heritage & Family:"))
         s_layout.addWidget(self._create_pills_flow(
             KHMER_STUDIO_TAGS["storylines"]["life_and_family"],
             lambda item: self._on_story_pill_clicked(item)
         ))
 
-        s_layout.addWidget(QLabel("ពិធីបុណ្យ • Festivals & Occasions:"))
+        s_layout.addWidget(QLabel("Festivals & Celebrations:"))
         s_layout.addWidget(self._create_pills_flow(
             KHMER_STUDIO_TAGS["storylines"]["festivals_and_occasions"],
             lambda item: self._on_story_pill_clicked(item)
@@ -424,7 +424,7 @@ class VisualStudioView(QWidget):
         i_layout = QVBoxLayout(self.khmer_inst_box)
         i_layout.setSpacing(8)
 
-        i_title = QLabel("❷ សំឡេងភ្លេង និងឧបករណ៍បុរាណ-សម័យ (Sound Design & Instruments)")
+        i_title = QLabel("❷ Traditional & Modern Sound Design & Instruments")
         i_title.setStyleSheet("font-weight: 700; color: #1e293b; font-size: 12.5px;")
         i_layout.addWidget(i_title)
 
@@ -485,19 +485,19 @@ class VisualStudioView(QWidget):
 
         # Header with Randomize button
         top_bar = QHBoxLayout()
-        self.en_title = QLabel("🌟 បទអង់គ្លេសលំដាប់ពិភពលោក (English Hits Studio)")
+        self.en_title = QLabel("🌟 English Hits Studio (Billboard & Streaming)")
         self.en_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #1e293b;")
         top_bar.addWidget(self.en_title)
         top_bar.addStretch()
 
-        self.btn_random_en = QPushButton("🎲 Auto-Pick Hit (ចៃដន្យ)")
+        self.btn_random_en = QPushButton("🎲 Auto-Pick Hit Formula")
         self.btn_random_en.setStyleSheet("background-color: #eff6ff; color: #2563eb; font-weight: 700; border: 1px solid #bfdbfe; border-radius: 6px; padding: 5px 12px; font-size: 11px;")
         self.btn_random_en.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_random_en.clicked.connect(self._auto_randomize_english)
         top_bar.addWidget(self.btn_random_en)
         layout.addLayout(top_bar)
 
-        self.sub_text_en = QLabel("ជ្រើសរើសរចនាបថតន្ត្រី Billboard (Max Martin, Taylor Swift, Billie Eilish, Coldplay, Adele) និងសាច់រឿង — ប្រព័ន្ធនឹងរៀបចំ Style Prompt សម្រាប់ Suno/Udio ភ្លាមៗ!")
+        self.sub_text_en = QLabel("Select a chart-ready Billboard production style (Max Martin, Taylor Swift, Billie Eilish, The Weeknd, Coldplay, Adele) and song theme — automatically builds your Suno/Udio prompt and chord progression.")
         self.sub_text_en.setStyleSheet("color: #64748b; font-size: 11.5px; line-height: 1.3;")
         self.sub_text_en.setWordWrap(True)
         layout.addWidget(self.sub_text_en)
@@ -508,7 +508,7 @@ class VisualStudioView(QWidget):
         st_layout = QVBoxLayout(self.english_style_box)
         st_layout.setSpacing(8)
 
-        self.st_title = QLabel("❶ រចនាបថតន្ត្រីពេញនិយម (Billboard & Streaming Sound Design)")
+        self.st_title = QLabel("❶ Billboard & Streaming Sound Design")
         self.st_title.setStyleSheet("font-weight: 800; color: #1e293b; font-size: 12.5px;")
         st_layout.addWidget(self.st_title)
 
@@ -556,7 +556,7 @@ class VisualStudioView(QWidget):
         s_layout = QVBoxLayout(self.english_story_box)
         s_layout.setSpacing(8)
 
-        self.s_title = QLabel("❷ សាច់រឿងភាសាអង់គ្លេស (Song Themes & Emotional Stories)")
+        self.s_title = QLabel("❷ Song Themes & Emotional Storylines")
         self.s_title.setStyleSheet("font-weight: 800; color: #1e293b; font-size: 12.5px;")
         s_layout.addWidget(self.s_title)
 
@@ -583,7 +583,7 @@ class VisualStudioView(QWidget):
         m_layout = QVBoxLayout(self.english_mod_box)
         m_layout.setSpacing(8)
 
-        self.m_title = QLabel("❸ ប៊ូតុងបន្ថែម Tag ពិសេស (Suno / Udio One-Click Vocal & Sound Tags)")
+        self.m_title = QLabel("❸ Suno / Udio One-Click Vocal & Production Tags")
         self.m_title.setStyleSheet("font-weight: 800; color: #1e293b; font-size: 12.5px;")
         m_layout.addWidget(self.m_title)
 
@@ -677,7 +677,7 @@ class VisualStudioView(QWidget):
 
         # Header with Pro Auditor Status (Pinned Top)
         h_row = QHBoxLayout()
-        self.lbl_formula_title = QLabel("✨ រូបមន្តបទរបស់អ្នក")
+        self.lbl_formula_title = QLabel("✨ Live Song Formula")
         self.lbl_formula_title.setStyleSheet("font-size: 13.5px; font-weight: 800; color: #1e293b; border: none; background: transparent;")
         h_row.addWidget(self.lbl_formula_title)
         h_row.addStretch()
@@ -714,7 +714,7 @@ class VisualStudioView(QWidget):
         p_layout.setContentsMargins(3, 3, 3, 3)
         p_layout.setSpacing(3)
 
-        self.lbl_presets_head = QLabel("⚡ Master Presets (ចុច ១ ដង):")
+        self.lbl_presets_head = QLabel("⚡ 1-Click Master Presets:")
         self.lbl_presets_head.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #475569;")
         p_layout.addWidget(self.lbl_presets_head)
 
@@ -948,7 +948,7 @@ class VisualStudioView(QWidget):
         m_inner.setSpacing(4)
 
         m_header = QHBoxLayout()
-        self.lbl_macro = QLabel("🏷️ ស្លាកផ្នែកបទ (Section Metatags):")
+        self.lbl_macro = QLabel("🏷️ Section Metatags:")
         self.lbl_macro.setStyleSheet("font-weight: 700; font-size: 10px; color: #1e293b;")
         m_header.addWidget(self.lbl_macro)
         m_header.addStretch()
@@ -993,7 +993,7 @@ class VisualStudioView(QWidget):
 
         m_inner.addWidget(macro_flow)
 
-        self.btn_copy_template = QPushButton("📋 ចម្លងទម្រង់បទ Suno (Copy Template)")
+        self.btn_copy_template = QPushButton("📋 Copy Suno Section Template")
         self.btn_copy_template.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_copy_template.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #86efac; border-radius: 4px; padding: 4px 6px; font-size: 10px; font-weight: 700;")
         self.btn_copy_template.clicked.connect(self._copy_suno_lyric_template)
@@ -1042,18 +1042,20 @@ class VisualStudioView(QWidget):
 
         # ── Pinned Footer: Negative Styles + Generate + Quick Export (Always Visible) ──
         neg_row = QHBoxLayout()
-        neg_row.setSpacing(4)
-        self.lbl_neg_head = QLabel("Neg:")
+        neg_row.setContentsMargins(0, 2, 0, 2)
+        neg_row.setSpacing(6)
+        self.lbl_neg_head = QLabel("Exclude:")
         self.lbl_neg_head.setStyleSheet("font-weight: 700; font-size: 10px; color: #475569; border: none; background: transparent;")
         neg_row.addWidget(self.lbl_neg_head)
 
         self.txt_negative = QLineEdit("low quality, noisy mixing, distorted, harsh screaming, clipping, muddy bass")
+        self.txt_negative.setFixedHeight(24)
         self.txt_negative.setStyleSheet("background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 10px; color: #64748b; padding: 2px 6px;")
         neg_row.addWidget(self.txt_negative)
         outer_layout.addLayout(neg_row)
 
         # Primary Generate Button (dynamically updated text)
-        self.btn_generate = QPushButton("✨ បង្កើតបទចម្រៀង (Generate Lyrics)")
+        self.btn_generate = QPushButton("✨ Generate English Lyrics")
         self.btn_generate.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_generate.setFixedHeight(34)
         self.btn_generate.setStyleSheet("""
@@ -1077,7 +1079,7 @@ class VisualStudioView(QWidget):
         action_row = QHBoxLayout()
         action_row.setSpacing(4)
 
-        self.btn_demo = QPushButton("🎵 បទគំរូ")
+        self.btn_demo = QPushButton("🎵 Demo Song")
         self.btn_demo.setStyleSheet("background-color: #f1f5f9; color: #2563eb; border: 1px solid #cbd5e1; border-radius: 5px; padding: 5px; font-size: 10.5px; font-weight: 600;")
         self.btn_demo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_demo.clicked.connect(self._emit_demo)
@@ -1568,11 +1570,11 @@ We only stop when the race is won!
         # Update dynamic generate button text
         if hasattr(self, "btn_generate"):
             if "English" in self.current_language:
-                self.btn_generate.setText("✨ បង្កើតបទអង់គ្លេស (Generate English)")
+                self.btn_generate.setText("✨ Generate English Lyrics")
             elif "Khmer" in self.current_language:
-                self.btn_generate.setText("✨ បង្កើតបទខ្មែរ (Generate Khmer)")
+                self.btn_generate.setText("✨ Generate Khmer Lyrics")
             else:
-                self.btn_generate.setText(f"✨ បង្កើតបទ ({self.current_language[:10]})")
+                self.btn_generate.setText(f"✨ Generate Lyrics ({self.current_language[:12]})")
 
     def _on_prompt_text_changed(self):
         char_count = len(self.txt_suno_prompt.toPlainText().strip())

@@ -310,13 +310,13 @@ class EditorPanel(QWidget):
         deck_tabs_row = QHBoxLayout()
         deck_tabs_row.setSpacing(4)
 
-        self.btn_sub_tags = QPushButton("🏷️ Tags & Chords")
+        self.btn_sub_tags = QPushButton("🏷️ Tags && Chords")
         self.btn_sub_tags.setCheckable(True)
         self.btn_sub_tags.setChecked(True)
         self.btn_sub_tags.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_sub_tags.clicked.connect(lambda: self._switch_tool_deck(0))
 
-        self.btn_sub_audio = QPushButton("🥁 Tempo & Audio")
+        self.btn_sub_audio = QPushButton("🥁 Tempo && Audio")
         self.btn_sub_audio.setCheckable(True)
         self.btn_sub_audio.setChecked(False)
         self.btn_sub_audio.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -465,10 +465,10 @@ class EditorPanel(QWidget):
         sec_layout.setContentsMargins(2, 2, 2, 2)
         sec_layout.setSpacing(3)
 
-        # Khmer Poetic Section Tags Dropdown
-        self.btn_khmer_tags = QPushButton("🇰🇭 ខ្មែរ ▾")
+        # Khmer Poetic Section Tags Dropdown (Clean English label)
+        self.btn_khmer_tags = QPushButton("🇰🇭 KH Tags ▾")
         self.btn_khmer_tags.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_khmer_tags.setToolTip("Authentic Khmer Section Metatags (ស្លាកផ្នែកកំណាព្យ និងបទខ្មែរ)")
+        self.btn_khmer_tags.setToolTip("Insert Khmer Section Metatags (Optional bilingual/Khmer section tags)")
         self.btn_khmer_tags.setStyleSheet("background-color: #fdf2f8; color: #be185d; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #fbcfe8;")
         kh_menu = QMenu(self)
         kh_menu.setStyleSheet("background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 4px;")
