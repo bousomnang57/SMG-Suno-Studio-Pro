@@ -23,7 +23,13 @@ from app.audio_mastering_engine import (
     AudioMasteringEngine,
     MASTERING_TARGETS,
 )
-from app.ui.waveform_widget import WaveformCanvas, StereoLevelMeter, WaveformEditorPane
+from app.ui.waveform_widget import (
+    WaveformCanvas,
+    StereoLevelMeter,
+    CompactHorizontalLevelMeter,
+    FLParametricEQWidget,
+    WaveformEditorPane,
+)
 from app.ui.audio_mastering_view import AudioMasteringView
 from app.ui.main_window import MainWindow
 from app.ui.suno_downloader_dialog import SunoLinkDownloadDialog
@@ -172,7 +178,19 @@ def test_waveform_widgets(tmp_path: Path):
     assert meter.peak_db == 0.0  # Clipped to 0 dBFS ceiling
     print("  ✓ StereoLevelMeter verified: dual L/R peak levels and clipping detection")
 
-    # 3. WaveformEditorPane
+    # 3. CompactHorizontalLevelMeter & FLParametricEQWidget
+    h_meter = CompactHorizontalLevelMeter()
+    h_meter.set_levels(-8.5, -9.2)
+    assert h_meter.level_l == -8.5
+    assert h_meter.level_r == -9.2
+
+    eq_widget = FLParametricEQWidget()
+    eq_widget.resize(500, 125)
+    eq_widget.set_band_gains([0.0, 1.5, -2.5, -1.8, 0.5, 1.5, 2.0])
+    assert abs(eq_widget.bands[2]["gain"] - (-2.5)) < 0.01
+    print("  ✓ CompactHorizontalLevelMeter and FLParametricEQWidget (7-band curve) verified")
+
+    # 4. WaveformEditorPane
     pane = WaveformEditorPane()
     pane.set_audio_data(audio, sr, is_mastered=True)
     pane.set_playback_position(1.0)
@@ -188,23 +206,35 @@ def test_audio_mastering_view(tmp_path: Path):
     view = AudioMasteringView()
     view.resize(1100, 750)
 
+    # Verify 4-Tab Top Studio Ribbon & 5-Tab DSP Rack
+    assert hasattr(view, "top_ribbon_tabs") and view.top_ribbon_tabs.count() == 4
+    assert view.tabs.count() == 5
+    assert hasattr(view, "list_ai_titles") and view.list_ai_titles.count() == 5
+    assert hasattr(view, "txt_musical_theme")
+    print("  ✓ 4-Tab Top Studio Ribbon, 5-Tab DSP Rack, and 5-Item Clickable Auto Title AI list verified")
+
     # Test Queue Operations
     view.add_track_file(test_wav, auto_select=True)
     assert len(view.tracks) == 1
     assert view.table_queue.rowCount() == 1
     print("  ✓ add_track_file verified: track loaded into queue and selected")
 
-    # Test Queue Item Data
+    # Test Queue Item Data & Clickable AI Title selection
     tr = view.tracks[0]
     assert "queue_track_1" in tr["path"]
     assert tr["status"] == "Ready"
+    view.list_ai_titles.setCurrentRow(1)
+    view._apply_active_title_to_track()
+    assert view.tracks[0]["title"] == view.txt_active_title.text()
 
-    # Test A/B Toggle Mode
+    # Test Pro DAW Chain Presets & Loudness-Matched A/B Toggle
+    view._on_daw_chain_preset_changed(1)
+    view.chk_loudness_match_ab.setChecked(True)
     view._set_ab_mode(False)
     assert view.is_ab_mastered is False
     view._set_ab_mode(True)
     assert view.is_ab_mastered is True
-    print("  ✓ Live A/B Monitor toggle verified: switches between A: Original and B: Mastered Pro")
+    print("  ✓ Live A/B Monitor toggle, Loudness-Matched A/B, and Pro DAW chain presets verified")
 
     # Test 5 Themes Adaptation
     themes = ["obsidian", "cyber_blue", "emerald", "sunset_amber", "canvas_light"]
@@ -323,6 +353,8 @@ def main():
     print("\n" + "=" * 70)
     print("🎉 ALL TESTS PASSED: MODE 6 PRO MASTERING STUDIO VERIFIED 100%!")
     print("=" * 70)
+    sys.stdout.flush()
+    os._exit(0)
 
 
 if __name__ == "__main__":

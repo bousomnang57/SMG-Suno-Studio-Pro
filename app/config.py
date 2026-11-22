@@ -37,7 +37,7 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Application Metadata & Versioning
 APP_NAME = "SMG Suno Studio Pro"
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.4.0"
 APP_TITLE = f"{APP_NAME} v{APP_VERSION}"
 DEFAULT_UPDATE_URL = "https://raw.githubusercontent.com/bousomnang57/SMG-Suno-Studio-Pro/main/version.json"
 

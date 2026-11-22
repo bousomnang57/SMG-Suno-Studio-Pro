@@ -579,7 +579,7 @@ class MainWindow(QMainWindow):
         self.btn_mode_master.clicked.connect(lambda: self._set_studio_mode(6))
 
         for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
-            btn.setFixedWidth(64)
+            btn.setFixedWidth(70)
             btn.setFixedHeight(28)
             mb_layout.addWidget(btn)
 
