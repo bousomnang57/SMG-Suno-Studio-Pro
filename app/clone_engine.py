@@ -21,49 +21,9 @@ from typing import Dict, Any, List
 from app.syllable_meter import count_line_syllables
 
 ARTIST_PERSONAS: Dict[str, Dict[str, str]] = {
-    "SINN_SISAMOUTH": {
-        "id": "SINN_SISAMOUTH",
-        "name": "🇰🇭 Sinn Sisamouth (អធិរាជសំនៀងមាស)",
-        "tag": "Khmer Golden Era 60s Poetic Sentimental",
-        "instruments": "Acoustic nylon guitar, Tro Ou, Takhe, nostalgic strings, vintage warm tube saturation",
-        "vocal_tone": "Sentimental golden era vibrato, deep nostalgic longing, poetic Khmer metaphors",
-        "bpm": 74,
-        "key": "G Major",
-        "prompt_vibe": (
-            "Write in the authentic poetic genius of Sinn Sisamouth (អធិរាជសំនៀងមាស ស៊ីន ស៊ីសាមុត). "
-            "Use evocative natural imagery (champa blossoms, gentle meandering rivers, moonlight over the forest), "
-            "classic Khmer rhyming couplets (ពាក្យ៧ ឬ កាកគតិ), and heart-melting romantic sorrow."
-        )
-    },
-    "VANNDA": {
-        "id": "VANNDA",
-        "name": "🇰🇭 Vannda (វណ្ណដា - Heritage Trap)",
-        "tag": "Khmer Traditional Roots & 808 Trap",
-        "instruments": "Heavy sliding 808 sub bass, rapid rolling hi-hats, traditional Khmer flute (Khloy), Chapei Dong Veng plucks",
-        "vocal_tone": "Aggressive rhythmic cadence, melodic trap autotune, multi-syllabic Khmer rhymes, proud cultural grit",
-        "bpm": 138,
-        "key": "E Minor",
-        "prompt_vibe": (
-            "Write in the explosive style of Vannda (វណ្ណដា). Combine ancient Cambodian cultural heritage pride "
-            "with cutting-edge 808 trap cadence, rapid internal rhymes, swaggering wordplay, and cinematic chants."
-        )
-    },
-    "TENA_CHET": {
-        "id": "TENA_CHET",
-        "name": "🇰🇭 Tena & Chet Kanhchna (Modern R&B)",
-        "tag": "Modern Khmer Acoustic Soul & Melodic R&B",
-        "instruments": "Warm nylon-string guitar, Rhodes electric piano, delicate acoustic percussion, emotional cello",
-        "vocal_tone": "Silky smooth intimate vocals, soulful ad-libs, bittersweet confession, tender whispers",
-        "bpm": 85,
-        "key": "C Major",
-        "prompt_vibe": (
-            "Write in the modern Khmer indie/R&B style of Tena and Chet Kanhchna. Intimate, conversational confessions, "
-            "melancholic urban heartbreak, and catchy acoustic earworms."
-        )
-    },
     "TAYLOR_SWIFT": {
         "id": "TAYLOR_SWIFT",
-        "name": "🌍 Taylor Swift (Intimate Confessional)",
+        "name": "🌟 Taylor Swift (Confessional Storyteller)",
         "tag": "Cinematic Storyteller Pop / Folklore",
         "instruments": "Acoustic fingerpicking, dramatic piano swells, building drum kit, indie folk textures",
         "vocal_tone": "Vulnerable conversational lead, breathy emotional delivery, soaring bridge climax",
@@ -76,7 +36,7 @@ ARTIST_PERSONAS: Dict[str, Dict[str, str]] = {
     },
     "THE_WEEKND": {
         "id": "THE_WEEKND",
-        "name": "🌍 The Weeknd (Dark 80s Synthwave)",
+        "name": "🌃 The Weeknd (Dark 80s Synthwave)",
         "tag": "Retro Analog Moog & Midnight Falsetto",
         "instruments": "Analog Prophet synth arpeggios, LinnDrum 80s gated snare, punchy Moog bassline, lush reverb pads",
         "vocal_tone": "Soaring melancholic falsetto, dark nocturnal passion, reverb-drenched vocal chops",
@@ -89,7 +49,7 @@ ARTIST_PERSONAS: Dict[str, Dict[str, str]] = {
     },
     "BRUNO_MARS": {
         "id": "BRUNO_MARS",
-        "name": "🌍 Bruno Mars / Silk Sonic (70s Soul Funk)",
+        "name": "🎷 Bruno Mars / Silk Sonic (70s Soul Funk)",
         "tag": "Vintage Silk Funk, Brass & Romantic Croon",
         "instruments": "Funky wah-guitar, punchy live brass horns, smooth Fender Rhodes, syncopated slap bass, live funk drums",
         "vocal_tone": "Playful romantic croon, explosive high belt notes, smooth falsetto harmonies",
@@ -99,14 +59,66 @@ ARTIST_PERSONAS: Dict[str, Dict[str, str]] = {
             "Write in the infectious 70s funk & soul style of Bruno Mars / Silk Sonic. High-stepping retro groove, "
             "slick charm, sparkling brass section, and euphoric sing-along hooks."
         )
-    }
+    },
+    "BILLIE_EILISH": {
+        "id": "BILLIE_EILISH",
+        "name": "🌙 Billie Eilish (Dark Bedroom Alt-Pop)",
+        "tag": "Intimate Whispered Vocal & Deep Sub-Bass",
+        "instruments": "Deep distorted sub-bass, minimalist finger snaps, dark ambient Rhodes, close-mic foley",
+        "vocal_tone": "Intimate ASMR whisper vocal, haunting stacked harmonies, subtle vocal fry",
+        "bpm": 115,
+        "key": "G Minor",
+        "prompt_vibe": (
+            "Write in the dark minimalist alt-pop style of Billie Eilish & Finneas. Close-mic whispered intimacy, "
+            "late-night psychological honesty, and sudden bass-heavy chorus drops."
+        )
+    },
+    "POST_MALONE": {
+        "id": "POST_MALONE",
+        "name": "🔥 Post Malone (Melodic 808 & Acoustic Trap)",
+        "tag": "Melodic Trap-Pop & Raspy Guitar Hook",
+        "instruments": "Acoustic strumming layered over booming 808 sub-bass, crisp trap hi-hats, atmospheric synth pad",
+        "vocal_tone": "Raspy emotional chest belt, melodic vibrato hook, vulnerable rockstar delivery",
+        "bpm": 135,
+        "key": "C Minor",
+        "prompt_vibe": (
+            "Write in the melodic trap-pop style of Post Malone. Blend heartfelt acoustic guitar melodies with "
+            "booming 808 drums and an unforgettable, raspy sing-along chorus."
+        )
+    },
+    "SINN_SISAMOUTH": {
+        "id": "SINN_SISAMOUTH",
+        "name": "🇰🇭 Sinn Sisamouth (60s Golden Era Classic)",
+        "tag": "Khmer Golden Era 60s Poetic Sentimental",
+        "instruments": "Acoustic nylon guitar, Tro Ou, Takhe, nostalgic strings, vintage warm tube saturation",
+        "vocal_tone": "Sentimental golden era vibrato, deep nostalgic longing, poetic Khmer metaphors",
+        "bpm": 74,
+        "key": "G Major",
+        "prompt_vibe": (
+            "Write in the authentic poetic genius of Sinn Sisamouth. "
+            "Use evocative natural imagery, classic rhyming couplets, and romantic nostalgia."
+        )
+    },
+    "VANNDA": {
+        "id": "VANNDA",
+        "name": "🇰🇭 Vannda (Heritage 808 Trap)",
+        "tag": "Khmer Traditional Roots & 808 Trap",
+        "instruments": "Heavy sliding 808 sub bass, rapid rolling hi-hats, traditional Khmer flute (Khloy), Chapei Dong Veng plucks",
+        "vocal_tone": "Aggressive rhythmic cadence, melodic trap autotune, multi-syllabic rhymes, proud cultural grit",
+        "bpm": 138,
+        "key": "E Minor",
+        "prompt_vibe": (
+            "Write in the explosive style of Vannda. Combine cultural heritage pride "
+            "with cutting-edge 808 trap cadence, rapid internal rhymes, and stadium chants."
+        )
+    },
 }
 
 CLONE_MODES: Dict[str, Dict[str, str]] = {
     "PARALLEL_TWIN": {
         "id": "PARALLEL_TWIN",
-        "title": "🧬 1:1 Parallel Twin (សមមូល)",
-        "subtitle": "Exact same story & emotional weight with 100% fresh metaphors and poetic rhymes",
+        "title": "🧬 1:1 Parallel Twin",
+        "subtitle": "Exact same story, structure & emotional weight with 100% fresh original lyrics & metaphors",
         "prompt_instruction": (
             "Write a 1:1 Parallel Semantic Twin. Preserve the EXACT core emotional meaning, conflict, "
             "and narrative arc of the reference song line-for-line. Do NOT copy any exact phrases or lyrics; "
@@ -116,71 +128,56 @@ CLONE_MODES: Dict[str, Dict[str, str]] = {
     },
     "ANSWER_SONG": {
         "id": "ANSWER_SONG",
-        "title": "🔄 Answer Song (ឆ្លើយឆ្លង)",
-        "subtitle": "Retell the exact situation from the other person's perspective (POV Flip)",
+        "title": "🔄 Answer Song (POV Flip)",
+        "subtitle": "Retell the exact same story from the other person's perspective (emotional dialogue reply)",
         "prompt_instruction": (
-            "Write an authentic 'Answer Song' (ឆ្លើយឆ្លង) from the opposite person's perspective. "
-            "If the original song is sung by a man mourning a lover who left, write from the woman's POV "
-            "explaining her hidden pain, sacrifice, or unspoken tears. The two songs should fit together "
-            "as a complete emotional dialogue, matching the same events with mutual heartfelt sincerity."
+            "Write an authentic 'Answer Song' from the opposite person's perspective. "
+            "If the original song is sung by someone mourning a lover who left, write from the partner's POV "
+            "explaining their hidden side, sacrifice, or unspoken feelings. The two songs should fit together "
+            "as a complete emotional dialogue."
         )
     },
     "GENRE_MUTATION": {
         "id": "GENRE_MUTATION",
-        "title": "🔀 Genre Mutation (បំប្លែងចង្វាក់)",
-        "subtitle": "Transform a 60s classic ballad into modern 808 Trap, R&B, or EDM festival anthem",
+        "title": "🔀 Genre Mutation",
+        "subtitle": "Keep the core story & meaning, but transform the sound into Synthwave, 808 Trap, Rock, or EDM",
         "prompt_instruction": (
             "Write a Cross-Genre Mutation. Take the deep lyrical meaning and emotional soul of the reference song, "
-            "but completely adapt the delivery, cadence, and vocabulary for the requested modern genre. "
-            "If transforming to Hip-Hop/Trap, use punchy rhythmic flows and street-level imagery; if EDM, use "
-            "euphoric build-ups and stadium-sized chorus chants, while keeping the authentic emotional core intact."
+            "but completely adapt the delivery, cadence, and vocabulary for the requested target genre."
         )
     },
     "TIME_SHIFT_SEQUEL": {
         "id": "TIME_SHIFT_SEQUEL",
-        "title": "⏳ 10 Years Later (10 ឆ្នាំក្រោយ)",
-        "subtitle": "The mature continuation of the same story a decade into the future",
+        "title": "⏳ 10 Years Later (Sequel)",
+        "subtitle": "Continue the story of the reference song a decade later with mature reflection & closure",
         "prompt_instruction": (
-            "Write 'The Sequel: 10 Years Later' (10 ឆ្នាំក្រោយ). Continue the story from the reference song "
-            "a decade into the future. Reflect on the past heartbreak or love with mature wisdom, bittersweet closure, "
-            "and the realization of how time heals wounds while leaving enduring memories etched in the heart."
-        )
-    },
-    "BILINGUAL_MIRROR": {
-        "id": "BILINGUAL_MIRROR",
-        "title": "🌐 Bilingual Mirror (ពីរភាសា)",
-        "subtitle": "Poetic transcreation between Khmer and English singable to the same melody",
-        "prompt_instruction": (
-            "Write a Bilingual Mirror (Transcreation). Translate not word-for-word, but poetically transcreate "
-            "the core meaning, syllable meter, and rhyme flow between Khmer and English so that the new lyrics "
-            "can be sung seamlessly to the original musical melody with natural phonetic breathing."
-        )
-    },
-    "PERSONA_DNA": {
-        "id": "PERSONA_DNA",
-        "title": "🎭 Artist Persona (ស្ទីលសិល្បករ)",
-        "subtitle": "Re-imagine the song in the signature voice and production of iconic legends",
-        "prompt_instruction": (
-            "Re-imagine the reference song completely transformed into the signature musical DNA, vocal phrasing, "
-            "and instrumental production of the chosen Artist Persona. Infuse their trademark lyrical hooks, "
-            "cadence, and harmonic character."
+            "Write 'The Sequel: 10 Years Later'. Continue the story from the reference song "
+            "a decade into the future. Reflect on the past heartbreak or love with mature wisdom and bittersweet closure."
         )
     },
     "STRICT_METER": {
         "id": "STRICT_METER",
-        "title": "🎯 Strict Meter (ត្រូវចង្វាក់ ១០០%)",
-        "subtitle": "Enforce line-by-line syllable count matching to sing directly on original karaoke backing",
+        "title": "🎯 Strict Karaoke Meter",
+        "subtitle": "Lock exact line-by-line syllable counts so the new lyrics can be sung over the original instrumental",
         "prompt_instruction": (
-            "CRITICAL REQUIREMENT: STRICT SYLLABLE CADENCE MATCHING (ត្រូវចំនួនព្យាង្គ និងចង្វាក់ ១០០%). "
+            "CRITICAL REQUIREMENT: STRICT SYLLABLE CADENCE MATCHING. "
             "Count the exact syllables of each line in the reference song. The cloned lyrics MUST match "
-            "the exact syllable counts line-by-line (e.g. Line 1: 7 syllables, Line 2: 7 syllables, Line 3: 8 syllables) "
-            "so that a vocalist can sing these brand new lyrics seamlessly over the original karaoke/instrumental track."
+            "the exact syllable counts line-by-line so a vocalist can sing these new lyrics over the original backing track."
+        )
+    },
+    "PERSONA_DNA": {
+        "id": "PERSONA_DNA",
+        "title": "🎭 Artist Persona DNA",
+        "subtitle": "Re-imagine the song in the signature vocal phrasing and production of iconic hitmakers",
+        "prompt_instruction": (
+            "Re-imagine the reference song completely transformed into the signature musical DNA, vocal phrasing, "
+            "and instrumental production of the chosen Artist Persona."
         )
     },
     "FOUR_FLAVORS": {
         "id": "FOUR_FLAVORS",
-        "title": "🎚️ 4-Flavor Matrix (៤ រសជាតិ)",
-        "subtitle": "Generate 4 distinct commercial arrangements simultaneously: Pop, Acoustic, Trap & Cinematic",
+        "title": "🎚️ 4-Flavor Matrix",
+        "subtitle": "Generate 4 distinct commercial arrangements at once: Radio Pop, Acoustic, 808 Trap & Cinematic",
         "prompt_instruction": (
             "Produce 4 distinct commercial variations of this song's theme:\n"
             "1. Flavor A: Commercial Radio Pop (Hook-driven, 120 BPM)\n"
@@ -188,58 +185,46 @@ CLONE_MODES: Dict[str, Dict[str, str]] = {
             "3. Flavor C: 808 Trap Club Remix (Heavy 808 bass, 138 BPM)\n"
             "4. Flavor D: Cinematic Film Score (Orchestral climax, 84 BPM)"
         )
-    }
+    },
+    "BILINGUAL_MIRROR": {
+        "id": "BILINGUAL_MIRROR",
+        "title": "🌐 Bilingual Mirror",
+        "subtitle": "Poetic transcreation between English and Khmer singable to the exact same melody",
+        "prompt_instruction": (
+            "Write a Bilingual Mirror (Transcreation). Poetically transcreate "
+            "the core meaning, syllable meter, and rhyme flow between English and Khmer so that the new lyrics "
+            "can be sung seamlessly to the original musical melody."
+        )
+    },
 }
 
 FAMOUS_SONG_PRESETS = {
-    "🇰🇭 ចំប៉ាបាត់ដំបង (Champa Battambang)": {
-        "title": "ចំប៉ាបាត់ដំបង",
-        "artist": "អធិរាជសំនៀងមាស ស៊ីន ស៊ីសាមុត",
-        "genre": "Khmer 60s Sentimental Ballad",
-        "bpm": 74,
-        "key": "G Major",
-        "theme": "ស្នេហាស្មោះស្ម័គ្រចំពោះនារីបាត់ដំបង នឹកក្លិនផ្កាចំប៉ានិងអនុស្សាវរីយ៍ដងស្ទឹងសង្កែ",
-        "lyrics": """[Title: ចំប៉ាបាត់ដំបង]
-[Style: Khmer 60s Ballad, 74 BPM, Key: G Major, acoustic guitar, sentimental strings, Sinn Sisamouth vocal]
+    "🌍 Blinding Lights (The Weeknd — 80s Synthpop)": {
+        "title": "Blinding Lights",
+        "artist": "The Weeknd",
+        "genre": "80s Synthwave & Retro Pop",
+        "bpm": 171,
+        "key": "F Minor",
+        "theme": "Addictive late-night longing, neon city lights, needing someone's touch to feel alive",
+        "lyrics": """[Title: Blinding Lights]
+[Style: 80s Synthpop, 171 BPM, Key: Fm, driving analog synth bass, punchy LinnDrum, reverb vocal]
 
 [Verse 1]
-ឱ! ផ្កាចំប៉ាបាត់ដំបងអើយ
-ចិត្តបងមិនដែលកន្តើយ នឹកកែវពុំងារ
-ក្លិនក្រអូបសាយ រសាត់តាមខ្យល់រាត្រី
-ធ្វើឱ្យប្រុសថ្លៃ នឹកស្ទើរខ្សោះកាយ។
+I've been on my own for long enough
+Maybe you can show me how to love, maybe
+I'm going through withdrawals
+You don't even have to do too much
 
 [Chorus]
-ដងស្ទឹងសង្កែ ទឹកហូរសន្សឹម
-រៀមចាំញញឹម ផ្ញើពាក្យសច្ចា
-ទោះបីឃ្លាតឆ្ងាយ ឆ្លងកាត់វេហាស៍
-ក៏ចិត្តស្នេហា ស្មោះមួយគ្មានពីរ!"""
+I said, ooh, I'm blinded by the lights
+No, I can't sleep until I feel your touch
+I said, ooh, I'm drowning in the night
+Oh, when I'm like this, you're the one I trust"""
     },
-    "🇰🇭 ស្ទឹងសង្កែ (Stung Sangker)": {
-        "title": "ស្ទឹងសង្កែ",
-        "artist": "អធិរាជសំនៀងមាស ស៊ីន ស៊ីសាមុត",
-        "genre": "Khmer 60s Sentimental Ballad",
-        "bpm": 76,
-        "key": "A Minor",
-        "theme": "ការបែកបាក់ស្នេហ៍នៅស្ទឹងសង្កែ ទឹកហូរមិនត្រឡប់ នឹកគ្រាធ្លាប់មានគ្នា",
-        "lyrics": """[Title: ស្ទឹងសង្កែ]
-[Style: Khmer 60s Sentimental, 76 BPM, Key: Am, emotive Tro Ou, intimate acoustic guitar]
-
-[Verse 1]
-ស្ទឹងសង្កែអើយ ទឹកហូរទៅណា
-ហូរនាំស្នេហា បងទៅចោលហើយ
-បន្សល់ទឹកភ្នែក ហូរលើថ្ពាល់អើយ
-គ្មានកោះគ្មានត្រើយ ឯកាក្នុងទ្រូង។
-
-[Chorus]
-ធ្លាប់ផ្ញើសម្បថ កណ្ដាលរាត្រី
-ថាស្នេហ៍ភក្តី មិនប្រែឡើយណា
-ពេលនេះស្ទឹងចាស់ នៅចាំសច្ចា
-តែរូបពុំងារ ឃ្លាតបាត់សូន្យឈឹង!"""
-    },
-    "🌍 Someone Like You (Adele)": {
+    "🌍 Someone Like You (Adele — Piano Ballad)": {
         "title": "Someone Like You",
         "artist": "Adele",
-        "genre": "Piano Pop Ballad",
+        "genre": "Acoustic Fingerpicked Indie Ballad",
         "bpm": 68,
         "key": "A Major",
         "theme": "Accepting heartbreak with dignity, wishing an ex happiness with their new partner",
@@ -258,28 +243,94 @@ I wish nothing but the best for you too
 Don't forget me, I beg, I remember you said
 Sometimes it lasts in love, but sometimes it hurts instead"""
     },
-    "🌍 Blinding Lights (The Weeknd)": {
-        "title": "Blinding Lights",
-        "artist": "The Weeknd",
-        "genre": "80s Synthpop / Retro Electro",
-        "bpm": 171,
-        "key": "F Minor",
-        "theme": "Addictive late-night longing, city lights, needing someone's touch to survive",
-        "lyrics": """[Title: Blinding Lights]
-[Style: 80s Synthpop, 171 BPM, Key: Fm, driving analog synth bass, punchy LinnDrum, reverb vocal]
+    "🌍 Midnight Summer Fever (Taylor Swift Style — Pop)": {
+        "title": "Midnight Summer Fever",
+        "artist": "Billboard Pop",
+        "genre": "Global Commercial Radio Pop",
+        "bpm": 120,
+        "key": "C Major",
+        "theme": "Secret summer romance under city streetlights, breathless anticipation and fragile rules",
+        "lyrics": """[Title: Midnight Summer Fever]
+[Style: Global Commercial Radio Pop, 120 BPM, Key: C Major, pulsing synth bass, soaring bridge]
 
 [Verse 1]
-I've been on my own for long enough
-Maybe you can show me how to love, maybe
-I'm going through withdrawals
-You don't even have to do too much
+Fever dream high in the quiet of the night
+You know that I caught it in the vending machine light
+Bad, bad boy, shiny toy with a price
+You know that I bought it when we rolled the dice
 
 [Chorus]
-I said, ooh, I'm blinded by the lights
-No, I can't sleep until I feel your touch
-I said, ooh, I'm drowning in the night
-Oh, when I'm like this, you're the one I trust"""
-    }
+It's a cruel summer with you in the dark
+Holding onto secrets in the empty park
+Every single promise burning on my tongue
+Singing like the night has only just begun"""
+    },
+    "🌍 Yellow Skylights (Coldplay Style — Arena Rock)": {
+        "title": "Yellow Skylights",
+        "artist": "Stadium Rock",
+        "genre": "Global Commercial Radio Pop",
+        "bpm": 126,
+        "key": "F Major",
+        "theme": "Looking up at the stars and dedicating every heartbeat and sacrifice to someone you love",
+        "lyrics": """[Title: Yellow Skylights]
+[Style: Stadium Pop-Rock Anthem, 126 BPM, Key: F Major, delay electric guitars, grand piano, choir]
+
+[Verse 1]
+Look at the stars, look how they shine for you
+And everything you do, yeah they were all yellow
+I came along, I wrote a song for you
+And all the things you do, and it was called yellow
+
+[Chorus]
+Your skin, oh yeah, your skin and bones
+Turn into something beautiful
+You know, you know I love you so
+You know I love you so"""
+    },
+    "🇰🇭 Champa Battambang (Sinn Sisamouth — 60s Classic)": {
+        "title": "ចំប៉ាបាត់ដំបង",
+        "artist": "Sinn Sisamouth",
+        "genre": "Khmer 60s Sentimental Ballad",
+        "bpm": 74,
+        "key": "G Major",
+        "theme": "Devoted romance and nostalgia for Battambang and the Sangker River",
+        "lyrics": """[Title: ចំប៉ាបាត់ដំបង]
+[Style: Khmer 60s Ballad, 74 BPM, Key: G Major, acoustic guitar, sentimental strings, Sinn Sisamouth vocal]
+
+[Verse 1]
+ឱ! ផ្កាចំប៉ាបាត់ដំបងអើយ
+ចិត្តបងមិនដែលកន្តើយ នឹកកែវពុំងារ
+ក្លិនក្រអូបសាយ រសាត់តាមខ្យល់រាត្រី
+ធ្វើឱ្យប្រុសថ្លៃ នឹកស្ទើរខ្សោះកាយ។
+
+[Chorus]
+ដងស្ទឹងសង្កែ ទឹកហូរសន្សឹម
+រៀមចាំញញឹម ផ្ញើពាក្យសច្ចា
+ទោះបីឃ្លាតឆ្ងាយ ឆ្លងកាត់វេហាស៍
+ក៏ចិត្តស្នេហា ស្មោះមួយគ្មានពីរ!"""
+    },
+    "🇰🇭 Stung Sangker (Sinn Sisamouth — Heartbreak Ballad)": {
+        "title": "ស្ទឹងសង្កែ",
+        "artist": "Sinn Sisamouth",
+        "genre": "Khmer 60s Sentimental Ballad",
+        "bpm": 76,
+        "key": "A Minor",
+        "theme": "Heartbreak and memories along the Sangker riverbank",
+        "lyrics": """[Title: ស្ទឹងសង្កែ]
+[Style: Khmer 60s Sentimental, 76 BPM, Key: Am, emotive Tro Ou, intimate acoustic guitar]
+
+[Verse 1]
+ស្ទឹងសង្កែអើយ ទឹកហូរទៅណា
+ហូរនាំស្នេហា បងទៅចោលហើយ
+បន្សល់ទឹកភ្នែក ហូរលើថ្ពាល់អើយ
+គ្មានកោះគ្មានត្រើយ ឯកាក្នុងទ្រូង។
+
+[Chorus]
+ធ្លាប់ផ្ញើសម្បថ កណ្ដាលរាត្រី
+ថាស្នេហ៍ភក្តី មិនប្រែឡើយណា
+ពេលនេះស្ទឹងចាស់ នៅចាំសច្ចា
+តែរូបពុំងារ ឃ្លាតបាត់សូន្យឈឹង!"""
+    },
 }
 
 
@@ -315,17 +366,17 @@ class CloneEngine:
         lyrics_lower = lyrics.lower()
         is_khmer = any(ord(c) >= 0x1780 and ord(c) <= 0x17FF for c in lyrics)
 
-        if any(w in lyrics_lower for w in ["បែកបាក់", "ទឹកភ្នែក", "ឈឺ", "cry", "heartbreak", "tears", "goodbye"]):
-            thesis = "Heartbreak, deep yearning, and sorrowful separation (ការបែកបាក់ និងការនឹកស្រណោះ)"
+        if any(w in lyrics_lower for w in ["បែកបាក់", "ទឹកភ្នែក", "ឈឺ", "cry", "heartbreak", "tears", "goodbye", "settled down", "hurts"]):
+            thesis = "Heartbreak, deep yearning, and emotional reflection"
             mood = "Heartfelt & Melancholic"
-        elif any(w in lyrics_lower for w in ["សប្បាយ", "រាំ", "party", "dance", "celebrate", "night"]):
-            thesis = "Joyful celebration, dance rhythm, and festive energy (ការអបអរសាទរ និងភាពរីករាយ)"
-            mood = "Energetic & Festive"
-        elif any(w in lyrics_lower for w in ["ស្រឡាញ់", "ស្នេហ៍", "love", "heart", "forever", "sweet"]):
-            thesis = "Devoted romance, timeless commitment, and tender affection (ស្នេហាស្មោះស្ម័គ្រ និងភក្តីភាព)"
+        elif any(w in lyrics_lower for w in ["សប្បាយ", "រាំ", "party", "dance", "celebrate", "night", "lights", "sunroof", "neon"]):
+            thesis = "Electric nocturnal energy, emotional momentum, and chasing connection"
+            mood = "Energetic & Uplifting"
+        elif any(w in lyrics_lower for w in ["ស្រឡាញ់", "ស្នេហ៍", "love", "heart", "forever", "sweet", "stars", "shine"]):
+            thesis = "Devoted romance, timeless commitment, and heartfelt connection"
             mood = "Romantic & Tender"
         else:
-            thesis = "Reflective personal narrative, memory, and emotional longing (អនុស្សាវរីយ៍ និងការរំឭកអតីតកាល)"
+            thesis = "Reflective personal storytelling, memory, and emotional longing"
             mood = "Nostalgic & Reflective"
 
         # Section structure mapping
@@ -800,14 +851,46 @@ class CloneEngine:
         clone_mode_key: str,
         target_genre: str,
         target_lang: str,
-        persona_key: str = "SINN_SISAMOUTH"
+        persona_key: str = "TAYLOR_SWIFT"
     ) -> Dict[str, str]:
-        """High-quality offline demonstration clone when no API key is present."""
-        is_khmer = ("Khmer" in target_lang or "ខ្មែរ" in target_lang)
+        """High-quality deterministic algorithmic clone for all 8 modes in English, Khmer, or Bilingual."""
+        is_khmer = ("Khmer" in target_lang or "ខ្មែរ" in target_lang) and "Both" not in target_lang
+        dna = cls.extract_song_dna(reference_lyrics)
+        bpm = dna.get("bpm", 120)
+        key = dna.get("key", "A Minor")
 
         if clone_mode_key == "PERSONA_DNA":
-            p = ARTIST_PERSONAS.get(persona_key, ARTIST_PERSONAS["SINN_SISAMOUTH"])
-            if persona_key == "VANNDA":
+            p = ARTIST_PERSONAS.get(persona_key, ARTIST_PERSONAS["TAYLOR_SWIFT"])
+            if not is_khmer and persona_key not in ("SINN_SISAMOUTH", "VANNDA"):
+                title = f"Velvet Rearview ({p['id'].replace('_', ' ').title()} DNA)"
+                style = f"{p['tag']}, {p['bpm']} BPM, Key: {p['key']}, {p['instruments'][:65]}"
+                lyrics = (
+                    f"[Title: {title}]\n"
+                    f"[Style: {style}]\n\n"
+                    f"[Intro: {p['bpm']} BPM, {p['tag']}]\n"
+                    "[Am] [F] [C] [G]\n\n"
+                    "[Verse 1: Signature Artist Phrasing & Sensory Detail]\n"
+                    "[Am] Two paper cups on the passenger seat at dawn\n"
+                    "[F] Tracing the map of a summer that's already gone\n"
+                    "[C] You left your Polaroid tucked in the dashboard frame\n"
+                    "[G] Every red traffic light still knows how to say your name\n\n"
+                    "[Pre-Chorus: Rising Emotional Tension]\n"
+                    "[F] Counting the exits we passed in the pouring rain\n"
+                    "[G] Learning that freedom and longing can feel the same\n\n"
+                    "[Chorus: Soaring Signature Hook]\n"
+                    "[F] We were electric [C] silhouettes in the dark\n"
+                    "[G] Leaving our fingerprints [Am] over the city park\n"
+                    "[F] Even when time turns the [C] highway to silver dust\n"
+                    "[G] You were the wildest horizon I learned to trust!\n\n"
+                    "[Bridge: Confessional Epiphany]\n"
+                    "[Dm] Maybe the best part of [Am] losing the way we knew\n"
+                    "[F] Is finding the song that was [G] waiting inside of you\n\n"
+                    "[Outro: Fading Reverb Tail]\n"
+                    "[Am] (Velvet rearview... still shining through) [F] [C]\n"
+                    "[End]"
+                )
+                return {"title": title, "style": style, "lyrics": lyrics}
+            elif persona_key == "VANNDA":
                 title = "កេរ្តិ៍តំណែល ៨០៨ (Heritage 808)"
                 style = f"{p['tag']}, {p['bpm']} BPM, Key: {p['key']}, {p['instruments'][:50]}..."
                 lyrics = (
@@ -853,6 +936,35 @@ class CloneEngine:
             return {"title": title, "style": style, "lyrics": lyrics}
 
         elif clone_mode_key == "STRICT_METER":
+            if not is_khmer:
+                title = "Chasing the Horizon Glow (100% Karaoke Meter Twin)"
+                style = f"{target_genre}, {bpm} BPM, Key: {key}, strict syllable-matched cadence, radio vocal"
+                lyrics = (
+                    f"[Title: {title}]\n"
+                    f"[Style: {style}]\n\n"
+                    f"[Intro: {bpm} BPM, Exact Karaoke Backing Fit]\n"
+                    "[Am] [F] [C] [G]\n\n"
+                    "[Verse 1: Strict Syllable Cadence Locked to Reference]\n"
+                    "[Am] City headlights shimmer on the boulevard\n"
+                    "[C] Every quiet mile never felt so hard\n"
+                    "[Am] Silver rain is tapping on the window glass\n"
+                    "[C] Watching all the midnight shadows slowly pass\n\n"
+                    "[Pre-Chorus: Locked Rhythmic Lift]\n"
+                    "[F] Engines humming louder as the skyline wakes\n"
+                    "[Am] Ready for the promise that the morning makes\n\n"
+                    "[Chorus: 100% Sing-Along Matched Hook]\n"
+                    "[F] Racing through the [C] electric horizon glow\n"
+                    "[G] Leaving every [Am] hesitation far below\n"
+                    "[F] Reach across the [C] dashboard into open skies\n"
+                    "[G] We can see tomorrow burning in our eyes!\n\n"
+                    "[Bridge: Matched Emotional Breakdown]\n"
+                    "[Dm] Even when the [Am] compass loses where to turn\n"
+                    "[F] We still have the [G] only fire left to burn\n\n"
+                    "[Outro: Synced Fade Out]\n"
+                    "[Am] (Burning in our [F] eyes...) [C] [G]\n"
+                    "[End]"
+                )
+                return {"title": title, "style": style, "lyrics": lyrics}
             title = "ទឹកភ្នែកហូរស្ទឹងសង្កែ (Matched Cadence Sing-Along)"
             style = "Khmer 60s Sentimental, 74 BPM, Key: G Major, exact syllable flow, Tro Ou, acoustic guitar"
             lyrics = (
@@ -903,29 +1015,121 @@ class CloneEngine:
                     "[C] នៅតែរង់ចាំ... ស្ទឹងសង្កែ..."
                 )
             else:
-                title = "The River's Reply (Answer to Goodbye)"
-                style = "Acoustic Pop Ballad, 74 BPM, Key: C Major, emotive female vocal, acoustic guitar"
+                title = "The Other Side of Midnight (Answer Song POV)"
+                style = f"{target_genre}, {bpm} BPM, Key: C Major, emotive response vocal, warm piano & guitar"
                 lyrics = (
-                    "[Title: The River's Reply]\n"
+                    f"[Title: {title}]\n"
                     f"[Style: {style}]\n\n"
-                    "[Intro: Gentle Acoustic Picking]\n"
-                    "[C] - [G] - [Am] - [F]\n\n"
-                    "[Verse 1: Intimate Lead Vocal]\n"
-                    "[C] I hear your whisper carried on the tide\n"
-                    "[G] The silent tears I could no longer hide\n"
-                    "[Am] I didn't leave because my love was gone\n"
-                    "[F] The heavy storm just forced me to move on.\n\n"
-                    "[Chorus: Soaring Emotional Sincerity]\n"
-                    "[C] Don't think for once I left your heart behind!\n"
-                    "[G] You're still the only shelter I can find!\n"
-                    "[Am] Across the miles where cold winds blow,\n"
-                    "[F] I still remember everything we know!\n\n"
-                    "[Outro: Fade into soft piano]\n"
-                    "[C] Still holding on... till I come home..."
+                    "[Intro: Gentle Piano & Acoustic Response]\n"
+                    "[C] [G] [Am] [F]\n\n"
+                    "[Verse 1: Opposite Perspective — Explaining the Other Side]\n"
+                    "[C] I saw your headlights waiting by the corner store\n"
+                    "[G] Standing in the hallway with my hand upon the door\n"
+                    "[Am] I didn't walk away because the spark had died\n"
+                    "[F] I only left to save the dream we built inside\n\n"
+                    "[Pre-Chorus: Rising Emotional Dialogue]\n"
+                    "[F] Every single mile that you drove alone\n"
+                    "[G] I was counting seconds by a silent phone\n\n"
+                    "[Chorus: Soaring Emotional Reply]\n"
+                    "[C] I was right there under the same neon sky!\n"
+                    "[G] Holding back the words I never said goodbye!\n"
+                    "[Am] Turn the car around and meet me where we started from,\n"
+                    "[F] The storm is finally over and the dawn has come!\n\n"
+                    "[Bridge: Two Voices Reconciling]\n"
+                    "[Dm] Neither one of us was [Am] meant to carry this alone\n"
+                    "[F] Every road we took was [G] leading us back home\n\n"
+                    "[Outro: Soft Piano Resolve]\n"
+                    "[C] (Leading us back [F] home...) [C]\n"
+                    "[End]"
                 )
             return {"title": title, "style": style, "lyrics": lyrics}
 
+        elif clone_mode_key == "TIME_SHIFT_SEQUEL":
+            title = "Ten Summers Down the Coast (10 Years Later)"
+            style = f"{target_genre}, {bpm} BPM, Key: {key}, nostalgic guitars, mature expressive vocal"
+            lyrics = (
+                f"[Title: {title}]\n"
+                f"[Style: {style}]\n\n"
+                "[Intro: Warm Vintage Rhodes & Acoustic Guitar]\n"
+                "[C] [G] [Am] [F]\n\n"
+                "[Verse 1: A Decade Later — Reflective Storytelling]\n"
+                "[C] Ten summers passed since we drove that coastal lane\n"
+                "[G] They repaved the highway and they changed the diner's name\n"
+                "[Am] Saw you at the bookshop with a coffee in your hand\n"
+                "[F] Smiling like two strangers who finally understand\n\n"
+                "[Pre-Chorus: Bittersweet Closure]\n"
+                "[F] Time took all the sharp edges off the pain\n"
+                "[G] Leaving only gratitude for shelter in the rain\n\n"
+                "[Chorus: Mature Anthemic Hook]\n"
+                "[C] Look how far we traveled from the midnight neon glow!\n"
+                "[G] Keeping all the best parts of the kids we used to know!\n"
+                "[Am] We didn't lose the story when the chapter had to end,\n"
+                "[F] Some fires turn to starlight just to guide an old friend!\n\n"
+                "[Bridge: Peaceful Realization]\n"
+                "[Dm] No regrets left hanging [Am] in the autumn air\n"
+                "[F] Just a quiet thank you [G] that we once were there\n\n"
+                "[Outro: Warm Acoustic Fade]\n"
+                "[C] (Ten summers down the [F] coast...) [C]\n"
+                "[End]"
+            )
+            return {"title": title, "style": style, "lyrics": lyrics}
+
+        elif clone_mode_key == "BILINGUAL_MIRROR":
+            title = "Neon Skyline / ពន្លឺរាត្រី (Bilingual Mirror)"
+            style = f"{target_genre}, {bpm} BPM, Key: {key}, bilingual English & Khmer crossover, modern radio mix"
+            lyrics = (
+                f"[Title: {title}]\n"
+                f"[Style: {style}]\n\n"
+                "[Intro: Modern Synth & Traditional Pluck Fusion]\n"
+                "[Am] [F] [C] [G]\n\n"
+                "[Verse 1: English Storytelling]\n"
+                "[Am] City lights are reflecting on the midnight rain\n"
+                "[F] Calling out a memory across the windowpane\n"
+                "[C] Every mile between us feels a little less far\n"
+                "[G] When we're looking up under the very same star\n\n"
+                "[Verse 2: Poetic Khmer Transcreation (Matched Cadence)]\n"
+                "[Am] ពន្លឺភ្លើងរាត្រី ឆ្លុះលើដំណក់ទឹកភ្លៀង\n"
+                "[F] បេះដូងនៅតែច្រៀង នឹកឃើញអនុស្សាវរីយ៍\n"
+                "[C] ទោះបីផ្លូវវែងឆ្ងាយ កាត់វេហាស៍រាប់ពាន់យប់\n"
+                "[G] ក្តីសង្ឃឹមមិនឈប់ ក្រោមដួងផ្កាយតែមួយ!\n\n"
+                "[Chorus: Bilingual Anthemic Hook]\n"
+                "[F] Underneath the [C] midnight neon skyline\n"
+                "[G] បេះដូងយើងទាំងពីរ [Am] នៅតែភ្លឺចែងចាំង\n"
+                "[F] Hands up to the dawn, [C] never letting go\n"
+                "[G] ស្នេហ៍ស្មោះគ្មានព្រំដែន Across the afterglow!\n\n"
+                "[Outro: Dual Harmony Fade]\n"
+                "[Am] (Across the afterglow... [F] ជានិច្ចនិរន្តរ៍)\n"
+                "[End]"
+            )
+            return {"title": title, "style": style, "lyrics": lyrics}
+
         elif clone_mode_key == "GENRE_MUTATION":
+            if not is_khmer:
+                title = "Skyline Overdrive (Cross-Genre Remix)"
+                style = f"{target_genre}, 136 BPM, Key: Cm, booming 808 sub-bass, analog synth lead, stadium vocal"
+                lyrics = (
+                    f"[Title: {title}]\n"
+                    f"[Style: {style}]\n\n"
+                    "[Intro: Filtered Synth Arpeggio & 808 Riser]\n"
+                    "[Cm] [Ab] [Eb] [Bb]\n\n"
+                    "[Verse 1: Rhythmic Modern Cadence]\n"
+                    "[Cm] Dashboard digital, 130 on the dial\n"
+                    "[Ab] Turned a quiet memory into something wild\n"
+                    "[Eb] 808 is knocking where the silence used to be\n"
+                    "[Bb] Unlocked every chain and set the rhythm free\n\n"
+                    "[Pre-Chorus: Snare Roll & Sub Drop Build]\n"
+                    "[Ab] Feel the voltage climbing through the floor\n"
+                    "[Bb] We aren't waiting in the shadows anymore—\n\n"
+                    "[Chorus: Explosive Genre-Mutated Drop]\n"
+                    "[Cm] Put the skyline into overdrive tonight!\n"
+                    "[Ab] Turning every tear into a laser light!\n"
+                    "[Eb] From a whispered ballad to a stadium roar,\n"
+                    "[Bb] Watch us rise higher than we ever did before!\n\n"
+                    "[Outro: Heavy Bass Tail]\n"
+                    "[Cm] (Skyline overdrive...) [Ab] [Cm]\n"
+                    "[End]"
+                )
+                return {"title": title, "style": style, "lyrics": lyrics}
             title = "រលកបេះដូង 808 (Heartwave 808)"
             style = "Khmer Modern Trap, 138 BPM, Key: Em, heavy 808 sub, rapid hi-hats, confident melodic flow"
             lyrics = (
@@ -950,6 +1154,35 @@ class CloneEngine:
             return {"title": title, "style": style, "lyrics": lyrics}
 
         else: # PARALLEL_TWIN
+            if not is_khmer:
+                title = "Silver Headlights on the Coast (1:1 Semantic Twin)"
+                style = f"{target_genre}, {bpm} BPM, Key: {key}, lush analog synths, punchy drums, soaring lead vocal"
+                lyrics = (
+                    f"[Title: {title}]\n"
+                    f"[Style: {style}]\n\n"
+                    f"[Intro: {bpm} BPM, {target_genre}, Analog Synth & Guitar]\n"
+                    "[Am] [F] [C] [G]\n\n"
+                    "[Verse 1: Fresh Metaphors, Same Emotional Core]\n"
+                    "[Am] Silver headlights cutting through the coastal fog\n"
+                    "[F] Turning every page inside our travelogue\n"
+                    "[C] Espresso on the console, static on the air\n"
+                    "[G] Racing toward a horizon only we would dare\n\n"
+                    "[Pre-Chorus: Rising Momentum]\n"
+                    "[F] Pulse is getting louder as the clouds divide\n"
+                    "[G] Leaving all the yesterday regrets behind\n\n"
+                    "[Chorus: 100% Original Anthemic Twin Hook]\n"
+                    "[F] Underneath the [C] electric boulevard glow\n"
+                    "[G] We are turning every [Am] ember into gold\n"
+                    "[F] Windows rolled down, [C] chasing down the morning sun\n"
+                    "[G] Yeah, our brightest chapter has only just begun!\n\n"
+                    "[Bridge: Stripped Breakdown -> Soaring Lift]\n"
+                    "[Dm] Even when the map runs [Am] out of painted lines\n"
+                    "[F] We still have the compass [G] that nobody finds\n\n"
+                    "[Outro: Fading Arpeggio & Reverb]\n"
+                    "[Am] (Only just begun...) [F] [C] [G]\n"
+                    "[End]"
+                )
+                return {"title": title, "style": style, "lyrics": lyrics}
             title = "ស្រមោលស្ទឹងឯកា (Shadows on the Silent River)"
             style = "Khmer Acoustic Ballad, 74 BPM, Key: G Major, fingerpicked guitar, emotive strings"
             lyrics = (

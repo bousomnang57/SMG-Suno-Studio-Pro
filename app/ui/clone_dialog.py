@@ -113,22 +113,24 @@ class SongDNAClonerView(QWidget):
     def __init__(self, initial_lyrics: str = "", initial_title: str = "", parent=None, is_dark: bool = True):
         super().__init__(parent)
         self.is_dark = is_dark
-        self.reference_lyrics = initial_lyrics.strip() if initial_lyrics else FAMOUS_SONG_PRESETS["🇰🇭 ចំប៉ាបាត់ដំបង (Champa Battambang)"]["lyrics"]
-        self.reference_title = initial_title or "Reference Song"
+        default_preset_key = next(iter(FAMOUS_SONG_PRESETS.keys()))
+        self.reference_lyrics = initial_lyrics.strip() if initial_lyrics else FAMOUS_SONG_PRESETS[default_preset_key]["lyrics"]
+        self.reference_title = initial_title or FAMOUS_SONG_PRESETS[default_preset_key]["title"]
         self.active_mode_key = "PARALLEL_TWIN"
-        self.active_persona_key = "SINN_SISAMOUTH"
+        self.active_persona_key = "TAYLOR_SWIFT"
         self.generated_title = ""
         self.generated_style = ""
         self.generated_lyrics = ""
         self.current_flavors = {}
 
-        self.setWindowTitle("🧬 Song DNA & Semantic Meaning Cloner (ម៉ាស៊ីនក្លូនបទចម្រៀងស្របន័យ)")
+        self.setWindowTitle("🧬 Song DNA & Semantic Meaning Cloner")
         self.resize(1120, 740)
         self.setMinimumSize(1000, 660)
 
         self._init_ui()
         self._apply_styling()
         self._analyze_reference()
+        self._load_instant_clone_preview()
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
@@ -174,16 +176,26 @@ class SongDNAClonerView(QWidget):
 
         main_layout.addLayout(header_box)
 
-        # 2. 8 Creative Clone Mode Selector Pills (2 Rows x 4 Columns)
+        # 2. Step 1: 8 Creative Clone Mode Selector Pills (2 Rows x 4 Columns)
         self.mode_frame = QFrame()
         self.mode_frame.setObjectName("card")
         m_layout = QVBoxLayout(self.mode_frame)
-        m_layout.setContentsMargins(10, 8, 10, 8)
-        m_layout.setSpacing(5)
+        m_layout.setContentsMargins(10, 6, 10, 6)
+        m_layout.setSpacing(4)
+
+        mode_top_row = QHBoxLayout()
+        self.lbl_step1_mode = QLabel("❶ SELECT CLONE MODE:")
+        self.lbl_step1_mode.setStyleSheet("font-size: 10px; font-weight: 800; color: #38bdf8; letter-spacing: 0.5px;")
+        mode_top_row.addWidget(self.lbl_step1_mode)
+        mode_top_row.addSpacing(8)
+        self.lbl_mode_desc = QLabel(CLONE_MODES["PARALLEL_TWIN"]["subtitle"])
+        self.lbl_mode_desc.setStyleSheet("font-size: 10.5px; font-weight: 700; color: #a78bfa;")
+        mode_top_row.addWidget(self.lbl_mode_desc, stretch=1)
+        m_layout.addLayout(mode_top_row)
 
         self.mode_buttons = {}
         row1_keys = ["PARALLEL_TWIN", "ANSWER_SONG", "GENRE_MUTATION", "TIME_SHIFT_SEQUEL"]
-        row2_keys = ["BILINGUAL_MIRROR", "PERSONA_DNA", "STRICT_METER", "FOUR_FLAVORS"]
+        row2_keys = ["STRICT_METER", "PERSONA_DNA", "FOUR_FLAVORS", "BILINGUAL_MIRROR"]
 
         row1_layout = QHBoxLayout()
         row1_layout.setSpacing(6)
@@ -211,24 +223,24 @@ class SongDNAClonerView(QWidget):
             self.mode_buttons[k] = btn
         m_layout.addLayout(row2_layout)
 
-        self.lbl_mode_desc = QLabel(CLONE_MODES["PARALLEL_TWIN"]["subtitle"])
-        self.lbl_mode_desc.setStyleSheet("font-size: 11px; font-weight: 600; color: #8b5cf6;")
-        m_layout.addWidget(self.lbl_mode_desc)
-
         main_layout.addWidget(self.mode_frame)
 
-        # 3. Target Clone Settings Row
+        # 3. Step 2: Target Clone Settings Row
         self.settings_frame = QFrame()
         self.settings_frame.setObjectName("card")
         s_layout = QVBoxLayout(self.settings_frame)
-        s_layout.setContentsMargins(12, 8, 12, 8)
-        s_layout.setSpacing(6)
+        s_layout.setContentsMargins(12, 6, 12, 6)
+        s_layout.setSpacing(5)
 
         # Row 1: Target Controls, Audio Ingestion, & Action Button
         row1 = QHBoxLayout()
         row1.setSpacing(8)
 
-        lbl_tg = QLabel("Target Genre:")
+        lbl_step2 = QLabel("❷ TARGET STYLE:")
+        lbl_step2.setStyleSheet("font-size: 10px; font-weight: 800; color: #34d399; letter-spacing: 0.5px;")
+        row1.addWidget(lbl_step2)
+
+        lbl_tg = QLabel("Genre:")
         lbl_tg.setStyleSheet("font-weight: 700; font-size: 11px;")
         row1.addWidget(lbl_tg)
 
@@ -236,12 +248,13 @@ class SongDNAClonerView(QWidget):
         self.combo_target_genre.addItems([
             "Global Commercial Radio Pop",
             "80s Synthwave & Retro Pop",
+            "Melodic 808 Trap & Late-Night R&B",
             "Acoustic Fingerpicked Indie Ballad",
+            "Stadium Pop-Rock Anthem",
             "EDM Club Festival Drop",
             "Khmer 60s Sentimental Ballad",
             "Khmer Romvong Folk Festive",
             "Khmer Modern Trap / Hip-Hop 808",
-            "Modern Khmer Acoustic Pop & R&B",
         ])
         self.combo_target_genre.setStyleSheet("padding: 4px 6px; font-size: 11px; min-width: 170px;")
         row1.addWidget(self.combo_target_genre)
@@ -357,8 +370,8 @@ class SongDNAClonerView(QWidget):
         l_layout.setContentsMargins(10, 10, 10, 10)
         l_layout.setSpacing(6)
 
-        lbl_l_title = QLabel("📄 Reference Song & Extracted DNA")
-        lbl_l_title.setStyleSheet("font-weight: 800; font-size: 12px; color: #38bdf8;")
+        lbl_l_title = QLabel("❸ REFERENCE SONG & EXTRACTED DNA")
+        lbl_l_title.setStyleSheet("font-weight: 800; font-size: 11.5px; color: #38bdf8; letter-spacing: 0.3px;")
         l_layout.addWidget(lbl_l_title)
 
         # Extracted DNA Capsule
@@ -396,8 +409,8 @@ class SongDNAClonerView(QWidget):
         r_layout.setSpacing(6)
 
         r_header_row = QHBoxLayout()
-        self.lbl_r_title = QLabel("✨ Generated Semantic Clone")
-        self.lbl_r_title.setStyleSheet("font-weight: 800; font-size: 12px; color: #34d399;")
+        self.lbl_r_title = QLabel("❹ GENERATED SEMANTIC CLONE (100% ORIGINAL)")
+        self.lbl_r_title.setStyleSheet("font-weight: 800; font-size: 11.5px; color: #34d399; letter-spacing: 0.3px;")
         r_header_row.addWidget(self.lbl_r_title)
         r_header_row.addStretch()
 
@@ -487,7 +500,7 @@ class SongDNAClonerView(QWidget):
         self.txt_clone_lyrics.setPlaceholderText("The semantic clone lyrics with section tags and chords will appear here...")
         self.txt_clone_lyrics.setFont(QFont("Segoe UI", 10))
         self.txt_clone_lyrics.textChanged.connect(self._on_clone_text_changed)
-        self.view_tabs.addTab(self.txt_clone_lyrics, "📝 Lyric Sheet & Chords")
+        self.view_tabs.addTab(self.txt_clone_lyrics, "📝 Lyric Sheet && Chords")
 
         # Tab 2: Twin Prompter & Syllable Cadence Table
         self.table_twin = QTableWidget()
@@ -499,7 +512,7 @@ class SongDNAClonerView(QWidget):
         self.table_twin.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.table_twin.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.table_twin.verticalHeader().setVisible(False)
-        self.view_tabs.addTab(self.table_twin, "🪞 Twin Prompter & Cadence")
+        self.view_tabs.addTab(self.table_twin, "🪞 Twin Prompter && Cadence")
 
         r_layout.addWidget(self.view_tabs, stretch=1)
 
@@ -572,19 +585,33 @@ class SongDNAClonerView(QWidget):
 
         # Auto-adjust target genre & defaults
         if mode_key == "GENRE_MUTATION":
-            self.combo_target_genre.setCurrentText("Khmer Modern Trap / Hip-Hop 808")
-            self.spin_target_bpm.setValue(138)
+            self.combo_target_genre.setCurrentText("Melodic 808 Trap & Late-Night R&B")
+            self.spin_target_bpm.setValue(136)
         elif mode_key == "PERSONA_DNA":
             self._on_persona_changed()
         elif mode_key == "STRICT_METER":
             self.view_tabs.setCurrentIndex(1) # Switch to Twin Prompter
             self.input_notes.setText("Exact syllable meter matching line-by-line for direct karaoke sing-along")
         elif mode_key == "ANSWER_SONG":
-            self.input_notes.setText("From female lover's perspective explaining her tears and loyalty")
+            self.input_notes.setText("From the partner's opposite perspective explaining their hidden side and loyalty")
         elif mode_key == "TIME_SHIFT_SEQUEL":
-            self.input_notes.setText("10 years later meeting by chance at an airport, bittersweet peace")
+            self.input_notes.setText("10 years later meeting by chance, mature reflection and bittersweet peace")
         elif mode_key == "FOUR_FLAVORS":
-            self.input_notes.setText("Generate 4 commercial arrangements: Pop, Acoustic, Trap, and Cinematic")
+            self.input_notes.setText("Generate 4 commercial arrangements: Radio Pop, Acoustic, 808 Trap, and Cinematic")
+            flavors = CloneEngine.generate_4_flavors(self.txt_reference.toPlainText(), self.combo_target_lang.currentText())
+            self._on_flavors_ready(flavors)
+
+        self._load_instant_clone_preview()
+
+    def _load_instant_clone_preview(self):
+        ref_lyrics = self.txt_reference.toPlainText().strip() if hasattr(self, "txt_reference") else self.reference_lyrics
+        if not ref_lyrics:
+            return
+        genre = self.combo_target_genre.currentText() if hasattr(self, "combo_target_genre") else "Global Commercial Radio Pop"
+        lang = self.combo_target_lang.currentText() if hasattr(self, "combo_target_lang") else "🇬🇧 English"
+        persona = (self.combo_persona.currentData() if hasattr(self, "combo_persona") else None) or self.active_persona_key
+        res = CloneEngine.generate_offline_clone(ref_lyrics, self.active_mode_key, genre, lang, persona)
+        self._on_clone_success(res["title"], res["style"], res["lyrics"])
 
     def _on_persona_changed(self):
         pk = self.combo_persona.currentData()
@@ -626,8 +653,13 @@ class SongDNAClonerView(QWidget):
             self.txt_reference.setPlainText(preset["lyrics"])
             self.reference_title = preset["title"]
             self.spin_target_bpm.setValue(preset["bpm"])
-            self.combo_target_genre.setCurrentText(preset.get("genre", "Khmer 60s Sentimental Ballad"))
+            self.combo_target_genre.setCurrentText(preset.get("genre", "Global Commercial Radio Pop"))
+            if "🇰🇭" in data:
+                self.combo_target_lang.setCurrentText("🇰🇭 Khmer (ភាសាខ្មែរ)")
+            else:
+                self.combo_target_lang.setCurrentText("🇬🇧 English")
             self._analyze_reference()
+            self._load_instant_clone_preview()
 
     def _on_ref_text_changed(self):
         self._analyze_reference()
