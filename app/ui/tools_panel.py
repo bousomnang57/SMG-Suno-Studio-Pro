@@ -452,10 +452,25 @@ class ToolsPanel(QWidget):
         input_row.addWidget(self.btn_find_rhyme)
         layout.addLayout(input_row)
 
+        # 1-Click English Songwriting Rhyme Families (Instant Offline + Studio Lookup)
+        chips_row = QHBoxLayout()
+        chips_row.setSpacing(4)
+        self.rhyme_chip_btns = []
+        for r_label, r_word in [("🌃 night", "night"), ("💔 heart", "heart"), ("🔥 fire", "fire"), ("🌧️ rain", "rain"), ("✨ dream", "dream")]:
+            c_btn = QPushButton(r_label)
+            c_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            c_btn.setToolTip(f"Instant English perfect, slant & 2-syllable rhymes for '{r_word}'")
+            c_btn.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 5px; font-size: 9.5px; font-weight: 700;")
+            c_btn.clicked.connect(lambda _, w=r_word: self._load_instant_english_rhyme(w))
+            chips_row.addWidget(c_btn)
+            self.rhyme_chip_btns.append(c_btn)
+        layout.addLayout(chips_row)
+
         self.rhyme_output = QTextEdit()
         self.rhyme_output.setReadOnly(True)
         self.rhyme_output.setPlaceholderText("Rhyme results categorized into Perfect, Slant, and Multi-syllabic will appear here...")
         layout.addWidget(self.rhyme_output)
+        self._load_instant_english_rhyme("night", set_input=False)
 
         rhyme_btn_row = QHBoxLayout()
         self.btn_insert_rhyme = QPushButton("✏️ Insert at Cursor")
@@ -699,9 +714,57 @@ class ToolsPanel(QWidget):
         self.lbl_rec_timer.setText("⏱️ Take Saved")
         self.lbl_rec_status.setText(f"Saved: {Path(path).name}")
 
+    def _load_instant_english_rhyme(self, word: str, set_input: bool = True):
+        w = word.strip().lower()
+        if set_input and hasattr(self, "rhyme_input"):
+            self.rhyme_input.setText(w)
+        bank = {
+            "night": (
+                "🎯 RHYME LAB: 'NIGHT'\n\n"
+                "• 1-Syllable Perfect:\n  light, bright, sight, flight, height, tight, white, fight, right\n\n"
+                "• 2-Syllable & Compound:\n  midnight, spotlight, street-light, starlight, ignite, rewrite, satellite\n\n"
+                "• Modern Pop Slant Rhymes:\n  time, mind, eyes, alive, drive, skyline,goodbye, high\n\n"
+                "• Songwriting Line Ideas:\n  - 'Dancing in the dashboard light'\n  - 'Every satellite burning through the night'"
+            ),
+            "heart": (
+                "🎯 RHYME LAB: 'HEART'\n\n"
+                "• 1-Syllable Perfect:\n  start, part, art, chart, spark, dark, mark,jar\n\n"
+                "• 2-Syllable & Compound:\n  apart, restart, depart, sweetheart, outsmart, landmark\n\n"
+                "• Modern Pop Slant Rhymes:\n  hard, scars, stars, arms, guards, car, far,yards\n\n"
+                "• Songwriting Line Ideas:\n  - 'Tearing all the paper maps apart'\n  - 'Waiting for a spark inside the dark'"
+            ),
+            "fire": (
+                "🎯 RHYME LAB: 'FIRE'\n\n"
+                "• 1-Syllable / 2-Syllable Perfect:\n  higher, wire, choir, liar, tire, flyer,spire\n\n"
+                "• Multi-Syllabic:\n  desire, inspire, empire, entire, amplifier,live-wire\n\n"
+                "• Modern Pop Slant Rhymes:\n  lighter, brighter, fighter, night-time,skyline,alive\n\n"
+                "• Songwriting Line Ideas:\n  - 'Walking on a high-voltage wire'\n  - 'Building up a neon empire'"
+            ),
+            "rain": (
+                "🎯 RHYME LAB: 'RAIN'\n\n"
+                "• 1-Syllable Perfect:\n  pain, train, lane, chain, stain, glass-pane,vein, gain\n\n"
+                "• 2-Syllable & Compound:\n  champagne, remain, explain, refrain,hurricane,windowpane\n\n"
+                "• Modern Pop Slant Rhymes:\n  name, flame, game, late, fade, waves,change,stay\n\n"
+                "• Songwriting Line Ideas:\n  - 'Tracing your name on the windowpane'\n  - 'Last night train out of the pouring rain'"
+            ),
+            "dream": (
+                "🎯 RHYME LAB: 'DREAM'\n\n"
+                "• 1-Syllable Perfect:\n  stream, beam, gleam, seam, team, scream,scheme,steam\n\n"
+                "• 2-Syllable & Compound:\n  daydream, mainstream, extreme, redeem,high-beam,redeem\n\n"
+                "• Modern Pop Slant Rhymes:\n  breathe,free,deep,sleep,street,believe,seen,green\n\n"
+                "• Songwriting Line Ideas:\n  - 'Caught inside a silver headlight beam'\n  - 'Nothing is as quiet as it seems'"
+            ),
+        }
+        if w in bank:
+            self.rhyme_output.setPlainText(bank[w])
+            return True
+        return False
+
     def _on_find_rhymes(self):
         word = self.rhyme_input.text().strip()
         if word:
+            if self._load_instant_english_rhyme(word, set_input=False):
+                return
             self.rhyme_output.setText("Searching rhymes & cadences with Gemini...")
             self.rhyme_requested.emit(word)
 
@@ -794,7 +857,13 @@ class ToolsPanel(QWidget):
                 self.btn_insert_rhyme.setStyleSheet("background-color: #1e1b4b; color: #a5b4fc; font-weight: 700; border: 1px solid #4338ca; border-radius: 5px; padding: 4px 6px; font-size: 8.5pt;")
             if hasattr(self, "btn_copy_rhyme"):
                 self.btn_copy_rhyme.setStyleSheet("background-color: #161b30; color: #cbd5e1; font-weight: 600; border: 1px solid #283256; border-radius: 5px; padding: 4px 6px; font-size: 8.5pt;")
+            if hasattr(self, "rhyme_chip_btns"):
+                for b in self.rhyme_chip_btns:
+                    b.setStyleSheet("background: #172554; color: #93c5fd; border: 1px solid #2563eb; border-radius: 4px; padding: 2px 5px; font-size: 9.5px; font-weight: 700;")
         else:
+            if hasattr(self, "rhyme_chip_btns"):
+                for b in self.rhyme_chip_btns:
+                    b.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 5px; font-size: 9.5px; font-weight: 700;")
             self.tabs.setStyleSheet("""
                 QTabBar::tab {
                     padding: 3px 4px;

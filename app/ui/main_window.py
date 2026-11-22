@@ -2274,6 +2274,34 @@ class MainWindow(QMainWindow):
         last_title = config_manager.get("last_title", "")
         last_bpm = config_manager.get("last_bpm", None)
         last_style = config_manager.get("last_style_prompt", "")
+        if not last_lyrics or last_title == "Test Downloaded Song":
+            last_title = "Midnight Neon Lights"
+            last_lyrics = """[Intro: 120 BPM, Global Radio Pop, Analog Synth & Electric Guitar]
+[Am] [F] [C] [G]
+
+[Verse 1: Intimate Lead Vocal, Conversational Storytelling]
+[Am] Streetlights flicker on the [F] wet windshield glass
+[C] Every mile marker lets the [G] old doubts pass
+[Am] Coffee on the dashboard, [F] radio turned low
+[C] Chasing down a coastline [G] only we would know
+
+[Pre-Chorus: Rising Drum Build, Tight Rhythmic Lift]
+[F] Heart beats faster as the [G] skyline clears
+[Am] Trading all the silence for the [C] open years
+
+[Chorus: Anthemic Earworm Hook, Full Layered Harmonies]
+[F] Underneath the [C] midnight neon lights
+[G] We are turning broken [Am] yesterdays to flights
+[F] Hands up through the sunroof, [C] racing with the dawn
+[G] Yeah, we keep on burning long after the storm is gone!
+
+[Bridge: Stripped Piano Breakdown -> Full Crescendo]
+[Dm] Even if the highway [Am] runs out of road
+[F] We carry the spark that [G] nobody owed
+
+[Outro: Fading Synth Arpeggio & Reverb Tail]
+[Am] (Long after the storm is [F] gone...) [C] [G]
+[End]"""
         if last_lyrics:
             self.editor_panel.set_title(last_title)
             self.editor_panel.set_lyrics(last_lyrics)

@@ -202,10 +202,10 @@ class SongCreationWizardView(QWidget):
         genres = [
             ("🌟 Global Radio Pop", "Catchy international earworm Billboard radio pop", "Global Radio Pop"),
             ("🌃 80s Synthwave && Retro", "Analog Moog bass, LinnDrum, retro neon synth-pop", "Synthwave Pop"),
-            ("🎸 Acoustic Folk && Indie", "Warm fingerpicked acoustic guitar and intimate vocal", "Acoustic Indie"),
+            ("🎸 Acoustic Folk && Indie", "Warm fingerpicked acoustic guitar & intimate vocal", "Acoustic Indie"),
             ("⚡ EDM && Club Festival", "Mainstage festival drop with euphoric synths", "EDM Dance"),
             ("🔥 Modern Hip-Hop && Trap", "Melodic 808 sub-bass bounce with crisp trap hi-hats", "Modern Trap"),
-            ("🎷 Late-Night R&&B Soul", "Lush Rhodes chords, neo-soul groove and silky vocals", "Modern R&B"),
+            ("🎷 Late-Night R&&B Soul", "Lush Rhodes chords, neo-soul groove & silky vocals", "Modern R&B"),
             ("💖 Golden Vintage Ballad", "60s/70s nostalgic orchestral ballad (World / Khmer Classic)", "Khmer pop ballad"),
             ("💃 Festive World Folk Dance", "Upbeat celebratory acoustic rhythm (Romvong / World Folk)", "Khmer Romvong")
         ]
@@ -354,8 +354,72 @@ class SongCreationWizardView(QWidget):
         dna_row.addWidget(self.btn_w_surprise)
 
         layout.addLayout(dna_row)
+
+        # English Title & Chorus Hook Starter Bar (Clean 1-row songwriting accelerator)
+        hook_row = QHBoxLayout()
+        hook_row.setSpacing(8)
+
+        self.lbl_w_title_tag = QLabel("🎯 Song Title:")
+        self.lbl_w_title_tag.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b;")
+        hook_row.addWidget(self.lbl_w_title_tag)
+
+        self.input_song_title = QLineEdit(self.current_title)
+        self.input_song_title.setPlaceholderText("Enter English song title (e.g. Midnight Neon Lights)...")
+        self.input_song_title.setStyleSheet("padding: 5px 8px; font-size: 11.5px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 6px;")
+        self.input_song_title.textChanged.connect(self._on_title_input_changed)
+        hook_row.addWidget(self.input_song_title, stretch=2)
+
+        self.lbl_w_hook_tag = QLabel("🎤 Hook Style:")
+        self.lbl_w_hook_tag.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b;")
+        hook_row.addWidget(self.lbl_w_hook_tag)
+
+        self.combo_w_hook_style = QComboBox()
+        self.combo_w_hook_style.addItems([
+            "Anthemic Earworm Chorus",
+            "Confessional Diary Hook",
+            "Melodic Call & Response",
+            "Dark Atmospheric Hook",
+            "Acoustic Heartfelt Refrain",
+        ])
+        self.combo_w_hook_style.setStyleSheet("padding: 5px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px;")
+        hook_row.addWidget(self.combo_w_hook_style, stretch=1)
+
+        self.btn_w_roll_hook = QPushButton("✨ Roll English Title && Hook")
+        self.btn_w_roll_hook.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_roll_hook.setToolTip("Generate a catchy English song title and chorus hook idea matching your style")
+        self.btn_w_roll_hook.clicked.connect(self._roll_english_title_and_hook)
+        self.btn_w_roll_hook.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
+        hook_row.addWidget(self.btn_w_roll_hook)
+
+        layout.addLayout(hook_row)
         layout.addStretch()
         return widget
+
+    def _on_title_input_changed(self, text: str):
+        if text.strip():
+            self.current_title = text.strip()
+
+    def _roll_english_title_and_hook(self):
+        import random
+        hooks_pool = [
+            ("Midnight Neon Lights", "Late night drive through neon city lights — 'We are burning brighter than the dashboard glow'"),
+            ("Echoes in the Rearview", "Leaving old heartbreak behind on an open highway — 'Every mile between us turns the static into gold'"),
+            ("Paper Crown in the Rain", "Rising from self-doubt under city streetlights — 'They can wash the sidewalk, never wash away our name'"),
+            ("Two Cups of Cold Coffee", "Bittersweet morning-after reflection — 'Your jacket on the chair still remembers who we were'"),
+            ("Electric Heartbeat at 2 AM", "Euphoric dancefloor connection — 'Hold the rhythm steady till the skyline starts to break'"),
+            ("Wildflowers on Concrete", "Unstoppable ambition and hope — 'Growing through the cracks where nobody thought we'd bloom'"),
+            ("Static on Channel Nine", "Nostalgic 80s synthwave romance — 'Rewind the cassette tape to the summer we were fearless'"),
+            ("Last Train to Nowhere", "Acoustic indie storytelling — 'Ticket in my pocket and a suitcase full of songs'"),
+        ]
+        title, concept = random.choice(hooks_pool)
+        self.current_title = title
+        if hasattr(self, "input_song_title"):
+            self.input_song_title.setText(title)
+        if hasattr(self, "input_theme"):
+            self.input_theme.setText(concept)
+        if hasattr(self, "btn_w_roll_hook"):
+            self.btn_w_roll_hook.setText("✓ New Title & Hook Set!")
+            QTimer.singleShot(1400, lambda: self.btn_w_roll_hook.setText("✨ Roll English Title && Hook") if hasattr(self, "btn_w_roll_hook") else None)
 
     def _on_human_mode_toggled(self, checked: bool):
         if checked:
@@ -684,6 +748,20 @@ class SongCreationWizardView(QWidget):
         t_row.addWidget(self.lbl_step3_preview)
         t_row.addStretch()
 
+        self.btn_w_load_template = QPushButton("🎵 Load English Hit Template")
+        self.btn_w_load_template.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_load_template.setToolTip("Instantly load a complete radio-ready English song tailored to your selected genre, title & tempo")
+        self.btn_w_load_template.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
+        self.btn_w_load_template.clicked.connect(self._load_english_hit_template)
+        t_row.addWidget(self.btn_w_load_template)
+
+        self.btn_w_insert_hook = QPushButton("🎤 + Chorus Hook")
+        self.btn_w_insert_hook.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_w_insert_hook.setToolTip("Insert a catchy 4-line English chorus hook into your lyrics")
+        self.btn_w_insert_hook.setStyleSheet("background: #f0fdf4; color: #15803d; border: 1px solid #86efac; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
+        self.btn_w_insert_hook.clicked.connect(self._insert_english_chorus_hook)
+        t_row.addWidget(self.btn_w_insert_hook)
+
         self.btn_w_copy_lyrics = QPushButton("📋 Copy All")
         self.btn_w_copy_lyrics.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_w_copy_lyrics.setStyleSheet("background: #f1f5f9; color: #334155; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
@@ -715,7 +793,7 @@ class SongCreationWizardView(QWidget):
         right_col.addLayout(s3_style_row)
 
         self.txt_preview = QTextEdit()
-        self.txt_preview.setPlaceholderText("Full structured lyrics ([Intro], [Verse 1], [Pre-Chorus], [Chorus], [Bridge], [Outro]) will appear here after clicking Generate...")
+        self.txt_preview.setPlaceholderText("Full structured lyrics ([Intro], [Verse 1], [Pre-Chorus], [Chorus], [Bridge], [Outro]) will appear here after clicking Generate or Load English Hit Template...")
         self.txt_preview.setFont(QFont("Segoe UI", 11))
         self.txt_preview.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; line-height: 1.4;")
         self.txt_preview.textChanged.connect(self._on_lyrics_edited)
@@ -723,7 +801,76 @@ class SongCreationWizardView(QWidget):
 
         split_row.addLayout(right_col, stretch=1)
         layout.addLayout(split_row)
+        self._load_english_hit_template(initial=True)
         return widget
+
+    def _load_english_hit_template(self, initial: bool = False):
+        title = (self.input_song_title.text().strip() if hasattr(self, "input_song_title") and self.input_song_title.text().strip() else self.current_title) or "Midnight Neon Lights"
+        self.current_title = title
+        sample = f"""=== {title} ===
+
+[Intro: {self.state_bpm} BPM, {self.state_genre}, Atmospheric Synth & Guitar]
+(Instrumentals build around {self.state_chords})
+
+[Verse 1: Intimate Lead Vocal, Conversational Storytelling]
+Streetlights flicker on the wet windshield glass
+Every mile marker lets the old doubts pass
+Coffee on the dashboard, radio turned low
+Chasing down a coastline only we would know
+
+[Pre-Chorus: Rising Drum Build, Tight Rhythmic Lift]
+Heart beats faster as the skyline clears
+Trading all the hesitation for the open years
+Hold your breath, count it down from three—
+
+[Chorus: Anthemic Earworm Hook, Full Layered Harmonies]
+Underneath the midnight neon lights
+We are turning broken yesterdays to flights
+Hands up through the sunroof, racing with the dawn
+Yeah, we keep on burning long after the storm is gone!
+
+[Verse 2: Bass & Drums Lock In, Vivid Sensory Detail]
+Polaroid snapshot tucked inside the door
+We don't have to wonder what we're waiting for
+Every red stoplight turning into green
+Brightest little chapter that this town has ever seen
+
+[Chorus: Anthemic Earworm Hook, Soaring Lead Belt]
+Underneath the midnight neon lights
+We are turning broken yesterdays to flights
+Hands up through the sunroof, racing with the dawn
+Yeah, we keep on burning long after the storm is gone!
+
+[Bridge: Stripped Acoustic & Vocal Breakdown -> Crescendo]
+(Quiet piano and vocal breath)
+Even if the highway runs out of road
+We carry the spark that nobody owed
+(Drums crash back in — Key Change +1!)
+
+[Final Chorus: Maximum Energy, Stadium Ad-Libs]
+Underneath the midnight neon lights! (Neon lights!)
+We are turning broken yesterdays to flights!
+Hands up through the sunroof, racing with the dawn
+Yeah, we keep on burning long after the storm is gone!
+
+[Outro: Fading Synth Arpeggio & Reverb Tail]
+(Long after the storm is gone...)
+[End]"""
+        self.txt_preview.setPlainText(sample)
+        if not initial and hasattr(self, "btn_w_load_template"):
+            self.btn_w_load_template.setText("✓ Template Loaded!")
+            QTimer.singleShot(1400, lambda: self.btn_w_load_template.setText("🎵 Load English Hit Template") if hasattr(self, "btn_w_load_template") else None)
+
+    def _insert_english_chorus_hook(self):
+        import random
+        hooks = [
+            "\n[Chorus: Anthemic Billboard Hook, Full Harmonies]\nWe are dancing on the edge of midnight gold\nEvery secret that we kept is finally told\nTurn the volume up until the speakers shake\nThis is the promise that we'll never break!\n",
+            "\n[Chorus: Emotional Melodic Hook, Soaring Vocal]\nI still see your shadow in the rearview glass\nTrying hard to outrun every ghost we passed\nIf the city lights go out before the dawn\nTell me how to love you when the road is gone!\n",
+            "\n[Chorus: High-Energy Festival Drop Hook]\nLight it up, let the skyline burn tonight\nEvery heartbeat locking into satellite\nZero gravity, we're rising off the floor\nWe don't look behind us anymore!\n",
+        ]
+        cursor = self.txt_preview.textCursor()
+        cursor.insertText(random.choice(hooks))
+        self.txt_preview.setTextCursor(cursor)
 
     def _copy_lyrics(self):
         text = self.txt_preview.toPlainText().strip()
@@ -1243,12 +1390,16 @@ class SongCreationWizardView(QWidget):
                 self.combo_mood.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 6px; font-size: 11.5px;")
             if hasattr(self, 'combo_lang'):
                 self.combo_lang.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 6px; font-size: 11.5px;")
-            for w_cb in [getattr(self, 'combo_w_vocal', None), getattr(self, 'combo_w_pov', None)]:
+            for w_cb in [getattr(self, 'combo_w_vocal', None), getattr(self, 'combo_w_pov', None), getattr(self, 'combo_w_hook_style', None)]:
                 if w_cb:
                     w_cb.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 5px 6px; font-size: 11px;")
-            for w_lbl in [getattr(self, 'lbl_w_vocal_tag', None), getattr(self, 'lbl_w_pov_tag', None)]:
+            for w_lbl in [getattr(self, 'lbl_w_vocal_tag', None), getattr(self, 'lbl_w_pov_tag', None), getattr(self, 'lbl_w_title_tag', None), getattr(self, 'lbl_w_hook_tag', None)]:
                 if w_lbl:
                     w_lbl.setStyleSheet(f"font-size: 11px; font-weight: 700; color: {text_sec};")
+            if hasattr(self, 'input_song_title'):
+                self.input_song_title.setStyleSheet(f"background-color: {bg_input}; color: {text_pri}; border: 1px solid {border_subtle}; border-radius: 6px; padding: 5px 8px; font-size: 11.5px; font-weight: 700;")
+            if hasattr(self, 'btn_w_roll_hook'):
+                self.btn_w_roll_hook.setStyleSheet(f"background: {btn_bg}; color: {accent}; border: 1px solid {accent}; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
             if hasattr(self, 'btn_w_surprise'):
                 self.btn_w_surprise.setStyleSheet(f"background: {btn_bg}; color: {accent}; border: 1px solid {accent_sec}; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
             if hasattr(self, 'txt_w_step3_style'):
@@ -1311,6 +1462,10 @@ class SongCreationWizardView(QWidget):
                 self.lbl_step3_preview.setStyleSheet(f"color: {text_pri}; font-weight: 800; font-size: 12px;")
             if hasattr(self, 'btn_w_copy_lyrics'):
                 self.btn_w_copy_lyrics.setStyleSheet(f"background: {btn_bg}; color: {accent}; border: 1px solid {accent_sec}; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
+            if hasattr(self, 'btn_w_load_template'):
+                self.btn_w_load_template.setStyleSheet(f"background: {btn_bg}; color: {accent}; border: 1px solid {accent}; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
+            if hasattr(self, 'btn_w_insert_hook'):
+                self.btn_w_insert_hook.setStyleSheet(f"background: #064e3b; color: #34d399; border: 1px solid #059669; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
             if hasattr(self, 'btn_w_clean_tags'):
                 self.btn_w_clean_tags.setStyleSheet(f"background: {btn_bg}; color: {text_sec}; border: 1px solid {border_subtle}; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
             if hasattr(self, 'txt_preview'):
@@ -1406,12 +1561,16 @@ class SongCreationWizardView(QWidget):
                 self.combo_mood.setStyleSheet("background: #ffffff; color: #0f172a; padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
             if hasattr(self, 'combo_lang'):
                 self.combo_lang.setStyleSheet("background: #ffffff; color: #0f172a; padding: 6px; font-size: 11.5px; border: 1px solid #cbd5e1; border-radius: 6px;")
-            for w_cb in [getattr(self, 'combo_w_vocal', None), getattr(self, 'combo_w_pov', None)]:
+            for w_cb in [getattr(self, 'combo_w_vocal', None), getattr(self, 'combo_w_pov', None), getattr(self, 'combo_w_hook_style', None)]:
                 if w_cb:
                     w_cb.setStyleSheet("background: #ffffff; color: #0f172a; padding: 5px 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px;")
-            for w_lbl in [getattr(self, 'lbl_w_vocal_tag', None), getattr(self, 'lbl_w_pov_tag', None)]:
+            for w_lbl in [getattr(self, 'lbl_w_vocal_tag', None), getattr(self, 'lbl_w_pov_tag', None), getattr(self, 'lbl_w_title_tag', None), getattr(self, 'lbl_w_hook_tag', None)]:
                 if w_lbl:
                     w_lbl.setStyleSheet("font-size: 11px; font-weight: 700; color: #1e293b;")
+            if hasattr(self, 'input_song_title'):
+                self.input_song_title.setStyleSheet("background: #ffffff; color: #0f172a; padding: 5px 8px; font-size: 11.5px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 6px;")
+            if hasattr(self, 'btn_w_roll_hook'):
+                self.btn_w_roll_hook.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
             if hasattr(self, 'btn_w_surprise'):
                 self.btn_w_surprise.setStyleSheet("background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700;")
             if hasattr(self, 'txt_w_step3_style'):
@@ -1474,6 +1633,10 @@ class SongCreationWizardView(QWidget):
                 self.lbl_step3_preview.setStyleSheet("color: #0f172a; font-weight: 800; font-size: 12px;")
             if hasattr(self, 'btn_w_copy_lyrics'):
                 self.btn_w_copy_lyrics.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 800; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
+            if hasattr(self, 'btn_w_load_template'):
+                self.btn_w_load_template.setStyleSheet("background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; font-weight: 800; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
+            if hasattr(self, 'btn_w_insert_hook'):
+                self.btn_w_insert_hook.setStyleSheet("background: #f0fdf4; color: #15803d; border: 1px solid #86efac; font-weight: 800; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
             if hasattr(self, 'btn_w_clean_tags'):
                 self.btn_w_clean_tags.setStyleSheet("background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; font-weight: 700; font-size: 10.5px; padding: 3px 8px; border-radius: 4px;")
             if hasattr(self, 'txt_preview'):

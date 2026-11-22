@@ -63,7 +63,14 @@ class GeneratorPanel(QWidget):
 
         self.preset_combo = _setup_combo(QComboBox())
         self.preset_combo.addItem("— Custom Song Setup —", None)
-        for name in ONE_CLICK_PRESETS.keys():
+        en_first_keys = sorted(
+            ONE_CLICK_PRESETS.keys(),
+            key=lambda k: (
+                0 if ONE_CLICK_PRESETS[k].get("language") == "English" and ("🏆" in k or "🍂" in k or "🌌" in k or "🏟️" in k or "🌙" in k or "🎹" in k or "🔥" in k)
+                else (1 if ONE_CLICK_PRESETS[k].get("language") == "English" else 2)
+            )
+        )
+        for name in en_first_keys:
             self.preset_combo.addItem(name, name)
         self.preset_combo.currentTextChanged.connect(self._on_preset_selected)
         p_layout.addWidget(self.preset_combo)
@@ -158,8 +165,7 @@ class GeneratorPanel(QWidget):
         self.concept_group = QFrame()
         c_layout = QVBoxLayout(self.concept_group)
         c_layout.setContentsMargins(0, 0, 0, 0)
-        c_layout.setSpacing(3)
-        c_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        c_layout.setSpacing(2)
 
         lbl_c = QLabel("📖 3. STRUCTURE & MOOD")
         lbl_c.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #34d399; letter-spacing: 0.5px;")
@@ -183,10 +189,8 @@ class GeneratorPanel(QWidget):
 
         self.custom_notes = QTextEdit()
         self.custom_notes.setPlaceholderText("Custom story notes, phrases, artist vibes...")
-        self.custom_notes.setFixedHeight(32)
+        self.custom_notes.setFixedHeight(28)
         c_layout.addWidget(self.custom_notes)
-        for grp in [self.preset_group, self.genre_group, self.lang_group, self.concept_group]:
-            grp.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         layout.addWidget(self.concept_group)
 
         # ── Section 4: Primary Actions ──

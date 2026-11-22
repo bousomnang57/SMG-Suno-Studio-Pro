@@ -1230,11 +1230,32 @@ class BatchGeneratorView(QWidget):
         self.side_tab_stack = QStackedWidget()
         sidebar_root_layout.addWidget(self.side_tab_stack)
 
-        # ── PAGE 0: ⚡ QUICK SETUP (Theme, Language, Vocal, Count) ──
+        # ── PAGE 0: ⚡ QUICK SETUP (English Hit Blueprint, Theme, Language, Vocal, Count) ──
         quick_page = QWidget()
         quick_layout = QVBoxLayout(quick_page)
         quick_layout.setContentsMargins(4, 2, 4, 2)
-        quick_layout.setSpacing(6)
+        quick_layout.setSpacing(5)
+
+        # ── 0. 1-CLICK ENGLISH HIT BLUEPRINT ──
+        self.lbl_s0_bp = QLabel("🏆 ENGLISH HIT FORMULA (1-CLICK SETUP)")
+        self.lbl_s0_bp.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #38bdf8; letter-spacing: 0.5px;")
+        quick_layout.addWidget(self.lbl_s0_bp)
+
+        self.combo_en_blueprint = QComboBox()
+        self.combo_en_blueprint.setFixedHeight(25)
+        self.combo_en_blueprint.addItems([
+            "🌟 Billboard Top 40 Pop (Max Martin Earworm)",
+            "🍂 Indie Folk & Confessional Diary (Taylor / Finneas)",
+            "🔥 Melodic 808 Trap & Late-Night R&B (Post / Weeknd)",
+            "🎸 Stadium Arena Rock & Power Anthem (Coldplay)",
+            "⚡ Festival EDM & Euphoric Mainstage Drop",
+            "🌙 Bedroom Alt-Pop & Lofi Soul (Billie Style)",
+            "🤠 Modern Country & Heartland Storyteller",
+        ])
+        self.combo_en_blueprint.setToolTip("1-Click English Songwriting Formula: Automatically configures Theme, Story Seed, Vocal Delivery & Lyrical Meter")
+        self.combo_en_blueprint.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #0b0f1f; border: 1px solid #283354; border-radius: 4px; color: #38bdf8;")
+        self.combo_en_blueprint.currentTextChanged.connect(self._on_english_blueprint_selected)
+        quick_layout.addWidget(self.combo_en_blueprint)
 
         # ── 1. SONG THEME / MOOD ──
         self.lbl_s1 = QLabel("🎵 1. THEME & STYLE")
@@ -2405,6 +2426,60 @@ class BatchGeneratorView(QWidget):
             btn.setStyleSheet(self._pill_style(code == lang))
         self._update_dynamic_language_presets(lang)
         self._load_initial_demo()
+
+    def _on_english_blueprint_selected(self, text: str):
+        blueprints = {
+            "Billboard Top 40": (
+                "80s retro synth-pop, upbeat earworm hook, neon midnight drive",
+                "Driving along the coastal highway at midnight with the windows down chasing second chances",
+                5, 1,
+            ),
+            "Indie Folk": (
+                "warm acoustic indie folk, fingerstyle Martin guitar, bittersweet autumn reflection",
+                "Finding an old handwritten letter in a vintage coat pocket on a rainy October afternoon",
+                0, 2,
+            ),
+            "Melodic 808 Trap": (
+                "modern melodic trap 808 sub-bass, late-night R&B soul, penthouse rain",
+                "Staring at the city skyline at 3 AM after making it from nothing, wondering who is still real",
+                4, 3,
+            ),
+            "Stadium Arena Rock": (
+                "driving stadium arena rock anthem, soaring electric guitars, massive crowd chant",
+                "Standing together in the pouring rain refusing to back down when the lights go out",
+                5, 5,
+            ),
+            "Festival EDM": (
+                "euphoric festival progressive house, emotional piano build, massive synth drop",
+                "Two strangers meeting under festival laser beams feeling invincible until sunrise",
+                5, 1,
+            ),
+            "Bedroom Alt-Pop": (
+                "dark bedroom alt-pop, intimate whispered vocal, deep sub-bass pulse",
+                "Talking to the ceiling fan at 2:15 AM while your phone screen glows in the dark",
+                3, 6,
+            ),
+            "Modern Country": (
+                "modern Nashville country pop, acoustic strumming, pedal steel, small-town nostalgia",
+                "Packing a beat-up pickup truck at dawn and leaving the hometown county line behind",
+                1, 2,
+            ),
+        }
+        for key, (theme_str, seed_str, depth_idx, div_idx) in blueprints.items():
+            if key in text:
+                if self.current_lang != "English":
+                    self._set_language("English")
+                if hasattr(self, "txt_theme"):
+                    self.txt_theme.setPlainText(theme_str)
+                if hasattr(self, "txt_story_seed"):
+                    self.txt_story_seed.setPlainText(seed_str)
+                if hasattr(self, "combo_depth_mode") and depth_idx < self.combo_depth_mode.count():
+                    self.combo_depth_mode.setCurrentIndex(depth_idx)
+                if hasattr(self, "combo_diversity") and div_idx < self.combo_diversity.count():
+                    self.combo_diversity.setCurrentIndex(div_idx)
+                if hasattr(self, "lbl_batch_stat"):
+                    self.lbl_batch_stat.setText(f"🏆 Applied Blueprint: {key} — Click Generate!")
+                break
 
     def _roll_fresh_anti_cliche_concept(self):
         """Generates an unexpected, highly novel atmosphere, sensory anchor, and emotional conflict."""
@@ -4418,6 +4493,8 @@ Stand up for the stories never told!"""
                 self.txt_theme.setStyleSheet(f"padding: 2px 6px; font-size: 11px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 5px; color: {t['text_primary']};")
             if hasattr(self, "combo_diversity"):
                 self.combo_diversity.setStyleSheet(f"padding: 1px 6px; font-weight: 700; font-size: 10px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 4px; color: {t['text_secondary']};")
+            if hasattr(self, "combo_en_blueprint"):
+                self.combo_en_blueprint.setStyleSheet(f"padding: 1px 6px; font-weight: 700; font-size: 10px; background: {t['bg_input']}; border: 1px solid {t['border_accent']}; border-radius: 4px; color: {t['text_accent']};")
             if hasattr(self, "combo_count"):
                 self.combo_count.setStyleSheet(f"padding: 1px 6px; font-weight: 700; font-size: 10px; background: {t['bg_input']}; border: 1px solid {t['border']}; border-radius: 4px; color: {t['text_accent']};")
             if hasattr(self, "combo_style_limit"):
@@ -4557,6 +4634,8 @@ Stand up for the stories never told!"""
                 self.txt_theme.setStyleSheet("padding: 2px 6px; font-size: 11px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 5px; color: #0f172a;")
             if hasattr(self, "combo_diversity"):
                 self.combo_diversity.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; color: #1d4ed8;")
+            if hasattr(self, "combo_en_blueprint"):
+                self.combo_en_blueprint.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #eff6ff; border: 1px solid #93c5fd; border-radius: 4px; color: #1d4ed8;")
             if hasattr(self, "combo_count"):
                 self.combo_count.setStyleSheet("padding: 1px 6px; font-weight: 700; font-size: 10px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a;")
             if hasattr(self, "combo_style_limit"):

@@ -34,32 +34,32 @@ MASTER_PRESETS = [
         "prompt": "80s synthpop, 124 BPM, Key: Am, punchy analog Moog bass, LinnDrum, Juno-106 synth arps, soaring female vocal belt, pristine modern radio master"
     },
     {
-        "label": "🇰🇭 Kantrum Trap",
-        "genre": "Khmer Kantrum Modern Trap Fusion",
-        "bpm": "135 BPM",
-        "key": "Dm",
-        "chords": ["Dm", "Bb", "C", "Dm"],
-        "prog_name": "i - VI - VII - i (Trap Minor)",
-        "mood": "Fiery & High-Energy",
-        "instruments": "Tro Sau, Roneat Ek, sliding 808 sub-bass, snappy hi-hat rolls, Skor Daey",
-        "vocals": "dynamic rhythmic Khmer vocal, party ad-libs, festive vocal callouts",
-        "story": "បុណ្យភូមិរាំវង់ (Village Festival Dance): សប្បាយរីករាយជួបជុំបងប្អូនរាំលេងកម្សាន្ត",
-        "language": "Khmer (ភាសាខ្មែរ)",
-        "prompt": "Khmer modern trap, 135 BPM, Key: Dm, Tro Sau, Roneat Ek, 808 sub-bass, snappy trap drums, energetic Khmer vocal chant, festive party bounce"
+        "label": "🔥 Melodic Trap 808",
+        "genre": "Melodic Trap & Late-Night R&B",
+        "bpm": "140 BPM",
+        "key": "Cm",
+        "chords": ["Cm", "Ab", "Eb", "Bb"],
+        "prog_name": "i - VI - III - VII (Melodic Trap)",
+        "mood": "Moody & Atmospheric",
+        "instruments": "Deep Sliding 808 Sub-Bass, Crisp Trap Hi-Hat Rolls, Atmospheric Pads, Muted Electric Guitar",
+        "vocals": "melodic autotune vocal flow, raspy emotional chest belt, spatial reverb ad-libs",
+        "story": "Penthouse Rain at 3 AM: Counting city lights from the balcony, chasing what money couldn't buy",
+        "language": "English",
+        "prompt": "melodic trap R&B, 140 BPM, Key: Cm, deep 808 sub-bass, crisp hi-hat rolls, atmospheric synth pads, raspy melodic male vocal, modern Billboard production"
     },
     {
-        "label": "🎙️ 70s Khmer Gold",
-        "genre": "Khmer 60s-70s Golden Era Psychedelic Rock",
-        "bpm": "118 BPM",
-        "key": "Gm",
-        "chords": ["Gm", "Cm", "D7", "Gm"],
-        "prog_name": "i - iv - V7 - i (Sinn Sisamouth)",
-        "mood": "Nostalgic & Romantic",
-        "instruments": "Vintage Fuzz Guitar, Farfisa Organ, Warm Brass Horn Section, Analog Drums",
-        "vocals": "emotive vintage crooner vocal, Sinn Sisamouth romantic timbre, warm tape slapback",
-        "story": "ស្នេហ៍ក្នុងគ្រាអតីត (Golden Era Romance): អនុស្សាវរីយ៍ស្នេហ៍ផ្អែមល្ហែមសម័យសង្គមរាស្ត្រនិយម",
-        "language": "Khmer (ភាសាខ្មែរ)",
-        "prompt": "1970s Cambodian psychedelic garage rock, 118 BPM, Key: Gm, fuzz guitar riffs, vintage Farfisa organ, emotive male crooner, warm analog tape mastering"
+        "label": "🎸 Stadium Pop-Rock",
+        "genre": "Stadium Arena Pop-Rock Anthem",
+        "bpm": "130 BPM",
+        "key": "F",
+        "chords": ["F", "C", "Dm", "Bb"],
+        "prog_name": "I - V - vi - IV (Arena Anthem)",
+        "mood": "Uplifting & Anthemic",
+        "instruments": "Delay Electric Guitars, Grand Piano Chords, Pounding Stadium Tom Drums, Crowd Choir",
+        "vocals": "soaring arena rock tenor lead, massive gang vocal chorus chant, emotional falsetto lift",
+        "story": "Lights Across the Stadium: Standing together when the world goes dark, singing till our voices break",
+        "language": "English",
+        "prompt": "stadium pop rock anthem, 130 BPM, Key: F, soaring U2/Coldplay style delay guitars, driving acoustic piano, massive crowd chant chorus, cinematic master"
     },
     {
         "label": "🌙 Lofi Midnight",
@@ -993,11 +993,25 @@ class VisualStudioView(QWidget):
 
         m_inner.addWidget(macro_flow)
 
-        self.btn_copy_template = QPushButton("📋 Copy Suno Section Template")
+        tpl_row = QHBoxLayout()
+        tpl_row.setContentsMargins(0, 0, 0, 0)
+        tpl_row.setSpacing(4)
+
+        self.btn_copy_template = QPushButton("📋 Copy Section Template")
         self.btn_copy_template.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_copy_template.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #86efac; border-radius: 4px; padding: 4px 6px; font-size: 10px; font-weight: 700;")
+        self.btn_copy_template.setToolTip("Copy complete Suno v6 song structure & lyric skeleton to clipboard")
+        self.btn_copy_template.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #86efac; border-radius: 4px; padding: 4px 6px; font-size: 9.5px; font-weight: 700;")
         self.btn_copy_template.clicked.connect(self._copy_suno_lyric_template)
-        m_inner.addWidget(self.btn_copy_template)
+        tpl_row.addWidget(self.btn_copy_template, 1)
+
+        self.btn_copy_en_hook = QPushButton("🎤 Copy English Hook")
+        self.btn_copy_en_hook.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy_en_hook.setToolTip("Generate and copy a catchy English chorus hook matching your live formula")
+        self.btn_copy_en_hook.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; border-radius: 4px; padding: 4px 6px; font-size: 9.5px; font-weight: 700;")
+        self.btn_copy_en_hook.clicked.connect(self._copy_english_chorus_hook)
+        tpl_row.addWidget(self.btn_copy_en_hook, 1)
+
+        m_inner.addLayout(tpl_row)
 
         layout.addWidget(self.macro_box)
 
@@ -1410,6 +1424,20 @@ class VisualStudioView(QWidget):
         QApplication.clipboard().setText(tag)
         if hasattr(self, "lbl_macro_status"):
             self.lbl_macro_status.setText(f"✅ Copied {tag} to Clipboard!")
+
+    def _copy_english_chorus_hook(self):
+        import random
+        title = self.current_story.split(":")[0].strip() if ":" in self.current_story else "Midnight Neon"
+        chords_str = " - ".join(f"[{c}]" for c in self.current_chords)
+        hooks = [
+            f"[Chorus: {self.current_genre} Hook, {self.current_bpm}, Key: {self.current_key}]\n{chords_str}\nWe are chasing {title.lower()} through the static and the rain\nTurning every broken promise into rocket fuel again\nHands up in the headlights, let the whole horizon glow\nYeah, we never look behind us when the stereo is low!",
+            f"[Chorus: Soaring Billboard Belt, {self.current_bpm}, Key: {self.current_key}]\n{chords_str}\nMeet me where the neon bleeds into the coastal sky\nEvery word we never spoke is burning in your eye\nHold the moment steady till the morning breaks the dark\nOne spark in the silence is enough to leave a mark!",
+            f"[Chorus: Catchy Earworm Hook, {self.current_bpm}, Key: {self.current_key}]\n{chords_str}\nSay my name across the wire before the signal fades\nDancing with the shadows that our younger summers made\nEven if the city sleeps, our heartbeat stays awake\nThis is still the only chance I'm ever gonna take!",
+        ]
+        picked = random.choice(hooks)
+        QApplication.clipboard().setText(picked)
+        if hasattr(self, "lbl_macro_status"):
+            self.lbl_macro_status.setText("🎤 Copied English Chorus Hook!")
 
     def _copy_suno_lyric_template(self):
         """Generate and copy an authentic Suno lyrics skeleton with section metatags (Khmer or English)."""

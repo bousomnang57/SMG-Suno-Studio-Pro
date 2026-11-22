@@ -459,37 +459,57 @@ class EditorPanel(QWidget):
         # Compatibility dummy ref if stem_frame is referenced
         self.stem_frame = self.metro_frame
 
-        # ── Deck Page 0 widget (Section Tags & Chords) ──
+        # ── Deck Page 0 widget (Section Tags & Chords — Clean English-First Order) ──
         self.tags_page = QWidget()
         sec_layout = QHBoxLayout(self.tags_page)
         sec_layout.setContentsMargins(2, 2, 2, 2)
         sec_layout.setSpacing(3)
 
-        # Khmer Poetic Section Tags Dropdown (Clean English label)
-        self.btn_khmer_tags = QPushButton("🇰🇭 KH Tags ▾")
-        self.btn_khmer_tags.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_khmer_tags.setToolTip("Insert Khmer Section Metatags (Optional bilingual/Khmer section tags)")
-        self.btn_khmer_tags.setStyleSheet("background-color: #fdf2f8; color: #be185d; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #fbcfe8;")
-        kh_menu = QMenu(self)
-        kh_menu.setStyleSheet("background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 4px;")
-        kh_tags = [
-            "[អារម្ភកថា: Intro - សំឡេងទ្រ និងព្យាណូ]",
-            "[វគ្គ១: Verse 1 - សំឡេងស្រទន់]",
-            "[វគ្គ២: Verse 2 - ចង្វាក់រលូន]",
-            "[តភ្ជាប់: Pre-Chorus - ចង្វាក់កើនឡើង]",
-            "[បន្ទរ: Chorus - អារម្មណ៍ឡើងខ្ពស់ ស្គរបុកពេញ]",
-            "[បន្ទរបន្ថែម: Post-Chorus]",
-            "[តភ្ជាប់ផ្លាស់ប្តូរ: Bridge - សំឡេងកូតទ្រកំសត់]",
-            "[ទោល: Solo - ឧបករណ៍ភ្លេងបុរាណ]",
-            "[បញ្ចប់: Outro - សំឡេងស្រុតចុះបន្តិចម្តងៗ]",
-            "[End]"
+        # 1. English Section Metatags Dropdown (Primary)
+        self.btn_en_sections = QPushButton("🏷️ Sections ▾")
+        self.btn_en_sections.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_en_sections.setToolTip("Insert Structured English Suno v6 Section Metatags")
+        self.btn_en_sections.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid #93c5fd;")
+        en_sec_menu = QMenu(self)
+        en_sec_menu.setStyleSheet("background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 4px;")
+        en_sec_tags = [
+            "[Intro: Atmospheric Instrumental Build]",
+            "[Verse 1: Intimate Storytelling Vocal]",
+            "[Pre-Chorus: Rising Drum Build & Tension]",
+            "[Chorus: Anthemic Earworm Hook, Full Harmonies]",
+            "[Post-Chorus: Catchy Vocal Chant]",
+            "[Verse 2: Bass & Drums Lock In]",
+            "[Bridge: Stripped Emotional Breakdown]",
+            "[Guitar / Synth Solo]",
+            "[Final Chorus: Key Change +1, Maximum Energy]",
+            "[Outro: Fading Reverb Tail]",
+            "[End]",
         ]
-        for kt in kh_tags:
-            kh_menu.addAction(kt, lambda t=kt: self.insert_section_tag(t))
-        self.btn_khmer_tags.setMenu(kh_menu)
-        sec_layout.addWidget(self.btn_khmer_tags)
+        for et in en_sec_tags:
+            en_sec_menu.addAction(et, lambda t=et: self.insert_section_tag(t))
+        self.btn_en_sections.setMenu(en_sec_menu)
+        sec_layout.addWidget(self.btn_en_sections)
 
-        # Hit Blueprints Dropdown
+        # 2. 1-Click English Hook & Lyric Starters Dropdown
+        self.btn_en_hooks = QPushButton("🎤 Hooks ▾")
+        self.btn_en_hooks.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_en_hooks.setToolTip("1-Click English Lyric Hook Starters (Choruses, Pre-Choruses & Emotional Twists)")
+        self.btn_en_hooks.setStyleSheet("background-color: #ecfdf5; color: #047857; font-weight: 700; font-size: 8.5pt; padding: 3px 6px; border-radius: 4px; border: 1px solid #86efac;")
+        hook_menu = QMenu(self)
+        hook_menu.setStyleSheet("background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 4px;")
+        en_hooks_list = [
+            ("🌟 Midnight Neon Pop Chorus", "[Chorus: Anthemic Pop Hook]\nUnderneath the midnight neon lights\nWe are turning broken yesterdays to flights\nHands up through the sunroof, racing with the dawn\nYeah, we keep on burning long after the storm is gone!"),
+            ("💔 Confessional Heartbreak Chorus", "[Chorus: Soaring Emotional Belt]\nI still see your jacket on the kitchen chair\nBreathing in a memory that isn't really there\nIf moving on is easy like you said it'd be\nWhy does every green light still remind you of me?"),
+            ("🔥 Melodic 808 Trap / R&B Hook", "[Chorus: Melodic Trap Flow, 808 Sub]\nPenthouse rain falling on the window pane\nTen thousand miles just to outrun the pain\nEverybody talking like they know my name\nNothing in the skyline ever stays the same"),
+            ("⚡ Pre-Chorus Tension Riser", "[Pre-Chorus: Snare Roll & Rising Synth]\nHeart beats faster as the static clears\nTrading all the silence for the open years\nHold your breath and count it down from three—"),
+            ("🌉 Vulnerable Bridge Twist", "[Bridge: Stripped Piano & Whispered Vocal]\nMaybe we were never meant to play it safe\nMaybe every scar is just a sacred place\n(Drums crash back in — Full Wall of Sound!)"),
+        ]
+        for h_label, h_text in en_hooks_list:
+            hook_menu.addAction(h_label, lambda t=h_text: self.insert_section_tag(t))
+        self.btn_en_hooks.setMenu(hook_menu)
+        sec_layout.addWidget(self.btn_en_hooks)
+
+        # 3. Hit Blueprints Dropdown
         self.btn_blueprints = QPushButton("📐 Hits ▾")
         self.btn_blueprints.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_blueprints.setToolTip("Commercial Hit Blueprints")
@@ -534,15 +554,6 @@ class EditorPanel(QWidget):
         self.btn_cues.setMenu(cues_menu)
         sec_layout.addWidget(self.btn_cues)
 
-        # Core essential section tags
-        for sec in ["[Verse]", "[Chorus]", "[Bridge]", "[Outro]"]:
-            btn = QPushButton(sec)
-            btn.setObjectName("sectionButton")
-            btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setStyleSheet("font-size: 8pt; font-weight: 600; padding: 2px 4px;")
-            btn.clicked.connect(lambda _, s=sec: self.insert_section_tag(s))
-            sec_layout.addWidget(btn)
-
         # Inline Chord Inserter Dropdown
         self.btn_chords_menu = QPushButton("🎹 Chord ▾")
         self.btn_chords_menu.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -575,6 +586,26 @@ class EditorPanel(QWidget):
         self.btn_trans_up.setStyleSheet("background-color: #f8fafc; color: #334155; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 8.5pt; font-weight: 700; padding: 3px 6px;")
         self.btn_trans_up.clicked.connect(lambda: self._on_transpose(1))
         sec_layout.addWidget(self.btn_trans_up)
+
+        # Optional Khmer Section Tags placed unobtrusively at the far right
+        self.btn_khmer_tags = QPushButton("🇰🇭 KH ▾")
+        self.btn_khmer_tags.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_khmer_tags.setToolTip("Optional Khmer Section Metatags")
+        self.btn_khmer_tags.setStyleSheet("background-color: #f8fafc; color: #64748b; font-weight: 700; font-size: 8pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #cbd5e1;")
+        kh_menu = QMenu(self)
+        kh_menu.setStyleSheet("background-color: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 4px;")
+        for kt in [
+            "[អារម្ភកថា: Intro - សំឡេងទ្រ និងព្យាណូ]",
+            "[វគ្គ១: Verse 1 - សំឡេងស្រទន់]",
+            "[វគ្គ២: Verse 2 - ចង្វាក់រលូន]",
+            "[តភ្ជាប់: Pre-Chorus - ចង្វាក់កើនឡើង]",
+            "[បន្ទរ: Chorus - អារម្មណ៍ឡើងខ្ពស់ ស្គរបុកពេញ]",
+            "[តភ្ជាប់ផ្លាស់ប្តូរ: Bridge - សំឡេងកូតទ្រកំសត់]",
+            "[បញ្ចប់: Outro - សំឡេងស្រុតចុះបន្តិចម្តងៗ]",
+        ]:
+            kh_menu.addAction(kt, lambda t=kt: self.insert_section_tag(t))
+        self.btn_khmer_tags.setMenu(kh_menu)
+        sec_layout.addWidget(self.btn_khmer_tags)
 
         sec_layout.addStretch()
 
@@ -1494,9 +1525,13 @@ class EditorPanel(QWidget):
             if hasattr(self, "btn_copy_lyrics"):
                 self.btn_copy_lyrics.setStyleSheet("background-color: #064e3b; color: #34d399; border: 1px solid #059669; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 700;")
 
+            if hasattr(self, "btn_en_sections"):
+                self.btn_en_sections.setStyleSheet("background-color: #172554; color: #93c5fd; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #2563eb;")
+            if hasattr(self, "btn_en_hooks"):
+                self.btn_en_hooks.setStyleSheet("background-color: #064e3b; color: #34d399; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #059669;")
             if hasattr(self, "btn_khmer_tags"):
-                self.btn_khmer_tags.setStyleSheet("background-color: #500724; color: #f472b6; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #be185d;")
-            self.btn_blueprints.setStyleSheet("background-color: #064e3b; color: #34d399; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #059669;")
+                self.btn_khmer_tags.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; font-weight: 700; font-size: 8pt; padding: 3px 5px; border-radius: 4px; border: 1px solid {t['border']};")
+            self.btn_blueprints.setStyleSheet("background-color: #2e1065; color: #d8b4fe; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #7c3aed;")
             self.btn_dynamics.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid {t['border_accent']};")
             if hasattr(self, "btn_cues"):
                 self.btn_cues.setStyleSheet(f"background-color: {t['bg_card_alt']}; color: {t['text_secondary']}; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid {t['border']};")
@@ -1555,6 +1590,8 @@ class EditorPanel(QWidget):
                 self.btn_compare_takes.setStyleSheet(f"background-color: {t['subtle_pill_bg']}; color: {t['text_accent']}; border: 1px solid {t['border_accent']}; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
 
             all_menus = [
+                getattr(self, "btn_en_sections", None) and self.btn_en_sections.menu(),
+                getattr(self, "btn_en_hooks", None) and self.btn_en_hooks.menu(),
                 getattr(self, "btn_khmer_tags", None) and self.btn_khmer_tags.menu(),
                 self.btn_blueprints.menu(),
                 self.btn_dynamics.menu(),
@@ -1619,9 +1656,13 @@ class EditorPanel(QWidget):
             if hasattr(self, "btn_copy_lyrics"):
                 self.btn_copy_lyrics.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; font-weight: 700;")
 
+            if hasattr(self, "btn_en_sections"):
+                self.btn_en_sections.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #93c5fd;")
+            if hasattr(self, "btn_en_hooks"):
+                self.btn_en_hooks.setStyleSheet("background-color: #ecfdf5; color: #047857; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #86efac;")
             if hasattr(self, "btn_khmer_tags"):
-                self.btn_khmer_tags.setStyleSheet("background-color: #fdf2f8; color: #be185d; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #fbcfe8;")
-            self.btn_blueprints.setStyleSheet("background-color: #f0fdf4; color: #166534; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #bbf7d0;")
+                self.btn_khmer_tags.setStyleSheet("background-color: #f8fafc; color: #475569; font-weight: 700; font-size: 8pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #cbd5e1;")
+            self.btn_blueprints.setStyleSheet("background-color: #faf5ff; color: #7c3aed; font-weight: 700; font-size: 8.5pt; padding: 3px 7px; border-radius: 4px; border: 1px solid #d8b4fe;")
             self.btn_dynamics.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #bfdbfe;")
             if hasattr(self, "btn_cues"):
                 self.btn_cues.setStyleSheet("background-color: #f8fafc; color: #1e293b; font-weight: 700; font-size: 8.5pt; padding: 3px 5px; border-radius: 4px; border: 1px solid #cbd5e1;")
@@ -1680,6 +1721,8 @@ class EditorPanel(QWidget):
                 self.btn_compare_takes.setStyleSheet("background-color: #faf5ff; color: #7c3aed; border: 1px solid #d8b4fe; border-radius: 4px; padding: 3px 7px; font-size: 8.5pt; font-weight: 700;")
 
             all_menus = [
+                getattr(self, "btn_en_sections", None) and self.btn_en_sections.menu(),
+                getattr(self, "btn_en_hooks", None) and self.btn_en_hooks.menu(),
                 getattr(self, "btn_khmer_tags", None) and self.btn_khmer_tags.menu(),
                 self.btn_blueprints.menu(),
                 self.btn_dynamics.menu(),
