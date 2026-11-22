@@ -30,6 +30,7 @@ class SunoLinkDownloadDialog(QDialog):
     """Studio Suno Downloader dialog matching usesuno.com/tools/downloader feature set."""
 
     load_into_editor_requested = pyqtSignal(str)  # audio_path
+    load_into_master_requested = pyqtSignal(str)  # audio_path
     import_lyrics_requested = pyqtSignal(str, str)  # title, lyrics
     send_to_visual_requested = pyqtSignal(dict)  # formula/tags
 
@@ -331,6 +332,13 @@ class SunoLinkDownloadDialog(QDialog):
         self.btn_audition_editor.clicked.connect(self._audition_in_editor)
         spf_layout.addWidget(self.btn_audition_editor)
 
+        self.btn_master_audio = QPushButton("🎛️ Master Audio")
+        self.btn_master_audio.setFixedHeight(27)
+        self.btn_master_audio.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_master_audio.setToolTip("Open audio in Mode 6 Pro Mastering Studio & Suno Audio Fixer")
+        self.btn_master_audio.clicked.connect(self._master_audio)
+        spf_layout.addWidget(self.btn_master_audio)
+
         self.btn_import_lyrics = QPushButton("📝 Import Lyrics to Studio")
         self.btn_import_lyrics.setFixedHeight(27)
         self.btn_import_lyrics.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -566,6 +574,7 @@ class SunoLinkDownloadDialog(QDialog):
 
             is_audio = p.suffix.lower() in [".mp3", ".wav", ".m4a", ".ogg"]
             self.btn_audition_editor.setEnabled(is_audio)
+            self.btn_master_audio.setEnabled(is_audio)
         else:
             self.progress_single.hide()
             self.lbl_status.setText(f"⚠️ Error: {err}")
@@ -672,6 +681,12 @@ class SunoLinkDownloadDialog(QDialog):
         if self.last_downloaded_path and Path(self.last_downloaded_path).exists():
             self.preview_player.stop()
             self.load_into_editor_requested.emit(self.last_downloaded_path)
+            self.accept()
+
+    def _master_audio(self):
+        if self.last_downloaded_path and Path(self.last_downloaded_path).exists():
+            self.preview_player.stop()
+            self.load_into_master_requested.emit(self.last_downloaded_path)
             self.accept()
 
     def _import_lyrics(self):

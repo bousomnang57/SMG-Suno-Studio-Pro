@@ -1,25 +1,25 @@
 {
-  "version": "2.3.0",
+  "version": "2.4.0",
   "name": "SMG Suno Studio Pro",
-  "title_kh": "SMG Suno Studio Pro v2.3.0 — ស្ទូឌីយោ Suno Browser, Downloader គ្មានដែនកំណត់ និង Style Limit 1000 តួអក្សរ",
-  "title_en": "SMG Suno Studio Pro v2.3.0 — Suno Browser Studio, Unlimited MP3/WAV Downloader & Suno v6 Pro 1000-Char Engine",
-  "release_date": "2026-11-20",
+  "title_kh": "SMG Suno Studio Pro v2.4.0 — ស្ទូឌីយោ Pro Mastering, Suno Audio Fixer, Live A/B Monitor និង Parametric EQ",
+  "title_en": "SMG Suno Studio Pro v2.4.0 — Pro Mastering Studio, Suno AI Audio Fixer, Live A/B Monitor & FL Parametric EQ",
+  "release_date": "2026-11-22",
   "min_os_version": "Windows 10 / 11 (64-bit)",
-  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_v2.3.0_Setup.exe",
-  "installer_name": "SMG_Suno_Studio_Pro_v2.3.0_Setup.exe",
-  "file_size_mb": 209.6,
+  "download_url": "https://github.com/bousomnang57/SMG-Suno-Studio-Pro/releases/latest/download/SMG_Suno_Studio_Pro_v2.4.0_Setup.exe",
+  "installer_name": "SMG_Suno_Studio_Pro_v2.4.0_Setup.exe",
+  "file_size_mb": 210.5,
   "changelog_kh": [
-    "🌐 បន្ថែមផ្ទាំងទី ៦ Suno Browser Studio ភ្ជាប់ Login Profile ច្រើនគណនី និងមុខងារ 1-Click Auto-Fill ទំនុកច្រៀង/Style ព្រមទាំង Full Screen (F11/Esc)",
-    "📥 បន្ថែមប្រព័ន្ធ Suno Downloader ទាញយកចម្រៀង MP3, Lossless WAV (PCM), MP4 Video និង 4K Artwork ដោយគ្មានដែនកំណត់ចំនួនបទក្នុងមួយខែ",
-    "🚀 គាំទ្រកម្រិត Style Limit 1,000 តួអក្សរសម្រាប់ Suno v6 Pro / Max / v5 លើ Batch Studio Pro, Visual Studio និង Gemini AI Generator",
-    "🎨 ធ្វើទំនើបកម្មរូបរាងទាំង ៥ (Obsidian, Cyber Blue, Emerald, Sunset Amber, Canvas Light) ឱ្យច្បាស់ត្រជាក់ភ្នែក និងងាយស្រួលមើលគ្រប់ប៊ូតុង",
-    "🛡️ ពង្រឹងប្រព័ន្ធ Build EXE និង Inno Setup ដោយបញ្ចូល Chromium WebEngine, VC++ Runtimes និង SoundFile DLLs ដើម្បីដំណើរការរលូនគ្មាន Error លើគ្រប់កុំព្យូទ័រ"
+    "🎛️ បន្ថែមផ្ទាំងទី ៧ Pro Mastering Studio & Suno Audio Fixer (Ctrl+7) ស្ទូឌីយោ DAW ពេញលេញ គ្មាន Logo ជាមួយ FL-Style 6-Band Parametric EQ, De-AI Filter និង 4x True-Peak Brickwall Limiter",
+    "🎧 ប្រព័ន្ធ Live A/B Monitor ប្តូរភ្លាមៗរវាងសម្លេងដើម [A: Original Suno] និងសម្លេងសម្រួលរួច [B: Mastered Pro] គ្មាន latency ជាមួយ Stereo L/R Peak Meters",
+    "🤖 មុខងារ AI Artifact Scanner រកឃើញសំឡេងរញ៉េរញ៉ៃ (Boxy Mud 200-500Hz, Robotic Harshness 6k-10kHz, Inter-sample Clipping) ព្រមទាំង Auto Title AI បង្កើតចំណងជើងតាម Key/BPM/Vibe",
+    "🌉 ស្ពានភ្ជាប់ 1-Click Studio Ecosystem: ទាញយកពី Suno Downloader ឬ Suno Browser ចូល Mastering Studio ភ្លាមៗ និង Export ចូល Lyric Editor Stem Player",
+    "🛡️ Hardened Installer & Standalone EXE: គាំទ្រ 64-bit NumPy Offline DSP គ្មានការពឹងផ្អែកលើ Scipy/Heavy ML ធានាដំណើរការរលូនគ្មាន Error លើគ្រប់ Windows 10/11 PC"
   ],
   "changelog_en": [
-    "🌐 Added 6th Studio Tab: Embedded Suno Browser Workstation with multi-account login profiles, 1-click Title/Style/Lyrics React auto-fill, and Dock Collapse / Theater Full Screen mode (F11 / Esc)",
-    "📥 Added Suno Music Downloader Studio: Unlimited in-browser / local MP3, Studio WAV (PCM), MP4 video, and 4K album art downloads with zero monthly song limits",
-    "🚀 Supported Suno v6 Pro / Max / v5 1,000-character Style Limit across Batch Studio Pro, Visual Studio, Suno Browser Studio, and Gemini Generation Worker",
-    "🎨 Enhanced all 5 Studio Themes (Obsidian Violet, Cyber Blue, Emerald, Sunset Amber, Canvas Light) with high-contrast sharp typography, responsive hover effects, and clean clear controls",
-    "🛡️ Hardened Windows x64 Standalone EXE and Inno Setup Windows installer with full PyQt6 WebEngine, Chromium runtime dependencies (icudtl.dat, pak), VC++ 2015-2022 DLLs, and libsndfile for zero error on other PCs"
+    "🎛️ Added 7th Studio Mode: Pro Mastering Studio & Suno Audio Fixer (Ctrl+7) clean logo-free pro DAW with FL-style 6-band Parametric EQ, De-AI notch filters, Mid-Side expander, and 4x True-Peak Brickwall Limiter",
+    "🎧 Zero-latency Live A/B Monitor: Instant one-click toggle between [A: Original Suno] and [B: Mastered Pro] with dual vertical L/R dBFS peak meters and antialiased interactive waveform editor",
+    "🤖 Suno AI Artifact Scanner & Auto Title AI: Auto-detects 200-500Hz boxy mud, 6k-10kHz robotic phase smear, inter-sample clipping, and generates 5 musical key/tempo/vibe song titles",
+    "🌉 1-Click Studio Ecosystem Bridges: Direct handoff from Suno Downloader and Suno Browser into Mastering Studio, and 1-click export to Lyric Editor Stem Player",
+    "🛡️ Hardened Installer & Standalone EXE: Pure 64-bit NumPy vectorized offline DSP without SciPy dependencies, ensuring flawless execution on all Windows 10/11 (x64) PCs"
   ]
 }

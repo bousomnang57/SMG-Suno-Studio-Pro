@@ -29,6 +29,7 @@ class SunoBrowserView(QWidget):
     """Embedded Suno AI Browser & 1-Click Auto-Fill Workstation."""
 
     load_audio_into_editor_requested = pyqtSignal(str)
+    load_audio_into_master_requested = pyqtSignal(str)
     open_floating_hud_requested = pyqtSignal()
     pull_from_studio_requested = pyqtSignal()
     open_link_downloader_requested = pyqtSignal(str)  # initial_url
@@ -420,6 +421,14 @@ class SunoBrowserView(QWidget):
         self.btn_load_dl_to_editor.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_load_dl_to_editor.clicked.connect(self._send_last_download_to_editor)
         dl_btns.addWidget(self.btn_load_dl_to_editor)
+
+        self.btn_load_dl_to_master = QPushButton("🎛️ Master")
+        self.btn_load_dl_to_master.setFixedHeight(23)
+        self.btn_load_dl_to_master.setEnabled(False)
+        self.btn_load_dl_to_master.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_load_dl_to_master.setToolTip("Open audio in Mode 6 Pro Mastering Studio & Suno Audio Fixer")
+        self.btn_load_dl_to_master.clicked.connect(self._send_last_download_to_master)
+        dl_btns.addWidget(self.btn_load_dl_to_master)
         dl_layout.addLayout(dl_btns)
 
         d_layout.addWidget(self.download_frame)
@@ -699,6 +708,7 @@ class SunoBrowserView(QWidget):
         if dest_path.exists():
             self.last_downloaded_audio_path = str(dest_path)
             self.btn_load_dl_to_editor.setEnabled(True)
+            self.btn_load_dl_to_master.setEnabled(True)
             self.lbl_download_status.setText(f"✅ Saved: {dest_path.name}")
 
     def _open_downloads_folder(self):
@@ -707,6 +717,10 @@ class SunoBrowserView(QWidget):
     def _send_last_download_to_editor(self):
         if self.last_downloaded_audio_path and Path(self.last_downloaded_audio_path).exists():
             self.load_audio_into_editor_requested.emit(self.last_downloaded_audio_path)
+
+    def _send_last_download_to_master(self):
+        if self.last_downloaded_audio_path and Path(self.last_downloaded_audio_path).exists():
+            self.load_audio_into_master_requested.emit(self.last_downloaded_audio_path)
 
     def _paste_into_quick_dl(self):
         txt = QApplication.clipboard().text().strip()
@@ -743,6 +757,7 @@ class SunoBrowserView(QWidget):
                 p = Path(path)
                 self.lbl_download_status.setText(f"✅ Saved: {p.name}")
                 self.btn_load_dl_to_editor.setEnabled(True)
+                self.btn_load_dl_to_master.setEnabled(True)
                 self.txt_quick_dl.clear()
             else:
                 self.lbl_download_status.setText(f"⚠️ Error: {err[:45]}")

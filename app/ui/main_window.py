@@ -152,12 +152,20 @@ class MainWindow(QMainWindow):
         # View 5: Native Embedded Suno Browser Studio (Account Switcher, Auto-Fill, Downloads)
         self.suno_browser_view = SunoBrowserView(parent=self, theme_key=self.current_theme)
         self.suno_browser_view.load_audio_into_editor_requested.connect(self._load_downloaded_suno_audio_into_editor)
+        self.suno_browser_view.load_audio_into_master_requested.connect(self._load_audio_into_mastering_studio)
         self.suno_browser_view.open_floating_hud_requested.connect(self._open_suno_hud)
         self.suno_browser_view.pull_from_studio_requested.connect(lambda: self._sync_tracks_into_suno_browser(prefer_batch=False))
         self.suno_browser_view.open_link_downloader_requested.connect(self._open_suno_link_downloader)
         self.suno_browser_view.import_lyrics_requested.connect(self._import_downloaded_suno_lyrics)
         self.suno_browser_view.toggle_fullscreen_requested.connect(self._on_suno_fullscreen_toggled)
         self.stack.addWidget(self.suno_browser_view)
+
+        # View 6: Pro Mastering Studio & Suno Audio Fixer (Mastering DAW)
+        from app.ui.audio_mastering_view import AudioMasteringView
+        self.master_view = AudioMasteringView(parent=self)
+        self.master_view.send_to_editor_requested.connect(self._on_master_sent_to_editor)
+        self.master_view.switch_to_suno_requested.connect(lambda: self._set_studio_mode(5))
+        self.stack.addWidget(self.master_view)
 
         master_layout.addWidget(self.stack, stretch=1)
 
@@ -464,6 +472,24 @@ class MainWindow(QMainWindow):
         elif mode == 5:  # Suno Browser Studio -> 1-Click Auto-Fill
             if hasattr(self, "suno_browser_view"):
                 self.suno_browser_view.autofill_all_to_suno()
+        elif mode == 6:  # Pro Audio Mastering -> 1-Click Auto All
+            if hasattr(self, "master_view"):
+                self.master_view._start_1click_auto_all()
+
+    def _on_master_sent_to_editor(self, audio_path: str):
+        """Handoff mastered audio directly into Lyric Editor Stem Player."""
+        p = Path(audio_path)
+        if not p.exists():
+            return
+        self._set_studio_mode(3)
+        if hasattr(self, "editor_panel"):
+            if hasattr(self.editor_panel, "load_audio_stem"):
+                self.editor_panel.load_audio_stem(str(p))
+            elif hasattr(self.editor_panel, "stem_player"):
+                self.editor_panel.stem_player.setSource(QUrl.fromLocalFile(str(p)))
+            if hasattr(self.editor_panel, "_switch_tool_deck"):
+                self.editor_panel._switch_tool_deck(1)
+        self.status_bar.showMessage(f"🎛️ Loaded mastered audio into Stem Player: {p.name}", 4500)
 
     def _create_header_bar(self) -> QWidget:
         self.header_frame = QFrame()
@@ -545,8 +571,15 @@ class MainWindow(QMainWindow):
         self.btn_mode_suno.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mode_suno.clicked.connect(lambda: self._set_studio_mode(5))
 
-        for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno]:
-            btn.setFixedWidth(66)
+        self.btn_mode_master = QPushButton("🎛️ Master")
+        self.btn_mode_master.setToolTip("🎛️ ស្ទូឌីយោ Master & Suno Audio Fixer (Pro Audio Mastering DAW) [Ctrl+7]")
+        self.btn_mode_master.setCheckable(True)
+        self.btn_mode_master.setChecked(False)
+        self.btn_mode_master.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mode_master.clicked.connect(lambda: self._set_studio_mode(6))
+
+        for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
+            btn.setFixedWidth(64)
             btn.setFixedHeight(28)
             mb_layout.addWidget(btn)
 
@@ -803,7 +836,7 @@ class MainWindow(QMainWindow):
                     border: 1px solid {accent};
                 }}
             """
-            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno]:
+            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
                 btn.setStyleSheet(mode_btn_qss)
 
             capsule_qss = f"""
@@ -1027,7 +1060,7 @@ class MainWindow(QMainWindow):
                     font-weight: 800;
                 }
             """
-            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno]:
+            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
                 btn.setStyleSheet(mode_btn_qss)
 
             capsule_qss = """
@@ -1219,16 +1252,19 @@ class MainWindow(QMainWindow):
         self.btn_mode_clone.setChecked(index == 4)
         if hasattr(self, "btn_mode_suno"):
             self.btn_mode_suno.setChecked(index == 5)
+        if hasattr(self, "btn_mode_master"):
+            self.btn_mode_master.setChecked(index == 6)
         self.stack.setCurrentIndex(index)
 
-        mode_titles = ["🗺️ WIZARD", "🎨 VISUAL", "⚡ BATCH", "✍️ EDITOR", "🧬 CLONE", "🌐 SUNO"]
+        mode_titles = ["🗺️ WIZARD", "🎨 VISUAL", "⚡ BATCH", "✍️ EDITOR", "🧬 CLONE", "🌐 SUNO", "🎛️ MASTER"]
         ribbon_infos = [
             "🗺️ Wizard Studio • Step-by-step guided song creation with automatic genre & prompt setup",
             "🎨 Visual Arranger • Suno AI visual prompt tags, mood matrix & live formula preview",
             "⚡ Batch Studio Pro • Multi-song generation, anti-cliché shuffler & album story arcs",
             "✍️ Lyric Editor Workbench • 3-pane DAW lyric writing, syllable meter, chord transposer & takes",
             "🧬 Song DNA Cloner • Deep structure & cadence cloner with twin rhyme scheme generator",
-            "🌐 Suno Browser Studio • Persistent multi-account login, 1-click Title/Style/Lyrics auto-fill & MP3 download manager"
+            "🌐 Suno Browser Studio • Persistent multi-account login, 1-click Title/Style/Lyrics auto-fill & MP3 download manager",
+            "🎛️ Pro Mastering Studio • Suno AI Artifact Removal, FL-Style Parametric EQ, True-Peak Limiter & Loudness Normalization"
         ]
         action_labels = [
             "✍️ Open in Editor ➔",
@@ -1236,7 +1272,8 @@ class MainWindow(QMainWindow):
             "✍️ Open in Editor ➔",
             "🎨 Open in Arranger ➔",
             "✍️ Open in Editor ➔",
-            "⚡ Auto-Fill to Suno ➔"
+            "⚡ Auto-Fill to Suno ➔",
+            "⚡ 1-Click Auto All ➔"
         ]
 
         if hasattr(self, "header_stage_pill") and 0 <= index < len(mode_titles):
@@ -1262,13 +1299,14 @@ class MainWindow(QMainWindow):
             self.suno_browser_view.ensure_browser_initialized()
 
     def _setup_global_shortcuts(self):
-        # Studio Modes 1-6
+        # Studio Modes 1-7
         QShortcut(QKeySequence("Ctrl+1"), self).activated.connect(lambda: self._set_studio_mode(0))
         QShortcut(QKeySequence("Ctrl+2"), self).activated.connect(lambda: self._set_studio_mode(1))
         QShortcut(QKeySequence("Ctrl+3"), self).activated.connect(lambda: self._set_studio_mode(2))
         QShortcut(QKeySequence("Ctrl+4"), self).activated.connect(lambda: self._set_studio_mode(3))
         QShortcut(QKeySequence("Ctrl+5"), self).activated.connect(lambda: self._set_studio_mode(4))
         QShortcut(QKeySequence("Ctrl+6"), self).activated.connect(lambda: self._set_studio_mode(5))
+        QShortcut(QKeySequence("Ctrl+7"), self).activated.connect(lambda: self._set_studio_mode(6))
 
         # Workflow Actions
         QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self._new_song)
@@ -1372,6 +1410,8 @@ class MainWindow(QMainWindow):
             self.clone_view.apply_theme(theme_key)
         if hasattr(self, "suno_browser_view") and self.suno_browser_view:
             self.suno_browser_view.apply_theme(theme_key)
+        if hasattr(self, "master_view") and self.master_view:
+            self.master_view.apply_theme(theme_key)
         if getattr(self, "suno_hud", None):
             self.suno_hud.apply_theme(theme_key)
 
@@ -2154,8 +2194,20 @@ class MainWindow(QMainWindow):
         """Launch the Suno Music Downloader dialog to download by link [Ctrl+Shift+D]."""
         dlg = SunoLinkDownloadDialog(parent=self, theme_key=self.current_theme, initial_url=initial_url)
         dlg.load_into_editor_requested.connect(self._load_downloaded_suno_audio_into_editor)
+        if hasattr(dlg, "load_into_master_requested"):
+            dlg.load_into_master_requested.connect(self._load_audio_into_mastering_studio)
         dlg.import_lyrics_requested.connect(self._import_downloaded_suno_lyrics)
         dlg.exec()
+
+    def _load_audio_into_mastering_studio(self, audio_path: str):
+        """Handoff downloaded audio directly into Pro Mastering Studio & Suno Audio Fixer."""
+        p = Path(audio_path)
+        if not p.exists():
+            return
+        if hasattr(self, "master_view"):
+            self.master_view.add_track_file(str(p), auto_select=True)
+            self._set_studio_mode(6)
+            self.status_bar.showMessage(f"🎛️ Loaded '{p.name}' into Pro Mastering Studio & Audio Fixer", 4500)
 
     def _import_downloaded_suno_lyrics(self, title: str, lyrics: str):
         """Load lyrics and title extracted from a downloaded Suno song directly into the Editor."""

@@ -29,17 +29,20 @@ def run_all_tests():
     win.show()
     print("  ✓ MainWindow initialized with 6 tabs")
 
-    print("[2/5] Testing 6-Mode Architecture...")
-    assert win.stack.count() == 6, f"Expected 6 views in stack, got {win.stack.count()}"
+    print("[2/5] Testing 7-Mode Architecture...")
+    assert win.stack.count() == 7, f"Expected 7 views in stack, got {win.stack.count()}"
     assert hasattr(win, "suno_browser_view"), "MainWindow missing suno_browser_view"
+    assert hasattr(win, "master_view"), "MainWindow missing master_view"
     assert hasattr(win, "btn_mode_suno"), "MainWindow missing btn_mode_suno"
+    assert hasattr(win, "btn_mode_master"), "MainWindow missing btn_mode_master"
 
-    mode_names = ["Wizard", "Visual", "Batch", "Editor", "Clone", "Suno"]
-    for idx in range(6):
+    mode_names = ["Wizard", "Visual", "Batch", "Editor", "Clone", "Suno", "Master"]
+    for idx in range(7):
         win._set_studio_mode(idx)
         assert win.stack.currentIndex() == idx, f"Failed switching to mode {idx}"
         print(f"  ✓ Mode {idx} ({mode_names[idx]}) set successfully")
 
+    win._set_studio_mode(5)
     assert win.btn_mode_suno.isChecked() is True
     assert "Suno Browser Studio" in win.lbl_ribbon_info.text()
     assert "Auto-Fill" in win.btn_ribbon_action.text()
