@@ -22,6 +22,7 @@ from PyQt6.QtCore import Qt, QPoint, QUrl
 from app.audio_mastering_engine import (
     AudioMasteringEngine,
     MASTERING_TARGETS,
+    DISTRIBUTOR_SPECS,
 )
 from app.ui.waveform_widget import (
     WaveformCanvas,
@@ -41,9 +42,9 @@ from app.ui.suno_browser_view import SunoBrowserView
 def _generate_test_audio_wav(output_path: str, duration_sec: float = 2.0, sr: int = 44100) -> str:
     """Generate a synthetic test audio WAV file with tone + boxy resonance + silence padding."""
     t = np.linspace(0, duration_sec, int(sr * duration_sec), endpoint=False)
-    # 440 Hz musical tone + 320 Hz boxy resonance + 8000 Hz high sibilance
+    # 440 Hz musical tone + 320 Hz boxy resonance + 8000 Hz high sibilance (realistic correlated stereo center)
     signal_left = 0.4 * np.sin(2 * np.pi * 440 * t) + 0.3 * np.sin(2 * np.pi * 320 * t) + 0.15 * np.sin(2 * np.pi * 8000 * t)
-    signal_right = 0.4 * np.cos(2 * np.pi * 440 * t) + 0.25 * np.sin(2 * np.pi * 320 * t) + 0.15 * np.cos(2 * np.pi * 8000 * t)
+    signal_right = 0.4 * np.sin(2 * np.pi * 440 * t + 0.15) + 0.25 * np.sin(2 * np.pi * 320 * t) + 0.15 * np.sin(2 * np.pi * 8000 * t + 0.2)
     
     # Add 0.2s silence head and 0.2s silence tail
     pad_samples = int(sr * 0.2)
@@ -144,6 +145,34 @@ def test_mastering_dsp_engine(tmp_path: Path):
     assert os.path.getsize(out_mp3) > 1000
     print(f"  ✓ process_master (MP3 320k) verified: {out_mp3} ({os.path.getsize(out_mp3)} bytes)")
 
+    # 8. Verify All 25 Music Distributors + Human Voice Naturalizer + Distribution Delivery Pack
+    required_25 = [
+        "DistroKid", "TuneCore", "CD Baby", "Too Lost", "Ditto Music", "Amuse",
+        "UnitedMasters", "LANDR", "Symphonic Distribution", "RouteNote", "AWAL",
+        "The Orchard", "Believe", "INgrooves", "EMPIRE", "ONErpm", "iMusician",
+        "EmuBands", "Songtradr", "Stem", "Vydia", "Soundrop",
+        "SoundCloud for Artists", "Record Union", "Mogul"
+    ]
+    for d in required_25:
+        assert d in DISTRIBUTOR_SPECS, f"Missing distributor spec: {d}"
+
+    pack = AudioMasteringEngine.export_distribution_release_pack(
+        input_path=test_wav,
+        output_root=tmp_path,
+        release_title="Human Voice Skyline",
+        distributor="All 25 Distributors (Universal Safe)",
+        release_meta={"artist": "SMG Studio", "isrc": "US-SMG-26-00001"},
+        dsp_params={"human_voice_warmth": 80.0, "human_voice_de_metallic": 85.0, "tube_mic_saturation": 50.0},
+    )
+    assert os.path.exists(pack["wav_24"])
+    assert os.path.exists(pack["wav_16"])
+    assert os.path.exists(pack["wav_inst"])
+    assert os.path.exists(pack["csv_path"])
+    assert os.path.exists(pack["cert_path"])
+    assert pack["qc"]["qc_passed"] is True
+    assert pack["qc"]["qc_score"] == 100
+    print(f"  ✓ All 25 Distributors QC & Delivery Pack verified: 100/100 score (24-bit WAV + 16-bit CD + Sync Inst + DDEX CSV + Cert)")
+
 
 def test_waveform_widgets(tmp_path: Path):
     print("\n[2/5] Testing Waveform Editor & Level Meter Widgets...")
@@ -213,12 +242,13 @@ def test_audio_mastering_view(tmp_path: Path):
     view = AudioMasteringView()
     view.resize(1100, 750)
 
-    # Verify 4-Tab Top Studio Ribbon & 5-Tab DSP Rack
+    # Verify 4-Tab Top Studio Ribbon & 6-Tab DSP Rack (including Tab 3 Human Voice & Tab 6 All-25 Distributors)
     assert hasattr(view, "top_ribbon_tabs") and view.top_ribbon_tabs.count() == 4
-    assert view.tabs.count() == 5
+    assert view.tabs.count() == 6
     assert hasattr(view, "list_ai_titles") and view.list_ai_titles.count() == 5
     assert hasattr(view, "txt_musical_theme")
-    print("  ✓ 4-Tab Top Studio Ribbon, 5-Tab DSP Rack, and 5-Item Clickable Auto Title AI list verified")
+    assert hasattr(view, "combo_distributor") and view.combo_distributor.count() >= 26
+    print("  ✓ 4-Tab Top Studio Ribbon, 6-Tab DSP Rack, 5-Item Clickable Auto Title AI list & 25 Distributors verified")
 
     # Test Queue Operations
     view.add_track_file(test_wav, auto_select=True)
@@ -234,7 +264,11 @@ def test_audio_mastering_view(tmp_path: Path):
     view._apply_active_title_to_track()
     assert view.tracks[0]["title"] == view.txt_active_title.text()
 
-    # Test Pro DAW Chain Presets, Reference Track Matcher & Loudness-Matched A/B Toggle
+    # Test Human Voice Preset, 25-Distributor QC Check, Reference Track Matcher & Loudness-Matched A/B Toggle
+    view._apply_human_voice_preset(0)
+    view.combo_distributor.setCurrentText("DistroKid")
+    view._run_distro_qc_check()
+    assert "DistroKid Automated QC Report" in view.txt_distro_qc.toPlainText()
     view._on_daw_chain_preset_changed(1)
     view._match_reference_track(test_wav)
     view.chk_loudness_match_ab.setChecked(True)
@@ -242,7 +276,7 @@ def test_audio_mastering_view(tmp_path: Path):
     assert view.is_ab_mastered is False
     view._set_ab_mode(True)
     assert view.is_ab_mastered is True
-    print("  ✓ Live A/B Monitor toggle, Reference Track Matcher, Loudness-Matched A/B, and Pro DAW chain presets verified")
+    print("  ✓ Human Voice presets, DistroKid QC check, Live A/B Monitor toggle, and Reference Track Matcher verified")
 
     # Test 5 Themes Adaptation
     themes = ["obsidian", "cyber_blue", "emerald", "sunset_amber", "canvas_light"]

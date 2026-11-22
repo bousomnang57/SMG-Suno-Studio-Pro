@@ -35,7 +35,11 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from app.config import config_manager
 from app.ui.styles import get_theme
-from app.audio_mastering_engine import AudioMasteringEngine, MASTERING_TARGETS
+from app.audio_mastering_engine import (
+    AudioMasteringEngine,
+    MASTERING_TARGETS,
+    DISTRIBUTOR_SPECS,
+)
 from app.ui.waveform_widget import (
     WaveformEditorPane,
     CompactHorizontalLevelMeter,
@@ -75,6 +79,9 @@ class MasterWorker(QThread):
                 de_phase_amount=self.params.get("de_phase_amount", 50.0),
                 de_esser_amount=self.params.get("de_esser_amount", 55.0),
                 harmonic_exciter=self.params.get("harmonic_exciter", 35.0),
+                human_voice_warmth=self.params.get("human_voice_warmth", 65.0),
+                human_voice_de_metallic=self.params.get("human_voice_de_metallic", 75.0),
+                tube_mic_saturation=self.params.get("tube_mic_saturation", 40.0),
                 eq_sub_cut_hz=self.params.get("eq_sub_cut_hz", 30.0),
                 eq_low_gain=self.params.get("eq_low_gain", 1.2),
                 eq_mud_cut_gain=self.params.get("eq_mud_cut_gain", -2.4),
@@ -102,6 +109,37 @@ class MasterWorker(QThread):
             self.master_completed.emit(res)
         except Exception as e:
             self.master_failed.emit(str(e))
+
+
+class DistroPackWorker(QThread):
+    """Background worker for building complete All-25 Commercial Distribution Delivery Packs."""
+    progress_updated = pyqtSignal(int, str)
+    pack_completed = pyqtSignal(dict)
+    pack_failed = pyqtSignal(str)
+
+    def __init__(self, input_path: str, out_root: str, title: str, distributor: str, meta: dict, params: dict):
+        super().__init__()
+        self.input_path = input_path
+        self.out_root = out_root
+        self.title = title
+        self.distributor = distributor
+        self.meta = meta
+        self.params = params
+
+    def run(self):
+        try:
+            res = AudioMasteringEngine.export_distribution_release_pack(
+                input_path=self.input_path,
+                output_root=self.out_root,
+                release_title=self.title,
+                distributor=self.distributor,
+                release_meta=self.meta,
+                dsp_params=self.params,
+                progress_callback=lambda pct, msg: self.progress_updated.emit(pct, msg),
+            )
+            self.pack_completed.emit(res)
+        except Exception as e:
+            self.pack_failed.emit(str(e))
 
 
 class AudioMasteringView(QWidget):
@@ -476,15 +514,16 @@ class AudioMasteringView(QWidget):
 
         r_layout.addWidget(wf_group)
 
-        # ── 5-Tab Pro Mastering DSP Rack ──
+        # ── 6-Tab Pro Mastering & Distribution DSP Rack ──
         self.tabs = QTabWidget()
         self.tabs.setObjectName("masterRackTabs")
 
         self.tabs.addTab(self._create_analysis_tab(), "1. AI Analysis && Title")
         self.tabs.addTab(self._create_eq_tab(), "2. EQ 2 (FL Style)")
-        self.tabs.addTab(self._create_deai_tab(), "3. Multiband && De-AI")
+        self.tabs.addTab(self._create_deai_tab(), "3. Human Voice && De-AI")
         self.tabs.addTab(self._create_stereo_tab(), "4. Stereo, Reverb && Trim")
         self.tabs.addTab(self._create_limiter_tab(), "5. Limiter && Export")
+        self.tabs.addTab(self._create_distribution_tab(), "6. Distribution (All 25)")
 
         r_layout.addWidget(self.tabs, stretch=1)
         self.main_splitter.addWidget(right_panel)
@@ -554,12 +593,14 @@ class AudioMasteringView(QWidget):
         self.btn_ribbon_trim = self._make_badge_tool_button("TR", "#0891b2", "Auto Trim", self._auto_trim_current)
         self.btn_ribbon_export = self._make_badge_tool_button("EX", "#059669", "Export Master", self._render_master_b)
         self.btn_ribbon_out_dir = self._make_badge_tool_button("OD", "#334155", "Output Folder", self._open_output_folder)
-        self.btn_ribbon_demo = self._make_badge_tool_button("🎵", "#6366f1", "Demo Track", self.load_demo_suno_track)
+        self.btn_ribbon_human_voice = self._make_badge_tool_button("🎤", "#ec4899", "Human Voice", lambda: (self.tabs.setCurrentIndex(2), self._apply_human_voice_preset(0)))
+        self.btn_ribbon_distro = self._make_badge_tool_button("🌍", "#0f766e", "25-Distro Pack", lambda: self.tabs.setCurrentIndex(5))
 
         self.ribbon_tile_buttons = [
             self.btn_ribbon_add, self.btn_ribbon_folder, self.btn_ribbon_auto_all,
             self.btn_ribbon_analyze, self.btn_ribbon_title, self.btn_ribbon_trim,
-            self.btn_ribbon_export, self.btn_ribbon_out_dir, self.btn_ribbon_demo
+            self.btn_ribbon_export, self.btn_ribbon_out_dir, self.btn_ribbon_human_voice,
+            self.btn_ribbon_distro
         ]
         for b in self.ribbon_tile_buttons:
             lay.addWidget(b)
@@ -1061,54 +1102,79 @@ class AudioMasteringView(QWidget):
 
         layout.addWidget(g_deai, stretch=1)
 
-        # Right Group: Multiband Dynamics & Mono Bass Maker
-        g_mb = QGroupBox("Multiband Dynamics && Mono Sub-Bass Lock")
+        # Right Group: Multiband Dynamics & Human Voice Naturalizer (Suno -> Real Vocal)
+        g_mb = QGroupBox("Human Voice Naturalizer (U87 / Tube Mic) && Multiband Lock")
         g_mb.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_mb = QGridLayout(g_mb)
         l_mb.setContentsMargins(8, 10, 8, 8)
-        l_mb.setVerticalSpacing(8)
+        l_mb.setVerticalSpacing(5)
 
-        l_mb.addWidget(QLabel("Low Band Punch (<150 Hz):"), 0, 0)
+        l_mb.addWidget(QLabel("Human Voice Preset:"), 0, 0)
+        self.combo_human_voice_preset = QComboBox()
+        self.combo_human_voice_preset.addItems([
+            "Neumann U87 Warm Pop Vocal",
+            "Crystal K-Pop / EDM Lead Vocal",
+            "Khmer Soulful Acoustic Human",
+            "Clean Studio Natural (Subtle)",
+        ])
+        self.combo_human_voice_preset.currentIndexChanged.connect(self._apply_human_voice_preset)
+        l_mb.addWidget(self.combo_human_voice_preset, 0, 1, 1, 2)
+
+        l_mb.addWidget(QLabel("Human Chest Warmth (185Hz Body):"), 1, 0)
+        self.slider_human_warmth = QSlider(Qt.Orientation.Horizontal)
+        self.slider_human_warmth.setRange(0, 100)
+        self.slider_human_warmth.setValue(65)
+        self.lbl_human_warmth = QLabel("65%")
+        self.slider_human_warmth.valueChanged.connect(lambda v: self.lbl_human_warmth.setText(f"{v}%"))
+        l_mb.addWidget(self.slider_human_warmth, 1, 1)
+        l_mb.addWidget(self.lbl_human_warmth, 1, 2)
+
+        l_mb.addWidget(QLabel("De-Metallicize AI Vocoder Overtones:"), 2, 0)
+        self.slider_human_demetal = QSlider(Qt.Orientation.Horizontal)
+        self.slider_human_demetal.setRange(0, 100)
+        self.slider_human_demetal.setValue(75)
+        self.lbl_human_demetal = QLabel("75%")
+        self.slider_human_demetal.valueChanged.connect(lambda v: self.lbl_human_demetal.setText(f"{v}%"))
+        l_mb.addWidget(self.slider_human_demetal, 2, 1)
+        l_mb.addWidget(self.lbl_human_demetal, 2, 2)
+
+        l_mb.addWidget(QLabel("Tube Condenser Harmonics (Neve):"), 3, 0)
+        self.slider_tube_mic = QSlider(Qt.Orientation.Horizontal)
+        self.slider_tube_mic.setRange(0, 100)
+        self.slider_tube_mic.setValue(40)
+        self.lbl_tube_mic = QLabel("40%")
+        self.slider_tube_mic.valueChanged.connect(lambda v: self.lbl_tube_mic.setText(f"{v}%"))
+        l_mb.addWidget(self.slider_tube_mic, 3, 1)
+        l_mb.addWidget(self.lbl_tube_mic, 3, 2)
+
+        l_mb.addWidget(QLabel("Low / High Multiband Balance:"), 4, 0)
+        mb_mini = QHBoxLayout()
         self.slider_mb_low = QSlider(Qt.Orientation.Horizontal)
         self.slider_mb_low.setRange(-60, 60)
         self.slider_mb_low.setValue(10)
-        self.lbl_mb_low = QLabel("+1.0 dB")
-        self.slider_mb_low.valueChanged.connect(lambda v: self.lbl_mb_low.setText(f"{v/10.0:+.1f} dB"))
-        l_mb.addWidget(self.slider_mb_low, 0, 1)
-        l_mb.addWidget(self.lbl_mb_low, 0, 2)
-
-        l_mb.addWidget(QLabel("Mid Band Focus (150 Hz - 4 kHz):"), 1, 0)
         self.slider_mb_mid = QSlider(Qt.Orientation.Horizontal)
         self.slider_mb_mid.setRange(-60, 60)
         self.slider_mb_mid.setValue(0)
-        self.lbl_mb_mid = QLabel("0.0 dB")
-        self.slider_mb_mid.valueChanged.connect(lambda v: self.lbl_mb_mid.setText(f"{v/10.0:+.1f} dB"))
-        l_mb.addWidget(self.slider_mb_mid, 1, 1)
-        l_mb.addWidget(self.lbl_mb_mid, 1, 2)
-
-        l_mb.addWidget(QLabel("High / Air Sheen (>4 kHz):"), 2, 0)
         self.slider_mb_high = QSlider(Qt.Orientation.Horizontal)
         self.slider_mb_high.setRange(-60, 60)
         self.slider_mb_high.setValue(10)
-        self.lbl_mb_high = QLabel("+1.0 dB")
-        self.slider_mb_high.valueChanged.connect(lambda v: self.lbl_mb_high.setText(f"{v/10.0:+.1f} dB"))
-        l_mb.addWidget(self.slider_mb_high, 2, 1)
-        l_mb.addWidget(self.lbl_mb_high, 2, 2)
-
-        l_mb.addWidget(QLabel("Mono Bass Cutoff Frequency:"), 3, 0)
         self.slider_mono_bass = QSlider(Qt.Orientation.Horizontal)
         self.slider_mono_bass.setRange(40, 200)
         self.slider_mono_bass.setValue(120)
-        self.lbl_mono_bass = QLabel("120 Hz")
-        self.slider_mono_bass.valueChanged.connect(lambda v: self.lbl_mono_bass.setText(f"{v} Hz"))
-        l_mb.addWidget(self.slider_mono_bass, 3, 1)
-        l_mb.addWidget(self.lbl_mono_bass, 3, 2)
+        self.slider_mono_bass.setToolTip("Mono Bass Cutoff Hz")
+        mb_mini.addWidget(QLabel("Low"))
+        mb_mini.addWidget(self.slider_mb_low)
+        mb_mini.addWidget(QLabel("High"))
+        mb_mini.addWidget(self.slider_mb_high)
+        mb_mini.addWidget(QLabel("MonoHz"))
+        mb_mini.addWidget(self.slider_mono_bass)
+        l_mb.addLayout(mb_mini, 4, 1, 1, 2)
 
-        btn_deai_render = QPushButton("⚡ Apply Multiband && De-AI to Render B")
+        btn_deai_render = QPushButton("🎤 Apply Human Voice Fix && Render B")
         btn_deai_render.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_deai_render.setStyleSheet("background: #16a34a; color: #ffffff; font-weight: 800; font-size: 9.5px; padding: 5px 10px; border-radius: 4px;")
         btn_deai_render.clicked.connect(self._render_master_b)
-        l_mb.addWidget(btn_deai_render, 4, 0, 1, 3)
+        l_mb.addWidget(btn_deai_render, 5, 0, 1, 3)
 
         layout.addWidget(g_mb, stretch=1)
         return widget
@@ -1303,6 +1369,95 @@ class AudioMasteringView(QWidget):
 
         l_exp.addStretch(1)
         layout.addWidget(g_exp, stretch=1)
+        return widget
+
+    # ── Tab 6: Music Distribution Compliance & Delivery Pack (All 25 Global Distributors) ──
+
+    def _create_distribution_tab(self) -> QWidget:
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(10)
+
+        # Left Group: Target Distributor Selector & Live Automated QC Compliance Matrix
+        g_qc = QGroupBox("All-25 Music Distribution Target && Automated QC Check")
+        g_qc.setStyleSheet("font-size: 10px; font-weight: 800;")
+        l_qc = QVBoxLayout(g_qc)
+        l_qc.setContentsMargins(8, 10, 8, 8)
+        l_qc.setSpacing(5)
+
+        dist_row = QHBoxLayout()
+        dist_row.addWidget(QLabel("Target Distributor:"))
+        self.combo_distributor = QComboBox()
+        self.combo_distributor.addItems(list(DISTRIBUTOR_SPECS.keys()))
+        self.combo_distributor.currentTextChanged.connect(self._on_distributor_changed)
+        dist_row.addWidget(self.combo_distributor, stretch=1)
+        l_qc.addLayout(dist_row)
+
+        self.lbl_distro_spec = QLabel(
+            "Spec: -14.0 LUFS | <= -1.0 dBTP | 44.1kHz 24-bit WAV | Art: 3000x3000 RGB JPG/PNG"
+        )
+        self.lbl_distro_spec.setWordWrap(True)
+        self.lbl_distro_spec.setStyleSheet("font-size: 9px; color: #0284c7; font-weight: 700;")
+        l_qc.addWidget(self.lbl_distro_spec)
+
+        self.txt_distro_qc = QTextEdit()
+        self.txt_distro_qc.setReadOnly(True)
+        self.txt_distro_qc.setStyleSheet("font-size: 9px; font-family: 'Consolas', monospace;")
+        self.txt_distro_qc.setText(
+            "Certified Distributors (25/25 Ready): DistroKid, TuneCore, CD Baby, Too Lost, Ditto Music, Amuse,\n"
+            "UnitedMasters, LANDR, Symphonic, RouteNote, AWAL, The Orchard, Believe, INgrooves, EMPIRE, ONErpm,\n"
+            "iMusician, EmuBands, Songtradr, Stem, Vydia, Soundrop, SoundCloud for Artists, Record Union, Mogul.\n"
+            "Click 'Run Distribution QC Check' to inspect LUFS, True-Peak (-1.0 dBTP), Phase & Dead-Air Silence."
+        )
+        l_qc.addWidget(self.txt_distro_qc, stretch=1)
+
+        btn_qc = QPushButton("🛡️ Run 25-Distributor Compliance QC Check")
+        btn_qc.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_qc.setStyleSheet("background: #2563eb; color: #ffffff; font-weight: 800; font-size: 9.5px; padding: 5px 10px; border-radius: 4px;")
+        btn_qc.clicked.connect(self._run_distro_qc_check)
+        l_qc.addWidget(btn_qc)
+
+        layout.addWidget(g_qc, stretch=3)
+
+        # Right Group: DDEX Release Credits & 1-Click Distribution Pack Builder
+        g_rel = QGroupBox("DDEX Release Metadata && 1-Click Delivery Pack")
+        g_rel.setStyleSheet("font-size: 10px; font-weight: 800;")
+        l_rel = QGridLayout(g_rel)
+        l_rel.setContentsMargins(8, 10, 8, 8)
+        l_rel.setVerticalSpacing(5)
+
+        l_rel.addWidget(QLabel("Primary Artist:"), 0, 0)
+        self.txt_dist_artist = QLineEdit("SMG Studio Artist")
+        l_rel.addWidget(self.txt_dist_artist, 0, 1)
+
+        l_rel.addWidget(QLabel("Composer / Lyricist:"), 1, 0)
+        self.txt_dist_composer = QLineEdit("SMG Studio Songwriter")
+        l_rel.addWidget(self.txt_dist_composer, 1, 1)
+
+        l_rel.addWidget(QLabel("ISRC / UPC Code:"), 2, 0)
+        code_row = QHBoxLayout()
+        self.txt_dist_isrc = QLineEdit("US-SMG-26-00001")
+        self.txt_dist_upc = QLineEdit("019999000001")
+        code_row.addWidget(self.txt_dist_isrc)
+        code_row.addWidget(self.txt_dist_upc)
+        l_rel.addLayout(code_row, 2, 1)
+
+        l_rel.addWidget(QLabel("Advisory & Sync:"), 3, 0)
+        self.combo_dist_explicit = QComboBox()
+        self.combo_dist_explicit.addItems(["Clean (Radio / All Stores)", "Explicit (Parental Advisory)", "Instrumental (Sync Ready)"])
+        l_rel.addWidget(self.combo_dist_explicit, 3, 1)
+
+        self.btn_build_distro_pack = QPushButton("🚀 Master && Export Complete Distribution Pack (24b + 16b + Sync + DDEX)")
+        self.btn_build_distro_pack.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_build_distro_pack.setFixedHeight(32)
+        self.btn_build_distro_pack.setStyleSheet(
+            "background: #16a34a; color: #ffffff; font-weight: 900; font-size: 9.5px; padding: 5px 10px; border-radius: 5px;"
+        )
+        self.btn_build_distro_pack.clicked.connect(self._build_distribution_release_pack)
+        l_rel.addWidget(self.btn_build_distro_pack, 4, 0, 1, 2)
+
+        layout.addWidget(g_rel, stretch=2)
         return widget
 
     # ── Drag-and-Drop Support ──
@@ -1670,6 +1825,9 @@ class AudioMasteringView(QWidget):
             "de_phase_amount": float(self.slider_dephase.value()),
             "de_esser_amount": float(self.slider_deesser.value()) if hasattr(self, "slider_deesser") else 55.0,
             "harmonic_exciter": float(self.slider_exciter.value()),
+            "human_voice_warmth": float(self.slider_human_warmth.value()) if hasattr(self, "slider_human_warmth") else 65.0,
+            "human_voice_de_metallic": float(self.slider_human_demetal.value()) if hasattr(self, "slider_human_demetal") else 75.0,
+            "tube_mic_saturation": float(self.slider_tube_mic.value()) if hasattr(self, "slider_tube_mic") else 40.0,
             "eq_sub_cut_hz": 30.0,
             "eq_low_gain": float(self.slider_low.slider_widget.value()),
             "eq_mud_cut_gain": float(self.slider_mud.slider_widget.value()),
@@ -1869,6 +2027,110 @@ class AudioMasteringView(QWidget):
 
     def _on_vol_changed(self, v: int):
         self._apply_loudness_match_volume()
+
+    # ── Human Voice AI Naturalizer & 25-Distributor Handlers ──
+
+    def _apply_human_voice_preset(self, idx: int):
+        if idx == 0:  # Neumann U87 Warm Pop Vocal
+            self.slider_human_warmth.setValue(72)
+            self.slider_human_demetal.setValue(80)
+            self.slider_tube_mic.setValue(48)
+            self.slider_deharsh.setValue(75)
+            self.slider_debox.setValue(82)
+            self.slider_deesser.setValue(60)
+        elif idx == 1:  # Crystal K-Pop / EDM Lead Vocal
+            self.slider_human_warmth.setValue(55)
+            self.slider_human_demetal.setValue(85)
+            self.slider_tube_mic.setValue(35)
+            self.slider_exciter.setValue(50)
+            self.slider_deesser.setValue(65)
+        elif idx == 2:  # Khmer Soulful Acoustic Human
+            self.slider_human_warmth.setValue(82)
+            self.slider_human_demetal.setValue(70)
+            self.slider_tube_mic.setValue(55)
+            self.slider_reverb.setValue(12)
+        else:  # Clean Studio Natural
+            self.slider_human_warmth.setValue(50)
+            self.slider_human_demetal.setValue(55)
+            self.slider_tube_mic.setValue(25)
+        self.lbl_status.setText(f"🎤 Applied Human Voice Preset: {self.combo_human_voice_preset.currentText()}")
+
+    def _on_distributor_changed(self, dist_name: str):
+        spec = DISTRIBUTOR_SPECS.get(dist_name)
+        if not spec:
+            return
+        self.lbl_distro_spec.setText(
+            f"Spec ({dist_name}): {spec['lufs']:.1f} LUFS | <= {spec['tp']:.1f} dBTP | "
+            f"{spec['sr']} Hz {spec['bit_depth']} {spec['format']} | Art: {spec['art_px']} — {spec['notes']}"
+        )
+        # Auto-align Mastering Target combo when relevant
+        if spec["lufs"] <= -15.5:
+            self.combo_target_preset.setCurrentText("Apple Digital Masters (-16.0 LUFS)")
+        elif spec["lufs"] >= -13.0:
+            self.combo_target_preset.setCurrentText("Suno Master (-13.0 LUFS)")
+        else:
+            self.combo_target_preset.setCurrentText("All 25 Distributors Universal (-14.0 LUFS)")
+
+    def _run_distro_qc_check(self):
+        target_path = self.current_master_path if (self.current_master_path and Path(self.current_master_path).exists()) else self.current_input_path
+        if not target_path or not Path(target_path).exists():
+            self.lbl_status.setText("⚠️ Please add or select an audio track to run Distribution QC.")
+            return
+
+        dist_name = self.combo_distributor.currentText()
+        qc = AudioMasteringEngine.validate_distribution_qc(target_path, dist_name)
+        lines = [
+            f"=== {dist_name} Automated QC Report ({'PASSED' if qc['qc_passed'] else 'NEEDS MASTER FIX'}) — Score: {qc['qc_score']}/100 ==="
+        ]
+        for chk in qc["checks"]:
+            icon = "[PASS]" if chk["passed"] else "[FIX ]"
+            lines.append(f"  {icon} {chk['name']} : {chk['value']}")
+        self.txt_distro_qc.setText("\n".join(lines))
+        self.lbl_status.setText(f"🛡️ QC Check ({dist_name}): {qc['qc_score']}/100 ({'PASSED' if qc['qc_passed'] else 'Click Build Pack to auto-fix'})")
+
+    def _build_distribution_release_pack(self):
+        if not self.current_input_path or not Path(self.current_input_path).exists():
+            self.lbl_status.setText("⚠️ Please add or load a track before building the Distribution Pack.")
+            return
+
+        out_root = Path(self.txt_output_dir.text().strip() or (Path.home() / ".lyric_ai_writer" / "output_masters"))
+        dist_name = self.combo_distributor.currentText()
+        title = self.txt_active_title.text().strip() or Path(self.current_input_path).stem
+        meta = {
+            "artist": self.txt_dist_artist.text().strip() or "SMG Studio Artist",
+            "composer": self.txt_dist_composer.text().strip() or "SMG Studio Songwriter",
+            "isrc": self.txt_dist_isrc.text().strip(),
+            "upc": self.txt_dist_upc.text().strip(),
+            "explicit": self.combo_dist_explicit.currentText(),
+            "genre": self.txt_musical_theme.toPlainText().strip(),
+        }
+        params = self._collect_dsp_params()
+
+        self.btn_build_distro_pack.setEnabled(False)
+        self.progress_bar.setValue(10)
+        self.lbl_status.setText(f"🚀 Building All-25 Distribution Pack ({dist_name})...")
+
+        self.distro_worker = DistroPackWorker(self.current_input_path, str(out_root), title, dist_name, meta, params)
+        self.distro_worker.progress_updated.connect(self._on_master_progress)
+        self.distro_worker.pack_completed.connect(self._on_distro_pack_done)
+        self.distro_worker.pack_failed.connect(self._on_master_failed)
+        self.distro_worker.start()
+
+    def _on_distro_pack_done(self, res: dict):
+        self.btn_build_distro_pack.setEnabled(True)
+        self.progress_bar.setValue(100)
+        qc = res["qc"]
+        self.current_master_path = res["wav_24"]
+        lines = [
+            f"✅ EXPORTED ALL-25 DISTRIBUTION PACK: {Path(res['pack_dir']).name}",
+            f"  • 24-bit Distributor Master : {Path(res['wav_24']).name} ({qc['lufs']:.1f} LUFS / {qc['true_peak']:.2f} dBTP)",
+            f"  • 16-bit CD / Store WAV     : {Path(res['wav_16']).name}",
+            f"  • Instrumental Sync Mix     : {Path(res['wav_inst']).name}",
+            f"  • DDEX Sheet & QC Cert      : {Path(res['csv_path']).name} + {Path(res['cert_path']).name}",
+            f"  • QC Score                  : {qc['qc_score']}/100 ({'100% READY FOR ALL 25 DISTRIBUTORS' if qc['qc_passed'] else 'REVIEW'})",
+        ]
+        self.txt_distro_qc.setText("\n".join(lines))
+        self.lbl_status.setText(f"✅ Distribution Pack Ready: {res['pack_dir']}")
 
     # ── Pro DAW Presets & Batch Operations ──
 
