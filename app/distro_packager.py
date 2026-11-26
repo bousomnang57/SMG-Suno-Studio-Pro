@@ -2,12 +2,13 @@
 DistroKid & TuneCore Single & Album Release Engine + Assisted Auto-Fill Builder.
 
 Provides:
-1. Store-compliant plain-text lyric cleaner (Apple Music / Spotify / DistroKid / TuneCore rules)
-   & LRC synced lyric generator.
-2. Store-compliant 3000x3000 px RGB Cover Art generator & image normalizer (zero forbidden badges).
-3. Pre-flight QC validator for both Single Song (1 Track) and EP / Album (2-30 Tracks).
-4. Staged Release Folder packager (numbered 24-bit 44.1kHz WAV masters + 3000x3000 JPG + CSV/JSON sheets).
-5. Transparent client-side React/DOM form Auto-Fill JavaScript builders for DistroKid & TuneCore
+1. Store-compliant Title Case & Rejection Shield (Apple Music / Spotify / DistroKid / TuneCore rules).
+2. Store-compliant plain-text lyric cleaner & LRC synced lyric generator.
+3. Smart Chorus / TikTok 15s-30s Preview Hook Start-Time Detector (RMS audio energy + lyric structure).
+4. Store-compliant 3000x3000 px RGB Cover Art + 1080x1920 (9:16) Spotify Canvas / Reels promo visual.
+5. Pre-flight QC validator for Single Song (1 Track), EP (2-6 Tracks), Album (7-30 Tracks), & 100% Splits.
+6. Staged Release Folder packager (numbered 24-bit WAV masters, 3000px Cover, 9:16 Canvas, Splits CSV, Social Copy).
+7. Transparent client-side React/DOM form Auto-Fill JavaScript builders for DistroKid & TuneCore
    (operates strictly on the upload form opened by the signed-in user; never touches auth or anti-bot gates).
 """
 
@@ -25,19 +26,23 @@ import wave
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-from app.cover_art_generator import CoverArtGenerator, STYLE_PRESETS
 from app.audio_mastering_engine import AudioMasteringEngine
+from app.cover_art_generator import CoverArtGenerator, STYLE_PRESETS
 
 
-DISTRO_PLATFORMS: Dict[str, Dict[str, str]] = {
+DISTRO_PLATFORMS: Dict[str, Dict[str, object]] = {
     "DistroKid": {
         "name": "DistroKid",
         "new_upload_url": "https://distrokid.com/new/",
         "releases_url": "https://distrokid.com/mymusic/",
         "lyrics_url": "https://distrokid.com/lyrics/",
+        "splits_url": "https://distrokid.com/teams/",
         "royalties_url": "https://distrokid.com/bank/",
+        "spotify_artists_url": "https://distrokid.com/spotify/",
+        "apple_artists_url": "https://artists.apple.com/",
         "accent": "#0284c7",
         "badge": "🟦 DistroKid",
     },
@@ -46,7 +51,10 @@ DISTRO_PLATFORMS: Dict[str, Dict[str, str]] = {
         "new_upload_url": "https://app.tunecore.com/releases/new",
         "releases_url": "https://app.tunecore.com/discography",
         "lyrics_url": "https://app.tunecore.com/discography",
+        "splits_url": "https://app.tunecore.com/splits",
         "royalties_url": "https://app.tunecore.com/sales",
+        "spotify_artists_url": "https://artists.spotify.com/",
+        "apple_artists_url": "https://artists.apple.com/",
         "accent": "#7c3aed",
         "badge": "🟪 TuneCore",
     },
@@ -88,6 +96,21 @@ DISTRO_LANGUAGES: List[str] = [
     "Instrumental (No Lyrics)",
 ]
 
+# Minor words kept lowercase in English Title Case (except first/last word)
+_TITLE_MINOR_WORDS = {
+    "a", "an", "and", "as", "at", "but", "by", "for", "from", "in",
+    "into", "nor", "of", "on", "onto", "or", "per", "so", "the",
+    "to", "up", "via", "with", "yet",
+}
+
+# Forbidden mastering/file suffixes rejected by Apple Music, Spotify, DistroKid & TuneCore
+_FORBIDDEN_TITLE_SUFFIX_RE = re.compile(
+    r"(?:[\s_-]*\b(?:mastered(?:\s+pro)?|final\s+mix|unmastered|suno\s+ai|ai\s+version|24-?bit|44\.1khz|mp3|wav)\b)+",
+    re.IGNORECASE,
+)
+_LEADING_TRACK_NUM_RE = re.compile(r"^(?:track\s*)?\d{1,2}[\s._-]+", re.IGNORECASE)
+_EMOJI_STRIP_RE = re.compile(r"[\U00010000-\U0010ffff\u2600-\u27bf]+")
+
 # Inline chord pattern e.g. [Am], [F#m7], [Cmaj7/G]
 _CHORD_TAG_RE = re.compile(
     r"\[([A-G][#b]?(?:m|maj|min|dim|aug|sus[24]?|add[0-9]+|[0-9])*(?:/[A-G][#b]?)?)\]"
@@ -101,12 +124,150 @@ _STAGE_DIRECTION_RE = re.compile(
 )
 
 
+def format_store_compliant_title(raw_title: str, featured_artist: str = "") -> str:
+    """
+    Auto-fix song/album titles to pass strict Apple Music, Spotify, DistroKid & TuneCore
+    editorial style guidelines:
+    - Strips leading track numbers ('01 - '), emojis, and forbidden engineering tags ('_Mastered_Pro', 'Final Mix')
+    - Converts SHOUTING ALL-CAPS or all-lowercase titles into proper English Music Title Case
+    - Normalizes featuring credits to '(feat. Artist)'
+    """
+    if not raw_title or not raw_title.strip():
+        return "Untitled Song"
+
+    t = _EMOJI_STRIP_RE.sub("", raw_title)
+    t = t.replace("_", " ").strip()
+    t = _LEADING_TRACK_NUM_RE.sub("", t)
+    t = _FORBIDDEN_TITLE_SUFFIX_RE.sub("", t)
+    # Remove empty parentheses left behind after stripping '(Mastered)'
+    t = re.sub(r"\(\s*\)|\[\s*\]", "", t)
+    t = re.sub(r"\s{2,}", " ", t).strip(" -–—.,")
+    if not t:
+        return "Untitled Song"
+
+    # Normalize existing ft./featuring variants to 'feat.'
+    t = re.sub(r"\(\s*(?:ft\.?|featuring)\s+", "(feat. ", t, flags=re.IGNORECASE)
+
+    # Apply smart Title Case if ALL CAPS or all lowercase or mixed filename casing
+    alpha_chars = [ch for ch in t if ch.isalpha()]
+    needs_recase = (
+        len(alpha_chars) > 0
+        and (all(ch.isupper() for ch in alpha_chars) or all(ch.islower() for ch in alpha_chars))
+    )
+    words = t.split(" ")
+    out_words: List[str] = []
+    for idx, w in enumerate(words):
+        if not w:
+            continue
+        low_clean = w.lower().strip("()[]")
+        if low_clean == "feat.":
+            out_words.append("(feat." if w.startswith("(") else "feat.")
+            continue
+        if needs_recase:
+            if 0 < idx < len(words) - 1 and low_clean in _TITLE_MINOR_WORDS and not w.startswith("("):
+                out_words.append(w.lower())
+            elif w.startswith("(") and len(w) > 1:
+                out_words.append("(" + w[1].upper() + w[2:].lower())
+            else:
+                out_words.append(w[0].upper() + w[1:].lower())
+        else:
+            # Ensure at least first word starts uppercase
+            if idx == 0 and w[0].islower():
+                out_words.append(w[0].upper() + w[1:])
+            else:
+                out_words.append(w)
+
+    final_title = " ".join(out_words).strip()
+    feat_clean = (featured_artist or "").strip()
+    if feat_clean and "(feat." not in final_title.lower():
+        final_title = f"{final_title} (feat. {feat_clean})"
+    return final_title
+
+
+def has_store_title_warning(title: str) -> Optional[str]:
+    """Return a concise warning string if a title violates Apple Music / DistroKid / TuneCore rules."""
+    t = (title or "").strip()
+    if not t:
+        return "Empty title"
+    alpha = [c for c in t if c.isalpha()]
+    if len(alpha) >= 4 and all(c.isupper() for c in alpha):
+        return "ALL-CAPS title (Apple Music rejects ALL CAPS — click '✨ Auto-Fix Titles')"
+    if _FORBIDDEN_TITLE_SUFFIX_RE.search(t):
+        return "Contains studio tag ('Mastered'/'Mix'/'WAV') — click '✨ Auto-Fix Titles'"
+    if _LEADING_TRACK_NUM_RE.match(t):
+        return "Starts with track number ('01 - ') — stores add track numbers automatically"
+    return None
+
+
+def detect_hook_start_timestamp(
+    audio_path: str | Path = "",
+    raw_lyrics: str = "",
+    default_sec: int = 42,
+) -> str:
+    """
+    Auto-detect the best 15s-30s Chorus / TikTok / Apple Music Preview Clip start time ('MM:SS').
+    1. If an audio file exists, computes 1-second RMS energy windows across 18%..68% of the song
+       and finds the strongest sustained 15-second chorus/hook lift.
+    2. Otherwise, estimates chorus entry time from [Chorus] line position in raw lyrics.
+    """
+    if audio_path and Path(audio_path).exists():
+        try:
+            audio, sr = AudioMasteringEngine.load_audio(str(audio_path))
+            total_samples = audio.shape[0]
+            dur_sec = total_samples / float(max(1, sr))
+            if dur_sec >= 25.0:
+                mono = np.mean(audio, axis=1)
+                win_samples = max(1, sr)  # 1.0s hop
+                n_secs = int(total_samples // win_samples)
+                rms_per_sec = np.array([
+                    float(np.sqrt(np.mean(mono[i * win_samples:(i + 1) * win_samples] ** 2)))
+                    for i in range(n_secs)
+                ])
+                start_idx = max(5, int(n_secs * 0.18))
+                end_idx = max(start_idx + 2, min(n_secs - 15, int(n_secs * 0.68)))
+                if end_idx > start_idx and len(rms_per_sec) >= 16:
+                    best_sec = start_idx
+                    best_energy = -1.0
+                    for s in range(start_idx, end_idx):
+                        span_end = min(len(rms_per_sec), s + 15)
+                        avg_e = float(np.mean(rms_per_sec[s:span_end]))
+                        if avg_e > best_energy:
+                            best_energy = avg_e
+                            best_sec = s
+                    return f"{best_sec // 60:02d}:{best_sec % 60:02d}"
+                mid_sec = max(0, int(dur_sec * 0.25))
+                return f"{mid_sec // 60:02d}:{mid_sec % 60:02d}"
+        except Exception:
+            pass
+
+    if raw_lyrics and raw_lyrics.strip():
+        lines = [ln.strip() for ln in raw_lyrics.splitlines() if ln.strip()]
+        for idx, ln in enumerate(lines):
+            if "chorus" in ln.lower() and ln.startswith("["):
+                ratio = min(0.55, max(0.18, idx / float(max(1, len(lines)))))
+                est_sec = int(round(180 * ratio))
+                return f"{est_sec // 60:02d}:{est_sec % 60:02d}"
+
+    return f"{default_sec // 60:02d}:{default_sec % 60:02d}"
+
+
+def parse_mmss_to_ms(mmss: str) -> int:
+    """Convert 'MM:SS' timestamp string to milliseconds for audio preview seek."""
+    try:
+        parts = (mmss or "00:42").strip().split(":")
+        if len(parts) == 2:
+            return max(0, (int(parts[0]) * 60 + int(parts[1])) * 1000)
+    except Exception:
+        pass
+    return 42000
+
+
 def clean_lyrics_for_stores(raw_lyrics: str) -> str:
     """
     Convert Suno / Studio chord-and-tag lyrics into strict Apple Music, Spotify,
     DistroKid & TuneCore store-compliant plain text:
     - Strips all [Verse], [Chorus], [Intro] structural tags and [Am] chord brackets
-    - Removes pure instrumental cue lines like (Guitar Solo)
+    - Removes pure instrumental cue lines like (Guitar Solo) or (Instrumental Break)
     - Trims trailing punctuation (. , ; !) per Apple Music lyric formatting guidelines
     - Preserves clean stanza spacing between sections
     """
@@ -124,7 +285,6 @@ def clean_lyrics_for_stores(raw_lyrics: str) -> str:
                 prev_blank = True
             continue
 
-        # If the entire line is one or more bracket tags (section header or chord bar), treat as stanza break
         stripped_brackets = _SECTION_TAG_RE.sub("", line).strip()
         if not stripped_brackets:
             if not prev_blank:
@@ -132,7 +292,6 @@ def clean_lyrics_for_stores(raw_lyrics: str) -> str:
                 prev_blank = True
             continue
 
-        # Remove inline chords and any remaining bracket cues
         cleaned = _CHORD_TAG_RE.sub("", line)
         cleaned = _SECTION_TAG_RE.sub("", cleaned)
         cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
@@ -140,17 +299,14 @@ def clean_lyrics_for_stores(raw_lyrics: str) -> str:
         if not cleaned or _STAGE_DIRECTION_RE.match(cleaned):
             continue
 
-        # Strip outer wrapping parentheses if a line was written as "(Long after the storm is gone...)"
         if cleaned.startswith("(") and cleaned.endswith(")") and len(cleaned) > 2:
             cleaned = cleaned[1:-1].strip()
 
-        # Apple Music / DistroKid rule: no trailing periods, commas, or excessive exclamation marks at line ends
         cleaned = re.sub(r"[.,;:!]+$", "", cleaned).strip()
         cleaned = cleaned.replace("...", "").strip()
         if not cleaned:
             continue
 
-        # Capitalize first alphabetical character of each sung line
         first_alpha = re.search(r"[a-zA-Z]", cleaned)
         if first_alpha and first_alpha.start() == 0:
             cleaned = cleaned[0].upper() + cleaned[1:]
@@ -205,12 +361,9 @@ def generate_store_cover_3000(
 ) -> Image.Image:
     """
     Generate a strict 3000 x 3000 px RGB store-compliant album/single cover.
-    IMPORTANT: Contains ZERO technical specs ('96kHz/24-bit'), store names, URLs,
-    or AI badges, because DistroKid, TuneCore, Apple Music & Spotify strictly reject
-    any cover text other than the exact Artist Name and Release Title.
+    Contains ZERO technical specs, store names, URLs, or AI badges.
     """
     style = STYLE_PRESETS.get(style_key, STYLE_PRESETS["cyberpunk_neon"])
-    # Render crisp base composition at 1500x1500 then upscale artwork layer smoothly and draw razor-sharp 3000px text
     base_size = 1500
     target_size = 3000
 
@@ -282,7 +435,6 @@ def generate_store_cover_3000(
     vignette = vignette.filter(ImageFilter.GaussianBlur(margin // 2))
     img = Image.alpha_composite(img.convert("RGBA"), vignette).convert("RGB")
 
-    # Scale atmospheric canvas to native 3000 x 3000 RGB before rendering crisp vector typography
     img_3000 = img.resize((target_size, target_size), Image.Resampling.LANCZOS).convert("RGB")
     draw_3000 = ImageDraw.Draw(img_3000)
 
@@ -316,6 +468,59 @@ def generate_store_cover_3000(
             img_3000.save(str(out_p), format="JPEG", quality=95, subsampling=0)
 
     return img_3000
+
+
+def generate_vertical_canvas_1080x1920(
+    title: str,
+    artist: str,
+    style_key: str = "cyberpunk_neon",
+    output_path: Optional[str | Path] = None,
+) -> Image.Image:
+    """
+    Generate a 1080 x 1920 (9:16 vertical) visual asset for Spotify Canvas, TikTok,
+    Instagram Reels & YouTube Shorts release promotion.
+    """
+    style = STYLE_PRESETS.get(style_key, STYLE_PRESETS["cyberpunk_neon"])
+    w, h = 1080, 1920
+    img = Image.new("RGB", (w, h))
+    draw = ImageDraw.Draw(img)
+
+    c_top = style["bg_top"]
+    c_bot = style["bg_bottom"]
+    acc1 = style["accent_1"]
+    acc2 = style["accent_2"]
+
+    for y in range(h):
+        ratio = y / float(h)
+        r = int(c_top[0] * (1.0 - ratio) + c_bot[0] * ratio)
+        g = int(c_top[1] * (1.0 - ratio) + c_bot[1] * ratio)
+        b = int(c_top[2] * (1.0 - ratio) + c_bot[2] * ratio)
+        draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+    orb = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    od = ImageDraw.Draw(orb)
+    cx, cy = w // 2, int(h * 0.43)
+    max_r = int(w * 0.44)
+    for rad in range(max_r, 0, -14):
+        alpha = int(125 * (1.0 - (rad / max_r) ** 1.8))
+        col = acc1 if (rad % 28 == 0) else acc2
+        od.ellipse([(cx - rad, cy - rad), (cx + rad, cy + rad)], fill=(col[0], col[1], col[2], alpha))
+
+    img = Image.alpha_composite(img.convert("RGBA"), orb).convert("RGB")
+    dt = ImageDraw.Draw(img)
+    f_badge = CoverArtGenerator.get_font(34, bold=True)
+    f_title = CoverArtGenerator.get_font(68 if len(title) <= 20 else 50, bold=True)
+    f_artist = CoverArtGenerator.get_font(40, bold=False)
+
+    dt.text((w // 2, int(h * 0.69)), "OUT NOW ON ALL PLATFORMS", fill=(210, 225, 245), font=f_badge, anchor="mm")
+    dt.text((w // 2, int(h * 0.75)), title or "New Release", fill=(255, 255, 255), font=f_title, anchor="mm")
+    dt.text((w // 2, int(h * 0.81)), (artist or "Artist").upper(), fill=acc1, font=f_artist, anchor="mm")
+
+    if output_path:
+        out_p = Path(output_path)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        img.save(str(out_p), format="JPEG", quality=93)
+    return img
 
 
 def normalize_image_to_store_3000(src_path: str | Path, dst_path: str | Path) -> Tuple[int, int]:
@@ -365,9 +570,9 @@ def validate_cover_art(image_path: str | Path) -> Dict[str, object]:
         with Image.open(str(p)) as im:
             w, h = im.size
             mode = im.mode
-        is_square = (w == h)
-        size_ok = (w >= 3000 and h >= 3000)
-        rgb_ok = (mode == "RGB")
+        is_square = w == h
+        size_ok = w >= 3000 and h >= 3000
+        rgb_ok = mode == "RGB"
         ok = is_square and size_ok and rgb_ok
         if ok:
             detail = f"Verified {w}×{h} px RGB ({p.name})"
@@ -423,7 +628,7 @@ def inspect_audio_file_quick(audio_path: str | Path) -> Dict[str, object]:
 
 
 class DistroPreflightValidator:
-    """Validates Single & Album release metadata, audio files, cover art, and store lyrics."""
+    """Validates Single & Album release metadata, formatting, audio, cover art, lyrics, and 100% splits."""
 
     @staticmethod
     def classify_release_format(track_count: int, mode: str = "single") -> str:
@@ -444,12 +649,9 @@ class DistroPreflightValidator:
         genre = str(project.get("primary_genre", "")).strip()
         cover_path = str(project.get("cover_path", "")).strip()
         tracks: List[Dict[str, object]] = list(project.get("tracks", []))
+        splits: List[Dict[str, object]] = list(project.get("splits", []))
 
-        if mode == "single" and len(tracks) > 1:
-            active_tracks = tracks[:1]
-        else:
-            active_tracks = tracks
-
+        active_tracks = tracks[:1] if (mode == "single" and len(tracks) > 1) else tracks
         checks: List[Dict[str, object]] = []
 
         # 1. Release Format & Track Count
@@ -470,15 +672,35 @@ class DistroPreflightValidator:
                 if t_ok else f"Album/EP requires 2–30 tracks (currently {len(active_tracks)})",
             })
 
-        # 2. Artist & Release Title
-        title_ok = bool(release_title) and release_title.lower() not in ("untitled", "track 1", "song 1")
+        # 2. Store-Compliant Artist & Title Formatting (No ALL CAPS or 'Mastered' suffixes)
+        rel_warn = has_store_title_warning(release_title)
+        tr_warns = [
+            f"#{i}: {has_store_title_warning(str(tr.get('title', '')))}"
+            for i, tr in enumerate(active_tracks, 1)
+            if has_store_title_warning(str(tr.get("title", "")))
+        ]
+        title_ok = (
+            bool(artist)
+            and bool(release_title)
+            and release_title.lower() not in ("untitled", "track 1", "song 1")
+            and rel_warn is None
+            and len(tr_warns) == 0
+        )
+        if title_ok:
+            t_detail = f"{artist} — {release_title} (Apple/Spotify Title Case OK)"
+        elif rel_warn:
+            t_detail = rel_warn
+        elif tr_warns:
+            t_detail = tr_warns[0]
+        else:
+            t_detail = "Enter Primary Artist and valid Release/Album Title"
         checks.append({
-            "label": "Artist & Release Title",
-            "ok": bool(artist) and title_ok,
-            "detail": f"{artist} — {release_title}" if (artist and title_ok) else "Enter Primary Artist and valid Release/Album Title",
+            "label": "Store Title Formatting Shield",
+            "ok": title_ok,
+            "detail": t_detail,
         })
 
-        # 3. Real Legal Songwriter Name (Mandatory on DistroKid & TuneCore)
+        # 3. Real Legal Songwriter Name
         sw_ok = len(legal_first) >= 2 and len(legal_last) >= 2
         checks.append({
             "label": "Legal Songwriter Name (First + Last)",
@@ -521,7 +743,7 @@ class DistroPreflightValidator:
                 "detail": "No tracks in tracklist yet",
             })
 
-        # 6. Clean Store Lyrics Check (No [Verse]/[Chorus]/[Am] tags)
+        # 6. Clean Store Lyrics Check
         raw_bracket_tracks = []
         for idx, tr in enumerate(active_tracks, 1):
             lyr = str(tr.get("lyrics", "")).strip()
@@ -532,14 +754,25 @@ class DistroPreflightValidator:
             "label": "Apple Music / Spotify Clean Lyrics",
             "ok": lyrics_ok,
             "detail": "Zero forbidden [Section] or [Chord] tags in track lyrics"
-            if lyrics_ok else f"Track(s) {raw_bracket_tracks} contain [Tags] — click 'Auto-Clean Lyrics' or Build Folder",
+            if lyrics_ok else f"Track(s) {raw_bracket_tracks} contain [Tags] — click 'Clean Lyrics' or Step 1",
         })
 
-        # 7. Primary Genre
+        # 7. Royalty Splits Total = 100% (if splits provided) & Genre
+        if splits:
+            total_pct = round(sum(float(s.get("share_pct", 0.0) or 0.0) for s in splits), 2)
+            splits_ok = abs(total_pct - 100.0) < 0.05 and bool(genre)
+            sp_detail = (
+                f"Genre: {genre} | Royalty Splits: {total_pct:.0f}% across {len(splits)} collaborator(s)"
+                if splits_ok
+                else f"Royalty Splits total {total_pct:.1f}% (must equal 100%)"
+            )
+        else:
+            splits_ok = bool(genre)
+            sp_detail = f"Genre: {genre} | Language: {project.get('language', 'English')} | 100% Primary Artist"
         checks.append({
-            "label": "Store Genre & Language",
-            "ok": bool(genre),
-            "detail": f"Genre: {genre} | Language: {project.get('language', 'English')}",
+            "label": "Genre & Royalty Splits (100%)",
+            "ok": splits_ok,
+            "detail": sp_detail,
         })
 
         passed_count = sum(1 for c in checks if c["ok"])
@@ -566,9 +799,10 @@ class DistroStagePackager:
     """
     Exports a complete, organized Single or Album upload staging folder:
     - Exact 3000x3000 RGB Cover_Art_3000x3000.jpg
+    - Promo_Assets/Spotify_Canvas_Vertical_1080x1920.jpg + Social_Launch_Copy.txt
     - Sequentially numbered 24-bit 44.1kHz -14 LUFS Stereo WAV masters (01 - Title.wav ...)
     - Clean plain-text Store Lyrics (.txt) + Synced Karaoke (.lrc)
-    - DistroKid JSON + TuneCore CSV + Quick Upload Checklist
+    - Royalty_Splits_Sheet.csv + TuneCore_and_DistroKid_Tracklist.csv + Release_Manifest.json
     """
 
     @staticmethod
@@ -583,6 +817,7 @@ class DistroStagePackager:
         project: Dict[str, object],
         output_root: Optional[str | Path] = None,
         auto_master_wav: bool = True,
+        export_promo_canvas: bool = True,
     ) -> Dict[str, object]:
         root = Path(output_root) if output_root else (Path.home() / ".lyric_ai_writer" / "distro_releases")
         root.mkdir(parents=True, exist_ok=True)
@@ -590,7 +825,7 @@ class DistroStagePackager:
         mode = str(project.get("release_mode", "single")).lower()
         platform = str(project.get("platform", "DistroKid"))
         artist = str(project.get("artist_name", "")).strip() or "Independent Artist"
-        release_title = str(project.get("release_title", "")).strip() or "Untitled Release"
+        release_title = format_store_compliant_title(str(project.get("release_title", "")).strip() or "Untitled Release")
         tracks_raw: List[Dict[str, object]] = list(project.get("tracks", []))
         active_tracks = tracks_raw[:1] if (mode == "single" and len(tracks_raw) >= 1) else tracks_raw
 
@@ -599,6 +834,7 @@ class DistroStagePackager:
                 "title": release_title,
                 "audio_path": "",
                 "lyrics": "",
+                "hook_start": "00:42",
                 "explicit": bool(project.get("explicit", False)),
                 "instrumental": False,
                 "isrc": "",
@@ -609,7 +845,8 @@ class DistroStagePackager:
         audio_dir = stage_dir / "Audio_WAV_24bit"
         lyrics_dir = stage_dir / "Store_Lyrics_Clean"
         lrc_dir = stage_dir / "Synced_Karaoke_LRC"
-        for d in (stage_dir, audio_dir, lyrics_dir, lrc_dir):
+        promo_dir = stage_dir / "Promo_Assets"
+        for d in (stage_dir, audio_dir, lyrics_dir, lrc_dir, promo_dir):
             d.mkdir(parents=True, exist_ok=True)
 
         # 1. Prepare 3000x3000 RGB Store-Compliant Cover Art
@@ -631,11 +868,22 @@ class DistroStagePackager:
                 output_path=cover_dst,
             )
 
-        # 2. Export Numbered 24-bit WAV Masters + Clean Lyrics + Synced LRC
+        # Optional 9:16 Vertical Canvas for Spotify Canvas / TikTok / Reels / Shorts
+        canvas_dst = promo_dir / "Spotify_Canvas_Vertical_1080x1920.jpg"
+        if export_promo_canvas:
+            generate_vertical_canvas_1080x1920(
+                title=release_title,
+                artist=artist,
+                style_key=cover_style,
+                output_path=canvas_dst,
+            )
+
+        # 2. Export Numbered 24-bit WAV Masters + Clean Lyrics + Synced LRC + Hook Start Time
         exported_tracks: List[Dict[str, object]] = []
         for idx, tr in enumerate(active_tracks, 1):
-            tr_title = str(tr.get("title", "")).strip() or (release_title if len(active_tracks) == 1 else f"Track {idx}")
-            safe_tr = cls._safe_filename(tr_title, f"Track_{idx:02d}")
+            raw_tr_title = str(tr.get("title", "")).strip() or (release_title if len(active_tracks) == 1 else f"Song {idx}")
+            tr_title = format_store_compliant_title(raw_tr_title, str(tr.get("featured_artist", "")))
+            safe_tr = cls._safe_filename(tr_title, f"Song_{idx:02d}")
             wav_name = f"{idx:02d} - {safe_tr}.wav"
             wav_dst = audio_dir / wav_name
 
@@ -659,6 +907,10 @@ class DistroStagePackager:
                     shutil.copy2(src_audio, wav_dst)
                     audio_exported = str(wav_dst)
 
+            hook_mmss = str(tr.get("hook_start", "")).strip() or detect_hook_start_timestamp(
+                audio_exported or src_audio,
+                str(tr.get("lyrics", "")),
+            )
             clean_lyr = clean_lyrics_for_stores(str(tr.get("lyrics", "")))
             lyr_path = lyrics_dir / f"{idx:02d} - {safe_tr}.txt"
             lrc_path = lrc_dir / f"{idx:02d} - {safe_tr}.lrc"
@@ -672,6 +924,7 @@ class DistroStagePackager:
                 "track_number": idx,
                 "title": tr_title,
                 "featured_artist": str(tr.get("featured_artist", "")).strip(),
+                "hook_start": hook_mmss,
                 "wav_path": audio_exported,
                 "clean_lyrics_path": str(lyr_path),
                 "lrc_path": str(lrc_path),
@@ -681,7 +934,7 @@ class DistroStagePackager:
                 "isrc": str(tr.get("isrc", "")).strip(),
             })
 
-        # 3. Write TuneCore / Universal DDEX CSV Sheet
+        # 3. Write TuneCore / DistroKid Tracklist CSV Sheet (with Hook Start Time!)
         csv_path = stage_dir / "TuneCore_and_DistroKid_Tracklist.csv"
         with open(csv_path, "w", newline="", encoding="utf-8") as cf:
             writer = csv.writer(cf)
@@ -692,11 +945,11 @@ class DistroStagePackager:
                 "Primary_Artist",
                 "Track_Number",
                 "Track_Title",
+                "TikTok_Preview_Hook_Start",
                 "Featured_Artist",
                 "Songwriter_Legal_First",
                 "Songwriter_Legal_Last",
                 "Primary_Genre",
-                "Secondary_Genre",
                 "Language",
                 "Release_Date",
                 "Record_Label",
@@ -715,11 +968,11 @@ class DistroStagePackager:
                     artist,
                     et["track_number"],
                     et["title"],
+                    et["hook_start"],
                     et["featured_artist"],
                     project.get("songwriter_first", ""),
                     project.get("songwriter_last", ""),
                     project.get("primary_genre", "Pop"),
-                    project.get("secondary_genre", ""),
                     project.get("language", "English"),
                     project.get("release_date", datetime.date.today().isoformat()),
                     project.get("record_label", artist),
@@ -730,7 +983,43 @@ class DistroStagePackager:
                     str(cover_dst),
                 ])
 
-        # 4. Write DistroKid Structured JSON Manifest
+        # 4. Write Collaborator Royalty Splits CSV (DistroKid Teams / TuneCore Splits)
+        splits = list(project.get("splits", []))
+        if not splits:
+            splits = [{
+                "name": f"{project.get('songwriter_first', '')} {project.get('songwriter_last', '')}".strip() or artist,
+                "role": "Primary Artist & Songwriter",
+                "email": "",
+                "share_pct": 100.0,
+            }]
+        splits_csv_path = stage_dir / "Royalty_Splits_Sheet.csv"
+        with open(splits_csv_path, "w", newline="", encoding="utf-8") as sf:
+            sw = csv.writer(sf)
+            sw.writerow(["Release_Title", "Collaborator_Name", "Role", "Email", "Royalty_Share_Percent"])
+            for sp in splits:
+                sw.writerow([
+                    release_title,
+                    sp.get("name", ""),
+                    sp.get("role", "Collaborator"),
+                    sp.get("email", ""),
+                    sp.get("share_pct", 100.0),
+                ])
+
+        # 5. Social Pre-Save / Release Day Launch Copy
+        social_path = promo_dir / "Social_Launch_Copy.txt"
+        genre_tag = re.sub(r"[^a-zA-Z0-9]", "", str(project.get("primary_genre", "NewMusic")))
+        social_lines = [
+            f"🚀 NEW {'SINGLE' if len(exported_tracks) == 1 else 'ALBUM'} RELEASE COPY — {release_title} by {artist}",
+            "=" * 64,
+            f"Caption Idea 1 (Release Day):",
+            f"'{release_title}' by {artist} is officially streaming everywhere! 🎧✨",
+            f"Skip to {exported_tracks[0]['hook_start']} for my favorite chorus drop — save it to your playlist!",
+            "",
+            f"Hashtags: #NewMusic #{genre_tag} #Spotify #AppleMusic #IndependentArtist",
+        ]
+        social_path.write_text("\n".join(social_lines) + "\n", encoding="utf-8")
+
+        # 6. Structured JSON Manifest & Upload Checklist
         json_path = stage_dir / "Release_Manifest.json"
         manifest = {
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
@@ -749,12 +1038,14 @@ class DistroStagePackager:
             "record_label": project.get("record_label", artist),
             "copyright_year": str(project.get("copyright_year", datetime.date.today().year)),
             "explicit": bool(project.get("explicit", False)),
+            "stores_options": project.get("stores_options", {}),
+            "splits": splits,
             "cover_path": str(cover_dst),
+            "canvas_vertical_path": str(canvas_dst) if canvas_dst.exists() else "",
             "tracks": exported_tracks,
         }
         json_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
-        # 5. Human-Readable Step-by-Step Checklist
         guide_path = stage_dir / "README_Quick_Upload_Steps.txt"
         guide_lines = [
             f"SMG SUNO STUDIO PRO — {platform.upper()} STAGED RELEASE PACK",
@@ -764,25 +1055,29 @@ class DistroStagePackager:
             f"Release Title  : {release_title}",
             f"Songwriter     : {project.get('songwriter_first', '')} {project.get('songwriter_last', '')}",
             f"Cover Art      : {cover_dst.name} (Verified 3000x3000 px RGB)",
+            f"Vertical Promo : Promo_Assets/{canvas_dst.name} (1080x1920 Spotify Canvas / Reels)",
             f"Audio Folder   : {audio_dir}",
             "",
             "FAST UPLOAD STEPS IN DISTRO TAB:",
             f"1. Sign into your {platform} account in the right browser pane.",
-            "2. Click '⚡ 2. Auto-Fill Upload Form' to populate Artist, Album/Single Title,",
-            "   Genre, Release Date, Legal Songwriter, and all Track Titles automatically.",
-            "3. Click the Cover Art picker on the web page and select 'Cover_Art_3000x3000.jpg'.",
-            "4. Click each Track Audio picker and select '01 - ... .wav' from 'Audio_WAV_24bit'.",
-            "5. Review all store checkboxes and click Upload / Publish on the website.",
+            "2. Click '⚡ Step 2: Auto-Fill Upload Form' to populate Artist, Title, Genre,",
+            "   Release Date, Legal Songwriter, Track Titles & TikTok Preview Hook timestamps.",
+            "3. Attach 'Cover_Art_3000x3000.jpg' and numbered WAVs from 'Audio_WAV_24bit'.",
+            "4. Review all store checkboxes and click Upload / Publish on the website.",
         ]
         guide_path.write_text("\n".join(guide_lines) + "\n", encoding="utf-8")
 
         return {
             "stage_dir": str(stage_dir),
             "cover_path": str(cover_dst),
+            "canvas_path": str(canvas_dst) if canvas_dst.exists() else "",
             "audio_dir": str(audio_dir),
             "lyrics_dir": str(lyrics_dir),
             "lrc_dir": str(lrc_dir),
+            "promo_dir": str(promo_dir),
             "csv_path": str(csv_path),
+            "splits_csv_path": str(splits_csv_path),
+            "social_path": str(social_path),
             "json_path": str(json_path),
             "guide_path": str(guide_path),
             "tracks": exported_tracks,
@@ -817,13 +1112,18 @@ class DistroAutoFillBuilder:
             "language": str(project.get("language", "English")).strip(),
             "releaseDate": str(project.get("release_date", "")).strip(),
             "recordLabel": str(project.get("record_label", "")).strip(),
+            "spotifyUri": str(project.get("spotify_uri", "")).strip(),
+            "appleUrl": str(project.get("apple_url", "")).strip(),
             "copyrightYear": str(project.get("copyright_year", datetime.date.today().year)).strip(),
             "explicit": bool(project.get("explicit", False)),
+            "storesOptions": project.get("stores_options", {}),
+            "splits": list(project.get("splits", [])),
             "stageDir": str(project.get("stage_dir", "")).strip(),
             "tracks": [
                 {
                     "index": idx,
-                    "title": str(tr.get("title", "")).strip() or f"Track {idx}",
+                    "title": str(tr.get("title", "")).strip() or f"Song {idx}",
+                    "hookStart": str(tr.get("hook_start", "00:42")).strip() or "00:42",
                     "featured": str(tr.get("featured_artist", "")).strip(),
                     "explicit": bool(tr.get("explicit", project.get("explicit", False))),
                     "instrumental": bool(tr.get("instrumental", False)),
@@ -929,7 +1229,6 @@ class DistroAutoFillBuilder:
         }}
     }}
 
-    // Helper applied both immediately and after 350ms (in case changing song count dynamically renders N track rows!)
     function populateFieldsPass() {{
         let passFilled = 0;
 
@@ -937,7 +1236,7 @@ class DistroAutoFillBuilder:
         const artistEls = findInputsByHints(['artist/band', 'artist name', 'primary artist', 'band name', 'artistname']);
         if (artistEls.length && setReactValue(artistEls[0], DATA.artistName)) passFilled++;
 
-        // Album / Release Title (for Album/EP or TuneCore Release Title)
+        // Album / Release Title
         if (DATA.releaseMode === 'album' || DATA.platform === 'TuneCore') {{
             const albumEls = findInputsByHints(['album title', 'release title', 'album name', 'ep title', 'albumtitle']);
             if (albumEls.length && setReactValue(albumEls[0], DATA.releaseTitle)) passFilled++;
@@ -955,6 +1254,16 @@ class DistroAutoFillBuilder:
         if (DATA.releaseDate) {{
             const dateEls = findInputsByHints(['release date', 'releasedate', 'sales start']);
             if (dateEls.length && setReactValue(dateEls[0], DATA.releaseDate)) passFilled++;
+        }}
+
+        // Optional Spotify URI / Apple Music Artist URL
+        if (DATA.spotifyUri) {{
+            const spEls = findInputsByHints(['spotify', 'artist uri']);
+            if (spEls.length && setReactValue(spEls[0], DATA.spotifyUri)) passFilled++;
+        }}
+        if (DATA.appleUrl) {{
+            const apEls = findInputsByHints(['apple music', 'itunes']);
+            if (apEls.length && setReactValue(apEls[0], DATA.appleUrl)) passFilled++;
         }}
 
         // Genre & Language Selects
@@ -975,12 +1284,12 @@ class DistroAutoFillBuilder:
             }}
         }}
 
-        // Track Titles (Single = 1 track or Album = Track 1..N)
+        // Track Titles (1..N)
         const trackTitleEls = findInputsByHints(['track title', 'song title', 'track 1', 'track name', 'title of song', 'songtitle']);
         if (trackTitleEls.length) {{
             DATA.tracks.forEach((tr, idx) => {{
-                if (idx < trackTitleEls.length) {{
-                    if (setReactValue(trackTitleEls[idx], tr.title)) passFilled++;
+                if (idx < trackTitleEls.length && setReactValue(trackTitleEls[idx], tr.title)) {{
+                    passFilled++;
                 }}
             }});
         }} else if (DATA.releaseMode === 'single') {{
@@ -990,14 +1299,18 @@ class DistroAutoFillBuilder:
             }}
         }}
 
-        // Songwriter Real Legal First / Middle / Last Name (fills across all track rows)
+        // TikTok / Apple Music Preview Clip Start Time (MM:SS)
+        const hookEls = findInputsByHints(['preview', 'clip start', 'tiktok', 'start time', 'previewstart']);
+        DATA.tracks.forEach((tr, idx) => {{
+            if (tr.hookStart && idx < hookEls.length && setReactValue(hookEls[idx], tr.hookStart)) {{
+                passFilled++;
+            }}
+        }});
+
+        // Songwriter Real Legal First / Middle / Last Name
         if (DATA.songwriterFirst) {{
             const firstEls = findInputsByHints(['first name', 'firstname', 'songwriter_first', 'legal first']);
             firstEls.forEach(el => {{ if (setReactValue(el, DATA.songwriterFirst)) passFilled++; }});
-        }}
-        if (DATA.songwriterMiddle) {{
-            const midEls = findInputsByHints(['middle name', 'middlename']);
-            midEls.forEach(el => {{ if (setReactValue(el, DATA.songwriterMiddle)) passFilled++; }});
         }}
         if (DATA.songwriterLast) {{
             const lastEls = findInputsByHints(['last name', 'lastname', 'surname', 'songwriter_last', 'legal last']);
@@ -1007,12 +1320,22 @@ class DistroAutoFillBuilder:
         // Optional ISRC codes per track
         const isrcEls = findInputsByHints(['isrc']);
         DATA.tracks.forEach((tr, idx) => {{
-            if (tr.isrc && idx < isrcEls.length) {{
-                if (setReactValue(isrcEls[idx], tr.isrc)) passFilled++;
+            if (tr.isrc && idx < isrcEls.length && setReactValue(isrcEls[idx], tr.isrc)) {{
+                passFilled++;
             }}
         }});
 
-        // Highlight File Upload Pickers (Cover Art 3000x3000 + Track WAVs) so user can attach in 1 click
+        // Collaborator Royalty Splits (on Teams / Splits pages)
+        if (DATA.splits && DATA.splits.length > 0) {{
+            const emailEls = findInputsByHints(['email', 'collaborator']);
+            const pctEls = findInputsByHints(['percent', 'share', 'split']);
+            DATA.splits.forEach((sp, idx) => {{
+                if (sp.email && idx < emailEls.length && setReactValue(emailEls[idx], sp.email)) passFilled++;
+                if (sp.share_pct !== undefined && idx < pctEls.length && setReactValue(pctEls[idx], String(sp.share_pct))) passFilled++;
+            }});
+        }}
+
+        // Highlight File Upload Pickers (Cover Art 3000x3000 + Track WAVs)
         const fileInputs = Array.from(document.querySelectorAll('input[type="file"]'));
         let audioIdx = 0;
         fileInputs.forEach((fIn) => {{
@@ -1027,12 +1350,12 @@ class DistroAutoFillBuilder:
                 badge.className = 'smg-distro-file-hint';
                 badge.style.cssText = 'margin-top:4px;padding:3px 8px;border-radius:5px;background:#0f172a;color:#38bdf8;font-size:11px;font-weight:700;display:inline-block;border:1px solid #0284c7;';
                 if (fMeta.includes('image') || fMeta.includes('art') || fMeta.includes('cover') || fMeta.includes('jpg')) {{
-                    badge.textContent = '⬅ Select Cover_Art_3000x3000.jpg (Folder path copied!)';
+                    badge.textContent = '⬅ Select Cover_Art_3000x3000.jpg (Folder copied!)';
                 }} else {{
                     audioIdx++;
                     const trObj = DATA.tracks[Math.min(audioIdx - 1, DATA.tracks.length - 1)];
                     const numStr = String(audioIdx).padStart(2, '0');
-                    badge.textContent = `⬅ Select ${{numStr}} - ${{trObj ? trObj.title : 'Track'}}.wav (24-bit Master)`;
+                    badge.textContent = `⬅ Select ${{numStr}} - ${{trObj ? trObj.title : 'Track'}}.wav (Hook @ ${{trObj ? trObj.hookStart : '00:42'}})`;
                 }}
                 container.appendChild(badge);
             }}
@@ -1046,11 +1369,10 @@ class DistroAutoFillBuilder:
         const extra = populateFieldsPass();
         const banner = document.getElementById('smg-distro-autofill-toast');
         if (banner && extra > 0) {{
-            banner.textContent = `✅ SMG Studio Auto-Filled ${{DATA.platform}} (${{DATA.trackCount}} Track${{DATA.trackCount > 1 ? 's' : ''}}) • Attach highlighted 3000px Cover & WAVs, then review!`;
+            banner.textContent = `✅ Auto-Filled ${{DATA.platform}} (${{DATA.trackCount}} Track${{DATA.trackCount > 1 ? 's' : ''}} + Hook Times) • Attach Cover & WAVs!`;
         }}
     }}, 400);
 
-    // Non-intrusive Studio confirmation toast
     const oldToast = document.getElementById('smg-distro-autofill-toast');
     if (oldToast) oldToast.remove();
     const toast = document.createElement('div');
