@@ -168,6 +168,13 @@ def run_all_tests():
         assert dv.dock_tabs.count() == 4
         assert dv.dock_tabs.usesScrollButtons() is False
 
+        # Verify official TuneCore domain (web.tunecore.com, NEVER non-existent app.tunecore.com)
+        dv.set_platform("TuneCore")
+        assert "web.tunecore.com" in dv.txt_url.text()
+        assert "app.tunecore.com" not in dv.txt_url.text()
+        dv.set_platform("DistroKid")
+        assert "distrokid.com" in dv.txt_url.text()
+
         # Test Artist Profile Save & Reload
         dv.txt_artist_name.setText("Nova Pulse")
         dv.txt_sw_first.setText("Liam")
