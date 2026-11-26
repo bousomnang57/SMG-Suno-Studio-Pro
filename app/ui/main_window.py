@@ -166,8 +166,18 @@ class MainWindow(QMainWindow):
         from app.ui.audio_mastering_view import AudioMasteringView
         self.master_view = AudioMasteringView(parent=self)
         self.master_view.send_to_editor_requested.connect(self._on_master_sent_to_editor)
+        self.master_view.send_to_distro_requested.connect(self._on_master_sent_to_distro)
         self.master_view.switch_to_suno_requested.connect(lambda: self._set_studio_mode(5))
         self.stack.addWidget(self.master_view)
+
+        # View 7: DistroKid & TuneCore Single & Album Auto-Upload Studio
+        from app.ui.distro_upload_view import DistroUploadView
+        self.distro_view = DistroUploadView(parent=self, theme_key=self.current_theme)
+        self.distro_view.pull_from_master_requested.connect(self._sync_master_into_distro)
+        self.distro_view.pull_from_batch_requested.connect(self._sync_batch_into_distro)
+        self.distro_view.pull_from_editor_requested.connect(self._sync_editor_into_distro)
+        self.distro_view.toggle_fullscreen_requested.connect(self._on_suno_fullscreen_toggled)
+        self.stack.addWidget(self.distro_view)
 
         master_layout.addWidget(self.stack, stretch=1)
 
@@ -194,7 +204,7 @@ class MainWindow(QMainWindow):
 
         r_layout.addStretch(1)
 
-        self.lbl_ribbon_hint = QLabel("Ctrl+S Save  •  Ctrl+U Suno HUD  •  Ctrl+1..5 Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
+        self.lbl_ribbon_hint = QLabel("Ctrl+S Save  •  Ctrl+U Suno HUD  •  Ctrl+1..8 Modes  •  Ctrl+F Focus  •  Ctrl+E Export")
         self.lbl_ribbon_hint.setObjectName("lblRibbonHint")
         r_layout.addWidget(self.lbl_ribbon_hint)
 
@@ -477,6 +487,9 @@ class MainWindow(QMainWindow):
         elif mode == 6:  # Pro Audio Mastering -> 1-Click Auto All
             if hasattr(self, "master_view"):
                 self.master_view._start_1click_auto_all()
+        elif mode == 7:  # DistroKid & TuneCore Studio -> Auto-Fill Upload Form
+            if hasattr(self, "distro_view"):
+                self.distro_view.autofill_active_portal_form()
 
     def _on_master_sent_to_editor(self, audio_path: str):
         """Handoff mastered audio directly into Lyric Editor Stem Player."""
@@ -580,8 +593,15 @@ class MainWindow(QMainWindow):
         self.btn_mode_master.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_mode_master.clicked.connect(lambda: self._set_studio_mode(6))
 
-        for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
-            btn.setFixedWidth(70)
+        self.btn_mode_distro = QPushButton("🚀 Distro")
+        self.btn_mode_distro.setToolTip("🚀 DistroKid & TuneCore Auto-Upload Studio (Single & Album) [Ctrl+8]")
+        self.btn_mode_distro.setCheckable(True)
+        self.btn_mode_distro.setChecked(False)
+        self.btn_mode_distro.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mode_distro.clicked.connect(lambda: self._set_studio_mode(7))
+
+        for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master, self.btn_mode_distro]:
+            btn.setFixedWidth(62)
             btn.setFixedHeight(28)
             mb_layout.addWidget(btn)
 
@@ -822,10 +842,10 @@ class MainWindow(QMainWindow):
                     background-color: transparent;
                     color: {text_sec};
                     font-weight: 700;
-                    padding: 4px 8px;
+                    padding: 4px 3px;
                     border: none;
                     border-radius: 6px;
-                    font-size: 11px;
+                    font-size: 10.5px;
                 }}
                 QPushButton:hover {{
                     color: {text_pri};
@@ -838,7 +858,7 @@ class MainWindow(QMainWindow):
                     border: 1px solid {accent};
                 }}
             """
-            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
+            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master, self.btn_mode_distro]:
                 btn.setStyleSheet(mode_btn_qss)
 
             capsule_qss = f"""
@@ -1047,10 +1067,10 @@ class MainWindow(QMainWindow):
                     background-color: transparent;
                     color: #1e293b;
                     font-weight: 700;
-                    padding: 4px 8px;
+                    padding: 4px 3px;
                     border: none;
                     border-radius: 6px;
-                    font-size: 11px;
+                    font-size: 10.5px;
                 }
                 QPushButton:hover {
                     color: #2563eb;
@@ -1062,7 +1082,7 @@ class MainWindow(QMainWindow):
                     font-weight: 800;
                 }
             """
-            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master]:
+            for btn in [self.btn_mode_wizard, self.btn_mode_visual, self.btn_mode_batch, self.btn_mode_editor, self.btn_mode_clone, self.btn_mode_suno, self.btn_mode_master, self.btn_mode_distro]:
                 btn.setStyleSheet(mode_btn_qss)
 
             capsule_qss = """
@@ -1247,6 +1267,8 @@ class MainWindow(QMainWindow):
     def _set_studio_mode(self, index: int):
         if index != 5 and hasattr(self, "suno_browser_view") and getattr(self.suno_browser_view, "_is_fullscreen_active", False):
             self.suno_browser_view._exit_fullscreen_view()
+        if index != 7 and hasattr(self, "distro_view") and getattr(self.distro_view, "_is_fullscreen_active", False):
+            self.distro_view._exit_fullscreen_view()
         self.btn_mode_wizard.setChecked(index == 0)
         self.btn_mode_visual.setChecked(index == 1)
         self.btn_mode_batch.setChecked(index == 2)
@@ -1256,9 +1278,11 @@ class MainWindow(QMainWindow):
             self.btn_mode_suno.setChecked(index == 5)
         if hasattr(self, "btn_mode_master"):
             self.btn_mode_master.setChecked(index == 6)
+        if hasattr(self, "btn_mode_distro"):
+            self.btn_mode_distro.setChecked(index == 7)
         self.stack.setCurrentIndex(index)
 
-        mode_titles = ["🗺️ WIZARD", "🎨 VISUAL", "⚡ BATCH", "✍️ EDITOR", "🧬 CLONE", "🌐 SUNO", "🎛️ MASTER"]
+        mode_titles = ["🗺️ WIZARD", "🎨 VISUAL", "⚡ BATCH", "✍️ EDITOR", "🧬 CLONE", "🌐 SUNO", "🎛️ MASTER", "🚀 DISTRO"]
         ribbon_infos = [
             "🗺️ Wizard Studio • Step-by-step guided song creation with automatic genre & prompt setup",
             "🎨 Visual Arranger • Suno AI visual prompt tags, mood matrix & live formula preview",
@@ -1266,7 +1290,8 @@ class MainWindow(QMainWindow):
             "✍️ Lyric Editor Workbench • 3-pane DAW lyric writing, syllable meter, chord transposer & takes",
             "🧬 Song DNA Cloner • Deep structure & cadence cloner with twin rhyme scheme generator",
             "🌐 Suno Browser Studio • Persistent multi-account login, 1-click Title/Style/Lyrics auto-fill & MP3 download manager",
-            "🎛️ Pro Mastering Studio • Suno AI Artifact Removal, FL-Style Parametric EQ, True-Peak Limiter & Loudness Normalization"
+            "🎛️ Pro Mastering Studio • Suno AI Artifact Removal, FL-Style Parametric EQ, True-Peak Limiter & Loudness Normalization",
+            "🚀 DistroKid & TuneCore Studio • Single Song & Full Album Release Packager (24-bit WAV + 3000px Cover) & Form Auto-Fill"
         ]
         action_labels = [
             "✍️ Open in Editor ➔",
@@ -1275,7 +1300,8 @@ class MainWindow(QMainWindow):
             "🎨 Open in Arranger ➔",
             "✍️ Open in Editor ➔",
             "⚡ Auto-Fill to Suno ➔",
-            "⚡ 1-Click Auto All ➔"
+            "⚡ 1-Click Auto All ➔",
+            "⚡ Auto-Fill Upload ➔"
         ]
 
         if hasattr(self, "header_stage_pill") and 0 <= index < len(mode_titles):
@@ -1299,9 +1325,11 @@ class MainWindow(QMainWindow):
         elif index == 5 and hasattr(self, "suno_browser_view"):
             self._sync_tracks_into_suno_browser()
             self.suno_browser_view.ensure_browser_initialized()
+        elif index == 7 and hasattr(self, "distro_view"):
+            self.distro_view.ensure_browser_initialized()
 
     def _setup_global_shortcuts(self):
-        # Studio Modes 1-7
+        # Studio Modes 1-8
         QShortcut(QKeySequence("Ctrl+1"), self).activated.connect(lambda: self._set_studio_mode(0))
         QShortcut(QKeySequence("Ctrl+2"), self).activated.connect(lambda: self._set_studio_mode(1))
         QShortcut(QKeySequence("Ctrl+3"), self).activated.connect(lambda: self._set_studio_mode(2))
@@ -1309,6 +1337,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+5"), self).activated.connect(lambda: self._set_studio_mode(4))
         QShortcut(QKeySequence("Ctrl+6"), self).activated.connect(lambda: self._set_studio_mode(5))
         QShortcut(QKeySequence("Ctrl+7"), self).activated.connect(lambda: self._set_studio_mode(6))
+        QShortcut(QKeySequence("Ctrl+8"), self).activated.connect(lambda: self._set_studio_mode(7))
 
         # Workflow Actions
         QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self._new_song)
@@ -1333,6 +1362,9 @@ class MainWindow(QMainWindow):
     def _toggle_fullscreen(self):
         if self.stack.currentIndex() == 5 and hasattr(self, "suno_browser_view"):
             self.suno_browser_view._toggle_fullscreen_view()
+            return
+        if self.stack.currentIndex() == 7 and hasattr(self, "distro_view"):
+            self.distro_view._toggle_fullscreen_view()
             return
 
         if self.isFullScreen():
@@ -1363,6 +1395,8 @@ class MainWindow(QMainWindow):
     def _on_escape_pressed(self):
         if hasattr(self, "suno_browser_view") and getattr(self.suno_browser_view, "_is_fullscreen_active", False):
             self.suno_browser_view._exit_fullscreen_view()
+        elif hasattr(self, "distro_view") and getattr(self.distro_view, "_is_fullscreen_active", False):
+            self.distro_view._exit_fullscreen_view()
         elif self.isFullScreen():
             self._toggle_fullscreen()
 
@@ -1370,6 +1404,10 @@ class MainWindow(QMainWindow):
         if event.key() == Qt.Key.Key_Escape:
             if hasattr(self, "suno_browser_view") and getattr(self.suno_browser_view, "_is_fullscreen_active", False):
                 self.suno_browser_view._exit_fullscreen_view()
+                event.accept()
+                return
+            elif hasattr(self, "distro_view") and getattr(self.distro_view, "_is_fullscreen_active", False):
+                self.distro_view._exit_fullscreen_view()
                 event.accept()
                 return
             elif self.isFullScreen():
@@ -1414,6 +1452,8 @@ class MainWindow(QMainWindow):
             self.suno_browser_view.apply_theme(theme_key)
         if hasattr(self, "master_view") and self.master_view:
             self.master_view.apply_theme(theme_key)
+        if hasattr(self, "distro_view") and self.distro_view:
+            self.distro_view.apply_theme(theme_key)
         if getattr(self, "suno_hud", None):
             self.suno_hud.apply_theme(theme_key)
 
@@ -2234,6 +2274,82 @@ class MainWindow(QMainWindow):
             self.master_view.add_track_file(str(p), auto_select=True)
             self._set_studio_mode(6)
             self.status_bar.showMessage(f"🎛️ Loaded '{p.name}' into Pro Mastering Studio & Audio Fixer", 4500)
+
+    def _on_master_sent_to_distro(self, tracks: list, artist: str, platform: str):
+        """Bridge from Mode 6 Mastering Studio straight into Mode 7 DistroKid & TuneCore Studio."""
+        if not hasattr(self, "distro_view"):
+            return
+        if platform:
+            self.distro_view.set_platform(platform)
+        editor_lyrics = self.editor_panel.get_lyrics() if hasattr(self, "editor_panel") else ""
+        if len(tracks) == 1 and editor_lyrics and not tracks[0].get("lyrics"):
+            tracks[0]["lyrics"] = editor_lyrics
+        rel_title = tracks[0].get("title", "New Single") if len(tracks) == 1 else f"{artist} — Studio Album"
+        self.distro_view.load_tracks_from_studio(tracks, release_title=rel_title, artist_name=artist)
+        self._set_studio_mode(7)
+        self.status_bar.showMessage(
+            f"🚀 Sent {len(tracks)} track(s) from Mastering Studio to {self.distro_view.current_platform} Upload Tab",
+            4500,
+        )
+
+    def _sync_master_into_distro(self):
+        """Pull queued tracks from Mode 6 Mastering Studio into Mode 7 Distro Tab."""
+        if not hasattr(self, "master_view") or not hasattr(self, "distro_view"):
+            return
+        mv = self.master_view
+        artist = mv.txt_dist_artist.text().strip() if hasattr(mv, "txt_dist_artist") else "SMG Studio Artist"
+        if mv.tracks:
+            payload = []
+            for idx, tr in enumerate(mv.tracks):
+                best_p = tr.get("master_path") if (tr.get("master_path") and Path(str(tr["master_path"])).exists()) else tr.get("path", "")
+                payload.append({
+                    "title": tr.get("title", f"Track {idx + 1}"),
+                    "audio_path": best_p,
+                    "lyrics": self.editor_panel.get_lyrics() if (idx == 0 and len(mv.tracks) == 1) else "",
+                })
+            rel_t = payload[0]["title"] if len(payload) == 1 else f"{artist} — Mastered Album"
+            self.distro_view.load_tracks_from_studio(payload, release_title=rel_t, artist_name=artist)
+            self.status_bar.showMessage(f"🎛️ Pulled {len(payload)} track(s) from Mastering Queue into Distro Tab", 3500)
+        else:
+            self._sync_editor_into_distro()
+
+    def _sync_batch_into_distro(self):
+        """Pull multi-song album tracklist & lyrics from Mode 2 Batch Studio into Mode 7 Distro Tab."""
+        if not hasattr(self, "batch_view") or not hasattr(self, "distro_view"):
+            return
+        songs = getattr(self.batch_view, "all_songs", []) or []
+        if not songs:
+            self.status_bar.showMessage("No Batch songs generated yet — pulling active Editor song instead", 3500)
+            self._sync_editor_into_distro()
+            return
+        payload = [
+            {
+                "title": s.get("title", f"Track {i + 1}"),
+                "lyrics": s.get("lyrics", ""),
+                "audio_path": s.get("audio_path", ""),
+            }
+            for i, s in enumerate(songs[:30])
+        ]
+        genre = songs[0].get("genre", "Pop") if songs else "Pop"
+        album_title = f"{songs[0].get('title', 'Midnight')} (Full Album)" if len(payload) >= 2 else payload[0]["title"]
+        self.distro_view.load_tracks_from_studio(payload, release_title=album_title, genre=genre)
+        self.status_bar.showMessage(f"⚡ Imported {len(payload)} Batch song(s) into Distro Album Tracklist", 4000)
+
+    def _sync_editor_into_distro(self):
+        """Pull active song title, stem audio & lyrics from Mode 3 Editor into Mode 7 Distro Tab."""
+        if not hasattr(self, "editor_panel") or not hasattr(self, "distro_view"):
+            return
+        title = self.editor_panel.get_title() or "Midnight Neon Lights"
+        lyrics = self.editor_panel.get_lyrics() or ""
+        stem_audio = getattr(self.editor_panel, "attached_audio_path", "") or ""
+        params = self.generator_panel.get_generation_parameters() if hasattr(self, "generator_panel") else {}
+        genre = params.get("genre", "Pop")
+        self.distro_view.load_tracks_from_studio(
+            [{"title": title, "lyrics": lyrics, "audio_path": stem_audio}],
+            release_title=title,
+            genre=genre,
+        )
+        self.status_bar.showMessage(f"✍️ Imported '{title}' from Lyric Editor into Distro Single Release", 3500)
 
     def _import_downloaded_suno_lyrics(self, title: str, lyrics: str):
         """Load lyrics and title extracted from a downloaded Suno song directly into the Editor."""

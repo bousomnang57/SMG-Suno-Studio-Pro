@@ -146,6 +146,7 @@ class AudioMasteringView(QWidget):
     """Pro Mastering Studio & Suno Audio Fixer View (Mode 6)."""
 
     send_to_editor_requested = pyqtSignal(str)  # audio_path
+    send_to_distro_requested = pyqtSignal(list, str, str)  # tracks, artist, platform
     switch_to_suno_requested = pyqtSignal()
     open_settings_requested = pyqtSignal()
 
@@ -1450,15 +1451,53 @@ class AudioMasteringView(QWidget):
 
         self.btn_build_distro_pack = QPushButton("🚀 Master && Export Complete Distribution Pack (24b + 16b + Sync + DDEX)")
         self.btn_build_distro_pack.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_build_distro_pack.setFixedHeight(32)
+        self.btn_build_distro_pack.setFixedHeight(30)
         self.btn_build_distro_pack.setStyleSheet(
             "background: #16a34a; color: #ffffff; font-weight: 900; font-size: 9.5px; padding: 5px 10px; border-radius: 5px;"
         )
         self.btn_build_distro_pack.clicked.connect(self._build_distribution_release_pack)
         l_rel.addWidget(self.btn_build_distro_pack, 4, 0, 1, 2)
 
+        self.btn_send_to_distro_tab = QPushButton("🚀 Send Single / Album Queue to DistroKid && TuneCore Upload Tab ➔")
+        self.btn_send_to_distro_tab.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_send_to_distro_tab.setFixedHeight(30)
+        self.btn_send_to_distro_tab.setStyleSheet(
+            "background: #0284c7; color: #ffffff; font-weight: 900; font-size: 9.5px; padding: 5px 10px; border-radius: 5px;"
+        )
+        self.btn_send_to_distro_tab.setToolTip(
+            "Send active mastered song (Single) or all queued tracks (Album/EP) directly to Mode 7 Distro Auto-Upload Tab"
+        )
+        self.btn_send_to_distro_tab.clicked.connect(self._send_queue_to_distro_tab)
+        l_rel.addWidget(self.btn_send_to_distro_tab, 5, 0, 1, 2)
+
         layout.addWidget(g_rel, stretch=2)
         return widget
+
+    def _send_queue_to_distro_tab(self):
+        dist_choice = self.combo_distributor.currentText()
+        platform = "TuneCore" if "TuneCore" in dist_choice else "DistroKid"
+        artist = self.txt_dist_artist.text().strip() or "SMG Studio Artist"
+        isrc_val = self.txt_dist_isrc.text().strip()
+        exp_flag = "Explicit" in self.combo_dist_explicit.currentText()
+
+        checked_tracks = [tr for tr in self.tracks if tr.get("checked", True)]
+        if not checked_tracks and self.current_input_path:
+            checked_tracks = [{
+                "title": self.txt_active_title.text().strip() or Path(self.current_input_path).stem,
+                "path": self.current_input_path,
+                "master_path": self.current_master_path,
+            }]
+
+        payload = []
+        for idx, tr in enumerate(checked_tracks):
+            best_audio = tr.get("master_path") if (tr.get("master_path") and Path(str(tr["master_path"])).exists()) else tr.get("path", "")
+            payload.append({
+                "title": tr.get("title", f"Track {idx + 1}"),
+                "audio_path": best_audio,
+                "isrc": isrc_val if idx == 0 else "",
+                "explicit": exp_flag,
+            })
+        self.send_to_distro_requested.emit(payload, artist, platform)
 
     # ── Drag-and-Drop Support ──
 

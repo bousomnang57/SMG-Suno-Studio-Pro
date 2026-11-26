@@ -29,15 +29,17 @@ def run_all_tests():
     win.show()
     print("  ✓ MainWindow initialized with 6 tabs")
 
-    print("[2/5] Testing 7-Mode Architecture...")
-    assert win.stack.count() == 7, f"Expected 7 views in stack, got {win.stack.count()}"
+    print("[2/5] Testing 8-Mode Architecture...")
+    assert win.stack.count() == 8, f"Expected 8 views in stack, got {win.stack.count()}"
     assert hasattr(win, "suno_browser_view"), "MainWindow missing suno_browser_view"
     assert hasattr(win, "master_view"), "MainWindow missing master_view"
+    assert hasattr(win, "distro_view"), "MainWindow missing distro_view"
     assert hasattr(win, "btn_mode_suno"), "MainWindow missing btn_mode_suno"
     assert hasattr(win, "btn_mode_master"), "MainWindow missing btn_mode_master"
+    assert hasattr(win, "btn_mode_distro"), "MainWindow missing btn_mode_distro"
 
-    mode_names = ["Wizard", "Visual", "Batch", "Editor", "Clone", "Suno", "Master"]
-    for idx in range(7):
+    mode_names = ["Wizard", "Visual", "Batch", "Editor", "Clone", "Suno", "Master", "Distro"]
+    for idx in range(8):
         win._set_studio_mode(idx)
         assert win.stack.currentIndex() == idx, f"Failed switching to mode {idx}"
         print(f"  ✓ Mode {idx} ({mode_names[idx]}) set successfully")
