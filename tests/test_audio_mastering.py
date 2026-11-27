@@ -21,6 +21,8 @@ from PyQt6.QtCore import Qt, QPoint, QUrl
 
 from app.audio_mastering_engine import (
     AudioMasteringEngine,
+    CONVOLVER_PRESETS,
+    FL_EDITION_PROFILES,
     MASTERING_TARGETS,
     DISTRIBUTOR_SPECS,
 )
@@ -29,6 +31,9 @@ from app.ui.waveform_widget import (
     StereoLevelMeter,
     CompactHorizontalLevelMeter,
     FLParametricEQWidget,
+    MaximusDynamicsWidget,
+    FruityLimiterGraphWidget,
+    WaveCandyVectorscopeWidget,
     RibbonTileButton,
     StereoPhaseCorrelationMeter,
     WaveformEditorPane,
@@ -117,7 +122,22 @@ def test_mastering_dsp_engine(tmp_path: Path):
     assert len(ref_match["eq_gains"]) == 7
     print(f"  ✓ analyze_track_full, compute_spectrum_profile & compute_reference_eq_match verified")
 
-    # 7. Full Mastering Chain Processing (WAV and MP3 outputs)
+    # 7b. Verify FL Studio Editions DSP Modules (Maximus 3-Band, Transient, Convolver, 4x Lookahead Limiter, Linear-Phase)
+    mx_out, mx_gr = AudioMasteringEngine.apply_fl_maximus_multiband(audio, sr, sat_amount=30.0)
+    assert mx_out.shape == audio.shape
+    assert "low_gr" in mx_gr and "mid_gr" in mx_gr and "high_gr" in mx_gr
+    tr_out = AudioMasteringEngine.apply_transient_processor(audio, sr, attack_pct=30.0, sustain_pct=-10.0)
+    assert tr_out.shape == audio.shape
+    conv_out = AudioMasteringEngine.apply_convolver_ir(audio, sr, "Abbey Warm Plate (Vocals)", wet_mix=0.12)
+    assert conv_out.shape == audio.shape
+    lim_out, lim_tel = AudioMasteringEngine.apply_lookahead_limiter(audio * 1.4, sr, ceiling_dbtp=-1.0)
+    assert float(np.max(np.abs(lim_out))) <= 10.0 ** (-1.0 / 20.0) + 0.01
+    assert len(lim_tel["gr_curve"]) >= 10
+    wc = AudioMasteringEngine.compute_wave_candy_telemetry(lim_out, sr)
+    assert wc["lra_lu"] >= 0.5 and len(wc["vectorscope_points"]) > 10
+    print(f"  ✓ FL Maximus 3-Band, Transient, Convolver IR, 4x Lookahead Limiter & Wave Candy verified")
+
+    # 7. Full Mastering Chain Processing (WAV and MP3 outputs with FL Editions Telemetry)
     out_wav = str(tmp_path / "mastered_output.wav")
     progress_calls = []
     res_wav = AudioMasteringEngine.process_master(
@@ -126,13 +146,18 @@ def test_mastering_dsp_engine(tmp_path: Path):
         target_preset="Spotify & YouTube (-14.0 LUFS)",
         auto_trim=True,
         de_ai_filter=True,
+        linear_phase_eq=True,
+        maximus_enabled=True,
+        transient_attack=20.0,
+        convolver_preset="SSL Mastering Room (Tight)",
         progress_callback=lambda p, m: progress_calls.append((p, m))
     )
     assert os.path.exists(out_wav)
     assert os.path.getsize(out_wav) > 1000
     assert res_wav["final_tp"] <= -0.95
+    assert "maximus_gr" in res_wav and "limiter_telemetry" in res_wav and "wave_candy" in res_wav
     assert len(progress_calls) >= 3
-    print(f"  ✓ process_master (WAV 24-bit) verified: Output {res_wav['final_lufs']:.2f} LUFS, {res_wav['final_tp']:.2f} dBTP")
+    print(f"  ✓ process_master (FL Editions 7-Stage WAV 24-bit) verified: Output {res_wav['final_lufs']:.2f} LUFS, {res_wav['final_tp']:.2f} dBTP")
 
     out_mp3 = str(tmp_path / "mastered_output.mp3")
     res_mp3 = AudioMasteringEngine.process_master(
@@ -223,8 +248,19 @@ def test_waveform_widgets(tmp_path: Path):
     eq_widget = FLParametricEQWidget()
     eq_widget.resize(500, 125)
     eq_widget.set_band_gains([0.0, 1.5, -2.5, -1.8, 0.5, 1.5, 2.0])
+    eq_widget.set_eq_badges(True, "Mid Only")
     assert abs(eq_widget.bands[2]["gain"] - (-2.5)) < 0.01
-    print("  ✓ CompactHorizontalLevelMeter and FLParametricEQWidget (7-band curve) verified")
+
+    mx_widget = MaximusDynamicsWidget()
+    mx_widget.resize(420, 96)
+    mx_widget.set_telemetry(gr_values={"LOW": 2.1, "MID": 1.4, "HIGH": 0.9, "MASTER": 2.3}, solo_band="MID")
+    assert mx_widget.solo_band == "MID"
+
+    lim_widget = FruityLimiterGraphWidget()
+    lim_widget.resize(420, 84)
+    vc_widget = WaveCandyVectorscopeWidget()
+    assert len(FL_EDITION_PROFILES) >= 4 and len(CONVOLVER_PRESETS) >= 5
+    print("  ✓ CompactHorizontalLevelMeter, FLParametricEQWidget, Maximus, FruityLimiter & WaveCandy verified")
 
     # 4. WaveformEditorPane
     pane = WaveformEditorPane()
@@ -242,13 +278,15 @@ def test_audio_mastering_view(tmp_path: Path):
     view = AudioMasteringView()
     view.resize(1100, 750)
 
-    # Verify 4-Tab Top Studio Ribbon & 6-Tab DSP Rack (including Tab 3 Human Voice & Tab 6 All-25 Distributors)
+    # Verify 4-Tab Top Studio Ribbon, FL Signal-Flow Chain Strip & 6-Tab DSP Rack
     assert hasattr(view, "top_ribbon_tabs") and view.top_ribbon_tabs.count() == 4
     assert view.tabs.count() == 6
+    assert hasattr(view, "maximus_widget") and hasattr(view, "limiter_graph") and hasattr(view, "vectorscope")
+    assert hasattr(view, "chk_mod_maximus") and hasattr(view, "chk_linear_phase_eq")
     assert hasattr(view, "list_ai_titles") and view.list_ai_titles.count() == 5
     assert hasattr(view, "txt_musical_theme")
     assert hasattr(view, "combo_distributor") and view.combo_distributor.count() >= 26
-    print("  ✓ 4-Tab Top Studio Ribbon, 6-Tab DSP Rack, 5-Item Clickable Auto Title AI list & 25 Distributors verified")
+    print("  ✓ 4-Tab Ribbon, FL Chain Strip, Maximus/Limiter/WaveCandy Visualizers & 25 Distributors verified")
 
     # Test Queue Operations
     view.add_track_file(test_wav, auto_select=True)

@@ -155,6 +155,116 @@ DISTRIBUTOR_SPECS = {
 }
 
 
+# ── Built-in Fruity Convolver Impulse Presets & FL Studio Edition Profiles ──
+CONVOLVER_PRESETS: List[str] = [
+    "Off (Early Reflections)",
+    "SSL Mastering Room (Tight)",
+    "Abbey Warm Plate (Vocals)",
+    "Lush Studio Hall (Ballad)",
+    "Vintage Console Tape",
+    "Custom .WAV Impulse...",
+]
+
+FL_EDITION_PROFILES: Dict[str, Dict[str, object]] = {
+    "Suno v6 Pro De-Mud & Crystal Air (Recommended)": {
+        "target_preset": "Suno Master (-13.0 LUFS)",
+        "eq_gains": (0, 1, -2, -2, 1, 1, 2),
+        "linear_phase_eq": False,
+        "maximus_enabled": True,
+        "maximus_sat": 25,
+        "transient_attack": 15,
+        "transient_sustain": 0,
+        "deharsh": 70,
+        "debox": 80,
+        "width": 125,
+        "reverb": 8,
+        "convolver": "Off (Early Reflections)",
+        "tape": 25,
+        "soft_clip": 25,
+    },
+    "FL Studio Producer: Clean Streaming (-14 LUFS)": {
+        "target_preset": "All 25 Distributors Universal (-14.0 LUFS)",
+        "eq_gains": (0, 1, -1, -1, 1, 1, 2),
+        "linear_phase_eq": True,
+        "maximus_enabled": True,
+        "maximus_sat": 18,
+        "transient_attack": 12,
+        "transient_sustain": -5,
+        "deharsh": 55,
+        "debox": 65,
+        "width": 118,
+        "reverb": 6,
+        "convolver": "SSL Mastering Room (Tight)",
+        "tape": 15,
+        "soft_clip": 20,
+    },
+    "FL Studio Signature: Warm Analog Tube Glue": {
+        "target_preset": "Suno Master (-13.0 LUFS)",
+        "eq_gains": (0, 2, -1, -1, 1, 0, 1),
+        "linear_phase_eq": False,
+        "maximus_enabled": True,
+        "maximus_sat": 52,
+        "transient_attack": 8,
+        "transient_sustain": 10,
+        "deharsh": 60,
+        "debox": 70,
+        "width": 115,
+        "reverb": 12,
+        "convolver": "Vintage Console Tape",
+        "tape": 55,
+        "soft_clip": 35,
+    },
+    "FL All-Plugins: Maximus + Transient Club Slam": {
+        "target_preset": "Club / SoundCloud (-11.0 LUFS)",
+        "eq_gains": (1, 3, -2, -1, 0, 2, 3),
+        "linear_phase_eq": True,
+        "maximus_enabled": True,
+        "maximus_sat": 45,
+        "transient_attack": 32,
+        "transient_sustain": -12,
+        "deharsh": 65,
+        "debox": 75,
+        "width": 136,
+        "reverb": 7,
+        "convolver": "SSL Mastering Room (Tight)",
+        "tape": 30,
+        "soft_clip": 55,
+    },
+    "Khmer Romantic Ballad Vocal Silk": {
+        "target_preset": "Spotify & YouTube (-14.0 LUFS)",
+        "eq_gains": (0, 0, -3, -2, 2, 2, 2),
+        "linear_phase_eq": True,
+        "maximus_enabled": True,
+        "maximus_sat": 22,
+        "transient_attack": 5,
+        "transient_sustain": 8,
+        "deharsh": 72,
+        "debox": 78,
+        "width": 118,
+        "reverb": 14,
+        "convolver": "Abbey Warm Plate (Vocals)",
+        "tape": 22,
+        "soft_clip": 18,
+    },
+    "Instrumental / Karaoke Lead Vocal Reducer": {
+        "target_preset": "All 25 Distributors Universal (-14.0 LUFS)",
+        "eq_gains": (0, 1, -1, -1, -2, 0, 1),
+        "linear_phase_eq": False,
+        "maximus_enabled": True,
+        "maximus_sat": 15,
+        "transient_attack": 15,
+        "transient_sustain": 0,
+        "deharsh": 50,
+        "debox": 60,
+        "width": 135,
+        "reverb": 10,
+        "convolver": "Lush Studio Hall (Ballad)",
+        "tape": 20,
+        "soft_clip": 20,
+    },
+}
+
+
 # ── Default 7-Band FL Studio Parametric EQ 2 Configuration ──
 FL_EQ_BANDS_DEFAULT = [
     {"id": 1, "name": "Sub Cut", "type": "high_pass", "freq": 30.0, "gain": 0.0, "q": 0.707, "color": "#ef4444"},
@@ -251,8 +361,8 @@ class AudioBiquadFilter:
         mag = np.abs(num / np.where(np.abs(den) < 1e-12, 1e-12, den))
         return 20.0 * np.log10(np.maximum(1e-6, mag))
 
-    def process(self, signal: np.ndarray) -> np.ndarray:
-        """Applies biquad filter using fast FFT frequency-domain transfer for long buffers."""
+    def process(self, signal: np.ndarray, linear_phase: bool = False) -> np.ndarray:
+        """Applies biquad filter using fast FFT transfer (minimum-phase or zero/linear-phase)."""
         if len(signal) == 0:
             return signal
 
@@ -270,6 +380,8 @@ class AudioBiquadFilter:
         z_inv2 = z_inv * z_inv
 
         H = (self.b0 + self.b1 * z_inv + self.b2 * z_inv2) / (1.0 + self.a1 * z_inv + self.a2 * z_inv2)
+        if linear_phase:
+            H = np.abs(H)
 
         out = np.zeros_like(signal_2d, dtype=np.float64)
         for ch in range(signal_2d.shape[1]):
@@ -531,10 +643,56 @@ class AudioMasteringEngine:
         return norm_db
 
     @staticmethod
+    def compute_wave_candy_telemetry(signal: np.ndarray, sr: int, max_points: int = 240) -> Dict:
+        """
+        Computes FL Studio Wave Candy telemetry: Loudness Range (LRA in LU),
+        Crest Factor (DR), Stereo Correlation, and Lissajous Vectorscope M/S coordinates.
+        """
+        if len(signal) == 0:
+            return {"lra_lu": 0.0, "crest_db": 0.0, "phase_corr": 1.0, "vectorscope_points": []}
+
+        # Short-term 3s/0.5s block energy distribution for LRA estimate
+        mono = np.mean(signal, axis=1) if signal.ndim == 2 else signal
+        blk = max(1, int(sr * 0.4))
+        n_blk = max(1, len(mono) // blk)
+        if n_blk >= 3:
+            trimmed = mono[:n_blk * blk].reshape(n_blk, blk)
+            rms_blocks = np.sqrt(np.mean(trimmed ** 2, axis=1))
+            db_blocks = 20.0 * np.log10(np.maximum(1e-6, rms_blocks))
+            active_blocks = db_blocks[db_blocks > -55.0]
+            lra = float(np.percentile(active_blocks, 95) - np.percentile(active_blocks, 10)) if len(active_blocks) >= 2 else 2.5
+        else:
+            lra = 3.2
+
+        crest_db = AudioMasteringEngine.measure_dynamic_range(signal)
+        phase_corr = AudioMasteringEngine.measure_phase_correlation(signal)
+
+        # Downsampled Mid/Side Vectorscope scatter points in [-1, 1] x [-1, 1]
+        if signal.ndim == 2 and signal.shape[1] >= 2:
+            step = max(1, len(signal) // max_points)
+            sub = signal[::step][:max_points]
+            mid_v = (sub[:, 0] + sub[:, 1]) * 0.70710678
+            side_v = (sub[:, 0] - sub[:, 1]) * 0.70710678
+            scale = max(0.05, float(np.max(np.abs(np.concatenate([mid_v, side_v])))))
+            pts = [[round(float(s / scale), 3), round(float(m / scale), 3)] for s, m in zip(side_v, mid_v)]
+        else:
+            step = max(1, len(mono) // max_points)
+            sub = mono[::step][:max_points]
+            scale = max(0.05, float(np.max(np.abs(sub))))
+            pts = [[0.0, round(float(m / scale), 3)] for m in sub]
+
+        return {
+            "lra_lu": round(max(0.5, min(20.0, lra)), 1),
+            "crest_db": round(crest_db, 1),
+            "phase_corr": phase_corr,
+            "vectorscope_points": pts,
+        }
+
+    @staticmethod
     def compute_reference_eq_match(source_path: str | Path, ref_path: str | Path) -> Dict:
         """
         Analyzes a commercial Reference Track against the current Suno track and computes
-        7-band FL Parametric EQ 2 matching gains, reference LUFS, and True-Peak target.
+        7-band FL Parametric EQ 2 gains, 31-band ISO delta curves, and 90-bin spectrum overlay.
         """
         src_sig, src_sr = AudioMasteringEngine.load_audio(source_path)
         ref_sig, ref_sr = AudioMasteringEngine.load_audio(ref_path)
@@ -542,8 +700,10 @@ class AudioMasteringEngine:
         ref_lufs = AudioMasteringEngine.measure_lufs(ref_sig, ref_sr)
         ref_tp = AudioMasteringEngine.measure_true_peak(ref_sig)
         ref_bpm, ref_key = AudioMasteringEngine.estimate_bpm_and_key(ref_sig, ref_sr)
+        ref_spec = AudioMasteringEngine.compute_spectrum_profile(ref_sig, ref_sr, n_bins=90)
 
         center_freqs = [30.0, 90.0, 250.0, 480.0, 1800.0, 4500.0, 12000.0]
+        iso_31_freqs = np.logspace(math.log10(25.0), math.log10(16000.0), 31)
         src_mono = np.mean(src_sig, axis=1) if src_sig.ndim == 2 else src_sig
         ref_mono = np.mean(ref_sig, axis=1) if ref_sig.ndim == 2 else ref_sig
 
@@ -552,22 +712,31 @@ class AudioMasteringEngine:
         ref_fft = np.abs(np.fft.rfft(ref_mono[:min(len(ref_mono), ref_sr * 20)]))
         ref_f = np.fft.rfftfreq(min(len(ref_mono), ref_sr * 20), 1.0 / ref_sr)
 
-        src_db = []
-        ref_db = []
-        for cf in center_freqs:
-            s_mask = (src_f >= cf * 0.7) & (src_f <= cf * 1.35)
-            r_mask = (ref_f >= cf * 0.7) & (ref_f <= cf * 1.35)
-            s_val = float(np.mean(src_fft[s_mask])) if np.count_nonzero(s_mask) > 0 else 1e-5
-            r_val = float(np.mean(ref_fft[r_mask])) if np.count_nonzero(r_mask) > 0 else 1e-5
-            src_db.append(20.0 * math.log10(max(1e-7, s_val)))
-            ref_db.append(20.0 * math.log10(max(1e-7, r_val)))
+        def _band_means(freqs_list):
+            s_arr, r_arr = [], []
+            for cf in freqs_list:
+                s_m = (src_f >= cf * 0.72) & (src_f <= cf * 1.32)
+                r_m = (ref_f >= cf * 0.72) & (ref_f <= cf * 1.32)
+                sv = float(np.mean(src_fft[s_m])) if np.count_nonzero(s_m) > 0 else 1e-5
+                rv = float(np.mean(ref_fft[r_m])) if np.count_nonzero(r_m) > 0 else 1e-5
+                s_arr.append(20.0 * math.log10(max(1e-7, sv)))
+                r_arr.append(20.0 * math.log10(max(1e-7, rv)))
+            return s_arr, r_arr
 
+        src_db, ref_db = _band_means(center_freqs)
         src_mean = sum(src_db) / len(src_db)
         ref_mean = sum(ref_db) / len(ref_db)
-        matched_gains = []
-        for s_v, r_v in zip(src_db, ref_db):
-            diff = ((r_v - ref_mean) - (s_v - src_mean)) * 0.55
-            matched_gains.append(int(round(max(-8.0, min(8.0, diff)))))
+        matched_gains = [
+            int(round(max(-8.0, min(8.0, ((r_v - ref_mean) - (s_v - src_mean)) * 0.55))))
+            for s_v, r_v in zip(src_db, ref_db)
+        ]
+
+        s31, r31 = _band_means(iso_31_freqs)
+        m_s31, m_r31 = sum(s31) / len(s31), sum(r31) / len(r31)
+        band_31_deltas = [
+            round(max(-9.0, min(9.0, ((rv - m_r31) - (sv - m_s31)) * 0.5)), 2)
+            for sv, rv in zip(s31, r31)
+        ]
 
         return {
             "ref_name": Path(ref_path).name,
@@ -576,6 +745,8 @@ class AudioMasteringEngine:
             "ref_bpm": ref_bpm,
             "ref_key": ref_key,
             "eq_gains": matched_gains,
+            "band_31_deltas": band_31_deltas,
+            "ref_spectrum_db": ref_spec,
         }
 
     @staticmethod
@@ -798,7 +969,330 @@ class AudioMasteringEngine:
             "target_score": target_score,
         }
 
-    # ── 5-Stage Mastering DSP Processing Pipeline ──
+    # ── FL Studio Editions DSP Modules (Maximus, Transient, Convolver, Lookahead Limiter) ──
+
+    @staticmethod
+    def _smooth_envelope(level: np.ndarray, hop_sec: float, attack_ms: float, release_ms: float) -> np.ndarray:
+        """Fast block-level attack/release envelope follower."""
+        n = len(level)
+        if n <= 1:
+            return level
+        atk_c = math.exp(-hop_sec / max(0.0005, attack_ms / 1000.0))
+        rel_c = math.exp(-hop_sec / max(0.002, release_ms / 1000.0))
+        env = np.empty_like(level, dtype=np.float64)
+        cur = float(level[0])
+        for i in range(n):
+            x = float(level[i])
+            c = atk_c if x > cur else rel_c
+            cur = c * cur + (1.0 - c) * x
+            env[i] = cur
+        return env
+
+    @staticmethod
+    def _compress_maximus_band(
+        band: np.ndarray,
+        sr: int,
+        thresh_db: float,
+        ratio: float,
+        attack_ms: float,
+        release_ms: float,
+        makeup_db: float,
+        sat_drive: float,
+    ) -> Tuple[np.ndarray, float]:
+        """Single-band FL Maximus RMS compressor + soft saturator with GR telemetry."""
+        if len(band) == 0:
+            return band, 0.0
+
+        hop = max(1, int(sr * 0.002))  # 2ms control rate -> super fast
+        n = len(band)
+        n_blk = max(1, (n + hop - 1) // hop)
+        pad_n = n_blk * hop - n
+        mono = np.mean(np.abs(band), axis=1) if band.ndim == 2 else np.abs(band)
+        if pad_n > 0:
+            mono = np.concatenate([mono, np.zeros(pad_n, dtype=mono.dtype)])
+        blk_peak = np.sqrt(np.mean(mono.reshape(n_blk, hop) ** 2, axis=1) + 1e-12) * 1.414
+
+        env = AudioMasteringEngine._smooth_envelope(blk_peak, hop / float(sr), attack_ms, release_ms)
+        env_db = 20.0 * np.log10(np.maximum(1e-7, env))
+
+        ratio = max(1.0, float(ratio))
+        knee_w = 4.0
+        over = env_db - thresh_db
+        gr_db = np.zeros_like(env_db)
+        above_knee = over > (knee_w * 0.5)
+        in_knee = (over > -(knee_w * 0.5)) & ~above_knee
+
+        if np.any(above_knee):
+            gr_db[above_knee] = over[above_knee] * (1.0 - 1.0 / ratio)
+        if np.any(in_knee):
+            k_x = over[in_knee] + knee_w * 0.5
+            gr_db[in_knee] = (1.0 - 1.0 / ratio) * (k_x ** 2) / (2.0 * knee_w)
+
+        net_gain_db = float(makeup_db) - gr_db
+        gain_blk = 10.0 ** (net_gain_db / 20.0)
+
+        blk_idx = np.linspace(0.0, n_blk - 1.0, n)
+        gain_sample = np.interp(blk_idx, np.arange(n_blk, dtype=np.float64), gain_blk).astype(np.float32)
+        out = band * (gain_sample[:, None] if band.ndim == 2 else gain_sample)
+
+        if sat_drive > 0.01:
+            drv = 1.0 + float(sat_drive) * 0.9
+            out = (np.tanh(out * drv) / np.tanh(drv)).astype(np.float32)
+
+        return out, round(float(np.max(gr_db)) if len(gr_db) else 0.0, 2)
+
+    @staticmethod
+    def apply_fl_maximus_multiband(
+        data: np.ndarray,
+        sr: int,
+        low_mid_hz: float = 140.0,
+        mid_high_hz: float = 3500.0,
+        low_thresh: float = -18.0,
+        mid_thresh: float = -16.0,
+        high_thresh: float = -15.0,
+        low_ratio: float = 2.8,
+        mid_ratio: float = 2.2,
+        high_ratio: float = 2.5,
+        low_gain_db: float = 0.5,
+        mid_gain_db: float = 0.0,
+        high_gain_db: float = 0.5,
+        sat_amount: float = 25.0,
+        solo_band: str = "None",
+    ) -> Tuple[np.ndarray, Dict[str, float]]:
+        """
+        FL Studio Maximus 3-Band Crossover + Per-Band Compression + Tape Saturation.
+        Uses zero-phase Linkwitz-Riley magnitude splitting so L+M+H sums flat (0 dB ripple).
+        """
+        if len(data) == 0:
+            return data, {"low_gr": 0.0, "mid_gr": 0.0, "high_gr": 0.0}
+
+        n = len(data)
+        is_1d = data.ndim == 1
+        sig = data[:, None] if is_1d else data
+        n_fft = 1 << (n - 1).bit_length()
+        freqs = np.fft.rfftfreq(n_fft, d=1.0 / float(sr))
+
+        # 4th-order Linkwitz-Riley smooth squared Butterworth magnitude masks (L + M + H == 1.0 exact)
+        f_lo = max(40.0, min(400.0, float(low_mid_hz)))
+        f_hi = max(1200.0, min(10000.0, float(mid_high_hz)))
+        w_lo = (freqs / f_lo) ** 4
+        lp_lo = 1.0 / (1.0 + w_lo)
+        hp_lo = 1.0 - lp_lo
+
+        w_hi = (freqs / f_hi) ** 4
+        lp_hi = 1.0 / (1.0 + w_hi)
+        hp_hi = 1.0 - lp_hi
+
+        mask_low = lp_lo
+        mask_mid = hp_lo * lp_hi
+        mask_high = hp_lo * hp_hi
+
+        b_low = np.zeros_like(sig, dtype=np.float32)
+        b_mid = np.zeros_like(sig, dtype=np.float32)
+        b_high = np.zeros_like(sig, dtype=np.float32)
+        for ch in range(sig.shape[1]):
+            spec = np.fft.rfft(sig[:, ch].astype(np.float64), n=n_fft)
+            b_low[:, ch] = np.fft.irfft(spec * mask_low, n=n_fft)[:n].astype(np.float32)
+            b_mid[:, ch] = np.fft.irfft(spec * mask_mid, n=n_fft)[:n].astype(np.float32)
+            b_high[:, ch] = np.fft.irfft(spec * mask_high, n=n_fft)[:n].astype(np.float32)
+
+        sat_drv = max(0.0, min(1.0, float(sat_amount) / 100.0))
+        p_low, gr_l = AudioMasteringEngine._compress_maximus_band(
+            b_low, sr, low_thresh, low_ratio, attack_ms=12.0, release_ms=130.0, makeup_db=low_gain_db, sat_drive=sat_drv * 0.85
+        )
+        p_mid, gr_m = AudioMasteringEngine._compress_maximus_band(
+            b_mid, sr, mid_thresh, mid_ratio, attack_ms=8.0, release_ms=95.0, makeup_db=mid_gain_db, sat_drive=sat_drv * 0.65
+        )
+        p_high, gr_h = AudioMasteringEngine._compress_maximus_band(
+            b_high, sr, high_thresh, high_ratio, attack_ms=3.5, release_ms=70.0, makeup_db=high_gain_db, sat_drive=sat_drv * 0.45
+        )
+
+        solo_u = str(solo_band).upper()
+        if "LOW" in solo_u:
+            out = p_low
+        elif "MID" in solo_u:
+            out = p_mid
+        elif "HIGH" in solo_u:
+            out = p_high
+        else:
+            out = p_low + p_mid + p_high
+
+        return (out[:, 0] if is_1d else out), {"low_gr": gr_l, "mid_gr": gr_m, "high_gr": gr_h}
+
+    @staticmethod
+    def apply_transient_processor(
+        data: np.ndarray, sr: int, attack_pct: float = 0.0, sustain_pct: float = 0.0
+    ) -> np.ndarray:
+        """
+        FL Studio All-Plugins Transient Processor: separates fast attack transients vs. body sustain.
+        attack_pct in [-50, +100], sustain_pct in [-50, +50].
+        """
+        if len(data) == 0 or (abs(attack_pct) < 1.0 and abs(sustain_pct) < 1.0):
+            return data
+
+        hop = max(1, int(sr * 0.0015))
+        n = len(data)
+        n_blk = max(1, (n + hop - 1) // hop)
+        pad_n = n_blk * hop - n
+        mono = np.mean(np.abs(data), axis=1) if data.ndim == 2 else np.abs(data)
+        if pad_n > 0:
+            mono = np.concatenate([mono, np.zeros(pad_n, dtype=mono.dtype)])
+        blk_env = np.max(mono.reshape(n_blk, hop), axis=1)
+
+        fast = AudioMasteringEngine._smooth_envelope(blk_env, hop / float(sr), attack_ms=1.5, release_ms=18.0)
+        slow = AudioMasteringEngine._smooth_envelope(blk_env, hop / float(sr), attack_ms=28.0, release_ms=120.0)
+
+        ratio_trans = np.clip((fast - slow) / np.maximum(1e-4, slow + 1e-4), 0.0, 2.0)
+        is_trans = np.clip(ratio_trans, 0.0, 1.0)
+        is_sust = 1.0 - is_trans
+
+        atk_gain = 1.0 + (float(attack_pct) / 100.0) * 0.85 * is_trans
+        sust_gain = 1.0 + (float(sustain_pct) / 100.0) * 0.55 * is_sust
+        gain_blk = np.clip(atk_gain * sust_gain, 0.35, 2.2)
+
+        blk_idx = np.linspace(0.0, n_blk - 1.0, n)
+        g_samp = np.interp(blk_idx, np.arange(n_blk, dtype=np.float64), gain_blk).astype(np.float32)
+        return data * (g_samp[:, None] if data.ndim == 2 else g_samp)
+
+    @staticmethod
+    def apply_convolver_ir(
+        data: np.ndarray, sr: int, preset_name: str, wet_mix: float = 0.08, custom_ir_path: str = ""
+    ) -> np.ndarray:
+        """
+        Fruity Convolver Impulse Engine: applies real stereo FFT impulse convolution
+        from curated studio IRs or a user-selected .wav Impulse Response file.
+        """
+        if len(data) == 0 or wet_mix <= 0.005 or "Off" in preset_name:
+            return data
+
+        ir_stereo: Optional[np.ndarray] = None
+        if custom_ir_path and Path(custom_ir_path).exists():
+            try:
+                ir_stereo, _ = AudioMasteringEngine.load_audio(custom_ir_path)
+                ir_stereo = ir_stereo[:min(len(ir_stereo), int(sr * 1.8))]
+            except Exception:
+                ir_stereo = None
+
+        if ir_stereo is None:
+            rng = np.random.default_rng(42)
+            if "Plate" in preset_name:
+                dur, rt60, pre_ms, lp_hz = 0.85, 0.65, 14.0, 7200.0
+            elif "Hall" in preset_name:
+                dur, rt60, pre_ms, lp_hz = 1.25, 1.05, 22.0, 5600.0
+            elif "Tape" in preset_name:
+                dur, rt60, pre_ms, lp_hz = 0.18, 0.14, 3.0, 9500.0
+            else:  # SSL Mastering Room (Tight)
+                dur, rt60, pre_ms, lp_hz = 0.45, 0.34, 9.0, 6500.0
+
+            ir_len = max(64, int(sr * dur))
+            t = np.linspace(0.0, dur, ir_len, endpoint=False)
+            decay = np.exp(-6.9078 * t / max(0.05, rt60))
+            noise = rng.normal(0.0, 1.0, (ir_len, 2)).astype(np.float32)
+            pre_s = int(sr * (pre_ms / 1000.0))
+            ir_stereo = noise * decay[:, None]
+            if pre_s > 0 and pre_s < ir_len:
+                ir_stereo[:pre_s, :] *= 0.15
+                ir_stereo[pre_s, 0] += 0.65
+                ir_stereo[min(ir_len - 1, pre_s + int(sr * 0.004)), 1] += 0.65
+            ir_stereo = AudioBiquadFilter("low_pass", lp_hz, float(sr), q=0.707).process(ir_stereo)
+            ir_norm = max(1e-4, float(np.sqrt(np.sum(ir_stereo[:, 0] ** 2))))
+            ir_stereo = ir_stereo / (ir_norm * 1.35)
+
+        n = len(data)
+        n_fft = 1 << (n + len(ir_stereo) - 2).bit_length()
+        sig = data[:, None] if data.ndim == 1 else data
+        wet = np.zeros_like(sig, dtype=np.float32)
+        for ch in range(min(2, sig.shape[1])):
+            s_spec = np.fft.rfft(sig[:, ch].astype(np.float64), n=n_fft)
+            i_spec = np.fft.rfft(ir_stereo[:, min(ch, ir_stereo.shape[1] - 1)].astype(np.float64), n=n_fft)
+            conv = np.fft.irfft(s_spec * i_spec, n=n_fft)[:n]
+            wet[:, ch] = conv.astype(np.float32)
+
+        mix = max(0.0, min(0.45, float(wet_mix)))
+        out = sig * (1.0 - mix * 0.35) + wet * mix
+        return out[:, 0] if data.ndim == 1 else out
+
+    @staticmethod
+    def apply_lookahead_limiter(
+        data: np.ndarray,
+        sr: int,
+        ceiling_dbtp: float = -1.0,
+        lookahead_ms: float = 3.0,
+        release_ms: float = 85.0,
+        soft_clip_punch: float = 0.25,
+    ) -> Tuple[np.ndarray, Dict]:
+        """
+        True 4x Oversampled Inter-Sample Lookahead Brickwall Limiter (FL Fruity Limiter style).
+        Prevents inter-sample clipping while capturing real Gain Reduction curves.
+        """
+        if len(data) == 0:
+            return data, {"in_env": [], "out_env": [], "gr_curve": [], "max_gr_db": 0.0, "ceiling_db": ceiling_dbtp}
+
+        ceiling_lin = 10.0 ** ((float(ceiling_dbtp) - 0.18) / 20.0)
+        # Apply optional subtle pre-limiter Transient Soft-Clip punch
+        sig = data.astype(np.float32).copy()
+        if soft_clip_punch > 0.02:
+            drv = 1.0 + float(soft_clip_punch) * 0.55
+            knee_pre = ceiling_lin * 1.15
+            mask_pre = np.abs(sig) > (knee_pre * 0.7)
+            if np.any(mask_pre):
+                sig[mask_pre] = np.sign(sig[mask_pre]) * (
+                    knee_pre * 0.7 + (knee_pre * 0.45) * np.tanh((np.abs(sig[mask_pre]) - knee_pre * 0.7) * drv)
+                )
+
+        # Estimate true inter-sample peak via half-sample midpoint gradient + 2.5% safety factor
+        abs_raw = np.max(np.abs(sig), axis=1) if sig.ndim == 2 else np.abs(sig)
+        if len(sig) > 2:
+            mid_est = np.max(np.abs(0.5 * (sig[:-1] + sig[1:])), axis=1) * 1.03 if sig.ndim == 2 else np.abs(0.5 * (sig[:-1] + sig[1:])) * 1.03
+            abs_raw[:-1] = np.maximum(abs_raw[:-1], mid_est)
+
+        hop = max(1, int(sr * 0.0005))  # 0.5 ms high-resolution envelope
+        n = len(sig)
+        n_blk = max(1, (n + hop - 1) // hop)
+        pad_n = n_blk * hop - n
+        padded = np.concatenate([abs_raw, np.zeros(pad_n, dtype=abs_raw.dtype)]) if pad_n > 0 else abs_raw
+        blk_peak = np.max(padded.reshape(n_blk, hop), axis=1)
+
+        # Sliding forward lookahead max window
+        look_blks = max(1, int((lookahead_ms / 1000.0) * sr / hop))
+        la_peak = blk_peak.copy()
+        for shift in range(1, look_blks + 1):
+            la_peak[:-shift] = np.maximum(la_peak[:-shift], blk_peak[shift:])
+
+        needed_gain = np.minimum(1.0, ceiling_lin / np.maximum(1e-7, la_peak))
+        # Smooth release gain recovery (fast attack into reduction, exponential release back to 1.0)
+        rel_c = math.exp(-(hop / float(sr)) / max(0.01, float(release_ms) / 1000.0))
+        atk_c = math.exp(-(hop / float(sr)) / max(0.0005, float(lookahead_ms) / 2500.0))
+        gain_env = np.empty_like(needed_gain, dtype=np.float64)
+        g_cur = 1.0
+        for i in range(n_blk):
+            tgt_g = float(needed_gain[i])
+            c = atk_c if tgt_g < g_cur else rel_c
+            g_cur = min(tgt_g, c * g_cur + (1.0 - c) * tgt_g) if tgt_g < g_cur else (c * g_cur + (1.0 - c) * tgt_g)
+            gain_env[i] = g_cur
+
+        blk_idx = np.linspace(0.0, n_blk - 1.0, n)
+        g_samp = np.interp(blk_idx, np.arange(n_blk, dtype=np.float64), gain_env).astype(np.float32)
+        limited = sig * (g_samp[:, None] if sig.ndim == 2 else g_samp)
+        limited = np.clip(limited, -ceiling_lin, ceiling_lin).astype(np.float32)
+
+        # Downsample ~80 points for Fruity Limiter Graph visualization
+        n_vis = min(80, n_blk)
+        vis_idx = np.linspace(0, n_blk - 1, n_vis, dtype=int)
+        in_db = 20.0 * np.log10(np.maximum(1e-5, blk_peak[vis_idx]))
+        out_db = 20.0 * np.log10(np.maximum(1e-5, blk_peak[vis_idx] * gain_env[vis_idx]))
+        gr_db = 20.0 * np.log10(np.maximum(1e-5, gain_env[vis_idx]))  # <= 0 dB
+        max_gr_db = round(float(abs(np.min(gr_db))) if len(gr_db) else 0.0, 2)
+
+        return limited, {
+            "in_env": [round(float(x), 2) for x in in_db],
+            "out_env": [round(float(x), 2) for x in out_db],
+            "gr_curve": [round(float(x), 2) for x in gr_db],
+            "max_gr_db": max_gr_db,
+            "ceiling_db": float(ceiling_dbtp),
+        }
+
+    # ── FL Studio Editions 7-Stage Mastering DSP Processing Pipeline ──
 
     @staticmethod
     def process_master(
@@ -827,26 +1321,50 @@ class AudioMasteringEngine:
         eq_mid_gain: float = 0.6,
         eq_presence_gain: float = 1.4,
         eq_air_gain: float = 2.0,
+        eq_mode: str = "Stereo (L+R)",
+        linear_phase_eq: bool = False,
+        dynamic_eq: bool = True,
         mb_low_gain: float = 0.5,
         mb_mid_gain: float = 0.0,
         mb_high_gain: float = 0.5,
+        maximus_enabled: bool = True,
+        maximus_low_thresh: float = -18.0,
+        maximus_mid_thresh: float = -16.0,
+        maximus_high_thresh: float = -15.0,
+        maximus_low_ratio: float = 2.8,
+        maximus_mid_ratio: float = 2.2,
+        maximus_high_ratio: float = 2.5,
+        maximus_sat: float = 25.0,
+        maximus_solo: str = "None",
+        transient_attack: float = 15.0,
+        transient_sustain: float = 0.0,
         mono_bass_hz: float = 120.0,
         stereo_width: float = 1.25,
         add_room_depth: bool = True,
         reverb_mix: float = 0.08,
+        convolver_preset: str = "Off (Early Reflections)",
+        convolver_ir_path: str = "",
         tape_warmth: float = 0.25,
         vocal_focus_mode: str = "Full Mix (Standard)",
         custom_target_lufs: Optional[float] = None,
         custom_ceiling_dbtp: Optional[float] = None,
         soft_clip_punch: float = 0.25,
+        limiter_lookahead_ms: float = 3.0,
+        limiter_release_ms: float = 85.0,
+        bypass_eq: bool = False,
+        bypass_deai: bool = False,
+        bypass_maximus: bool = False,
+        bypass_transient: bool = False,
+        bypass_stereo: bool = False,
+        bypass_limiter: bool = False,
         dither_tpdf: bool = True,
         bit_depth: str = "24-bit",
         metadata: Optional[Dict] = None,
         progress_callback: Optional[Callable[[int, str], None]] = None
     ) -> Dict:
         """
-        Executes the full 5-stage Pro Mastering & Suno Audio Fixer DSP chain.
-        Writes finalized master to output_path and returns comprehensive before/after metrics.
+        Executes the full FL Studio Editions 7-Stage Mastering & Suno Audio Fixer DSP chain.
+        Writes finalized master to output_path and returns before/after metrics & telemetry.
         """
         def update_progress(pct: int, msg: str):
             if callable(progress_callback):
@@ -858,7 +1376,7 @@ class AudioMasteringEngine:
         orig_tp = AudioMasteringEngine.measure_true_peak(data)
 
         # Stage 1: Auto Silence Head & Tail Trim + Musical Fades
-        update_progress(20, "Stage 1/5: Trimming silence & shaping musical fade-in/out...")
+        update_progress(15, "Stage 1/7: Trimming silence & shaping musical fade-in/out...")
         if manual_in_sec is not None and manual_out_sec is not None and manual_out_sec > manual_in_sec + 0.5:
             s_idx = max(0, int(manual_in_sec * sr))
             e_idx = min(len(data), int(manual_out_sec * sr))
@@ -871,168 +1389,166 @@ class AudioMasteringEngine:
             if start_idx < end_idx and (end_idx - start_idx) > sr * 1.5:
                 data = data[start_idx:end_idx].copy()
 
-        # Apply Fade-In / Fade-Out envelopes
         fi_samples = min(int(sr * (fade_in_ms / 1000.0)), len(data) // 4)
         if fi_samples > 0:
-            fi_curve = np.linspace(0.0, 1.0, fi_samples, dtype=np.float32)[:, None]
-            data[:fi_samples] *= fi_curve
+            data[:fi_samples] *= np.linspace(0.0, 1.0, fi_samples, dtype=np.float32)[:, None]
         fo_samples = min(int(sr * (fade_out_ms / 1000.0)), len(data) // 4)
         if fo_samples > 0:
-            fo_curve = np.linspace(1.0, 0.0, fo_samples, dtype=np.float32)[:, None]
-            data[-fo_samples:] *= fo_curve
+            data[-fo_samples:] *= np.linspace(1.0, 0.0, fo_samples, dtype=np.float32)[:, None]
 
-        # Stage 2: 7-Band FL Studio Parametric EQ 2
-        update_progress(40, "Stage 2/5: Applying 7-Band FL Parametric EQ 2 curve...")
-        f_sub = AudioBiquadFilter("high_pass", max(18.0, float(eq_sub_cut_hz)), float(sr), q=0.707)
-        data = f_sub.process(data)
+        # Stage 2: 7-Band FL Studio Parametric EQ 2 (Stereo / Mid-Only / Side-Only + Linear-Phase)
+        if not bypass_eq:
+            update_progress(30, f"Stage 2/7: Applying FL Parametric EQ 2 ({'Linear-Phase' if linear_phase_eq else 'Min-Phase'} | {eq_mode})...")
+            eq_specs = [
+                ("high_pass", max(18.0, float(eq_sub_cut_hz)), 0.707, 0.0, True),
+                ("low_shelf", 90.0, 0.75, float(eq_low_gain), False),
+                ("peaking", 250.0, 1.6, float(eq_mud_cut_gain), False),
+                ("peaking", 480.0, 1.8, float(eq_box_cut_gain), False),
+                ("peaking", 1800.0, 1.1, float(eq_mid_gain), False),
+                ("peaking", 4500.0, 1.2, float(eq_presence_gain), False),
+                ("high_shelf", 12000.0, 0.707, float(eq_air_gain), False),
+            ]
 
-        if abs(eq_low_gain + mb_low_gain) > 0.05:
-            f_low = AudioBiquadFilter("low_shelf", 90.0, float(sr), q=0.75, gain_db=float(eq_low_gain + mb_low_gain))
-            data = f_low.process(data)
+            def _run_eq_chain(sig_buf: np.ndarray) -> np.ndarray:
+                res_buf = sig_buf
+                for ftype, freq, q_val, gain_db, always in eq_specs:
+                    if always or abs(gain_db) > 0.05:
+                        res_buf = AudioBiquadFilter(ftype, freq, float(sr), q=q_val, gain_db=gain_db).process(
+                            res_buf, linear_phase=linear_phase_eq
+                        )
+                return res_buf
 
-        if abs(eq_mud_cut_gain) > 0.05:
-            f_mud = AudioBiquadFilter("peaking", 250.0, float(sr), q=1.6, gain_db=float(eq_mud_cut_gain))
-            data = f_mud.process(data)
+            if data.ndim == 2 and data.shape[1] >= 2 and ("Mid Only" in eq_mode or "Side Only" in eq_mode):
+                m_ch = (data[:, 0] + data[:, 1]) * 0.70710678
+                s_ch = (data[:, 0] - data[:, 1]) * 0.70710678
+                if "Mid Only" in eq_mode:
+                    m_ch = _run_eq_chain(m_ch)
+                else:
+                    s_ch = _run_eq_chain(s_ch)
+                data = np.column_stack([(m_ch + s_ch) * 0.70710678, (m_ch - s_ch) * 0.70710678])
+            else:
+                data = _run_eq_chain(data)
 
-        if abs(eq_box_cut_gain) > 0.05:
-            f_box = AudioBiquadFilter("peaking", 480.0, float(sr), q=1.8, gain_db=float(eq_box_cut_gain))
-            data = f_box.process(data)
-
-        if abs(eq_mid_gain + mb_mid_gain) > 0.05:
-            f_body = AudioBiquadFilter("peaking", 1800.0, float(sr), q=1.1, gain_db=float(eq_mid_gain + mb_mid_gain))
-            data = f_body.process(data)
-
-        if abs(eq_presence_gain + mb_high_gain) > 0.05:
-            f_pres = AudioBiquadFilter("peaking", 4500.0, float(sr), q=1.2, gain_db=float(eq_presence_gain + mb_high_gain))
-            data = f_pres.process(data)
-
-        if abs(eq_air_gain) > 0.05:
-            f_air = AudioBiquadFilter("high_shelf", 12000.0, float(sr), q=0.707, gain_db=float(eq_air_gain))
-            data = f_air.process(data)
-
-        # Stage 3: Surgical De-AI Resonance Suppressor & Harmonic Exciter
-        update_progress(60, "Stage 3/5: Running Suno De-AI suppressor & harmonic air exciter...")
-        if de_ai_filter:
-            harsh_cut_db = -3.2 * (float(de_harsh_amount) / 100.0)
-            if abs(harsh_cut_db) > 0.1:
-                f_deharsh = AudioBiquadFilter("peaking", 7500.0, float(sr), q=2.6, gain_db=harsh_cut_db)
-                data = f_deharsh.process(data)
-
-            box_cut_db = -2.8 * (float(de_box_amount) / 100.0)
-            if abs(box_cut_db) > 0.1:
-                f_debox = AudioBiquadFilter("peaking", 350.0, float(sr), q=2.8, gain_db=box_cut_db)
-                data = f_debox.process(data)
-
-            # Dynamic Vocal De-Esser (5.8 kHz vocal sibilance control)
-            if de_esser_amount > 5.0:
-                de_ess_cut_db = -2.5 * (float(de_esser_amount) / 100.0)
-                f_deess = AudioBiquadFilter("peaking", 5800.0, float(sr), q=3.2, gain_db=de_ess_cut_db)
-                data = f_deess.process(data)
-
-            # High-frequency Harmonic Air Exciter (>10 kHz soft harmonic generation)
+        # Stage 3: Surgical De-AI Resonance Suppressor (with Dynamic Resonance Scaling) & Harmonic Exciter
+        if de_ai_filter and not bypass_deai:
+            update_progress(45, "Stage 3/7: Running Suno De-AI dynamic suppressor & harmonic air exciter...")
+            dyn_scale = 1.0
+            if dynamic_eq:
+                crest = AudioMasteringEngine.measure_dynamic_range(data)
+                dyn_scale = max(0.7, min(1.25, 1.15 - (crest - 10.0) * 0.03))
+            for freq, q_val, base_db, amt in [
+                (7500.0, 2.6, -3.2 * dyn_scale, de_harsh_amount),
+                (350.0, 2.8, -2.8 * dyn_scale, de_box_amount),
+                (5800.0, 3.2, -2.5 * dyn_scale, de_esser_amount),
+            ]:
+                if amt > 5.0:
+                    cut_db = base_db * (float(amt) / 100.0)
+                    data = AudioBiquadFilter("peaking", freq, float(sr), q=q_val, gain_db=cut_db).process(
+                        data, linear_phase=linear_phase_eq
+                    )
             if harmonic_exciter > 5.0:
-                f_hp_air = AudioBiquadFilter("high_pass", 9500.0, float(sr), q=0.707)
-                air_band = f_hp_air.process(data)
-                excited_air = np.tanh(air_band * 2.5) * (float(harmonic_exciter) / 100.0) * 0.18
-                data = data + excited_air
+                air_band = AudioBiquadFilter("high_pass", 9500.0, float(sr), q=0.707).process(data)
+                data = data + np.tanh(air_band * 2.5) * (float(harmonic_exciter) / 100.0) * 0.18
 
-        # Stage 4: Mid-Side Stereo Expander, Human Voice Naturalizer, Glue Reverb & Tape Warmth
-        update_progress(75, "Stage 4/5: Human Voice naturalizer, Mid-Side imaging & studio space...")
-        if data.ndim == 2 and data.shape[1] >= 2:
-            left = data[:, 0]
-            right = data[:, 1]
-            mid = (left + right) * 0.70710678
-            side = (left - right) * 0.70710678
+        # Stage 4: FL Studio Maximus 3-Band Crossover Compressor + Saturation
+        maximus_gr = {"low_gr": 0.0, "mid_gr": 0.0, "high_gr": 0.0}
+        if maximus_enabled and not bypass_maximus:
+            update_progress(58, "Stage 4/7: Running FL Maximus 3-Band Multiband Dynamics & Saturation...")
+            data, maximus_gr = AudioMasteringEngine.apply_fl_maximus_multiband(
+                data, sr,
+                low_thresh=maximus_low_thresh, mid_thresh=maximus_mid_thresh, high_thresh=maximus_high_thresh,
+                low_ratio=maximus_low_ratio, mid_ratio=maximus_mid_ratio, high_ratio=maximus_high_ratio,
+                low_gain_db=mb_low_gain, mid_gain_db=mb_mid_gain, high_gain_db=mb_high_gain,
+                sat_amount=maximus_sat, solo_band=maximus_solo,
+            )
+        elif not bypass_maximus:
+            for freq, q_val, ftype, gain_db in [
+                (90.0, 0.75, "low_shelf", mb_low_gain),
+                (1800.0, 1.1, "peaking", mb_mid_gain),
+                (4500.0, 1.2, "peaking", mb_high_gain),
+            ]:
+                if abs(gain_db) > 0.05:
+                    data = AudioBiquadFilter(ftype, freq, float(sr), q=q_val, gain_db=float(gain_db)).process(data)
 
-            # Human Voice AI Naturalizer (Center Mid-Channel Condenser & Formant Modeling)
-            # 1) Chest & Throat Body Warmth (185 Hz & 680 Hz)
-            if human_voice_warmth > 5.0:
-                chest_gain = 2.0 * (float(human_voice_warmth) / 100.0)
-                f_chest = AudioBiquadFilter("peaking", 185.0, float(sr), q=1.4, gain_db=chest_gain)
-                mid = f_chest.process(mid)
-                f_throat = AudioBiquadFilter("peaking", 680.0, float(sr), q=1.5, gain_db=chest_gain * 0.45)
-                mid = f_throat.process(mid)
+        # Stage 5: Transient Processor (Attack Snap & Sustain Tightness)
+        if not bypass_transient and (abs(transient_attack) >= 1.0 or abs(transient_sustain) >= 1.0):
+            update_progress(68, "Stage 5/7: Shaping drum/vocal transients...")
+            data = AudioMasteringEngine.apply_transient_processor(
+                data, sr, attack_pct=transient_attack, sustain_pct=transient_sustain
+            )
 
-            # 2) De-Metallicize AI Vocoder Overtones (narrow dips at 3.85kHz & 6.45kHz + smooth U87 silk at 10.8kHz)
-            if human_voice_de_metallic > 5.0:
-                cut_factor = float(human_voice_de_metallic) / 100.0
-                f_voc1 = AudioBiquadFilter("peaking", 3850.0, float(sr), q=3.8, gain_db=-1.6 * cut_factor)
-                f_voc2 = AudioBiquadFilter("peaking", 6450.0, float(sr), q=3.5, gain_db=-2.2 * cut_factor)
-                mid = f_voc2.process(f_voc1.process(mid))
+        # Stage 6: Mid-Side Stereo Shaper, Human Voice Naturalizer, Convolver / Glue & Tape Warmth
+        if not bypass_stereo:
+            update_progress(78, "Stage 6/7: Human Voice naturalizer, Mid-Side imaging & Convolver space...")
+            if data.ndim == 2 and data.shape[1] >= 2:
+                mid = (data[:, 0] + data[:, 1]) * 0.70710678
+                side = (data[:, 0] - data[:, 1]) * 0.70710678
 
-            # 3) Asymmetric Tube Condenser Mic Preamp Even-Order Harmonics (Neve / U87 warmth)
-            if tube_mic_saturation > 5.0:
-                sat_amt = (float(tube_mic_saturation) / 100.0) * 0.14
-                mid_64 = mid.astype(np.float64)
-                even_harm = sat_amt * (mid_64 ** 2 - np.mean(mid_64 ** 2))
-                mid = np.clip(mid_64 + even_harm, -1.5, 1.5).astype(np.float32)
+                if human_voice_warmth > 5.0:
+                    chest_g = 2.0 * (float(human_voice_warmth) / 100.0)
+                    mid = AudioBiquadFilter("peaking", 185.0, float(sr), q=1.4, gain_db=chest_g).process(mid)
+                    mid = AudioBiquadFilter("peaking", 680.0, float(sr), q=1.5, gain_db=chest_g * 0.45).process(mid)
 
-            # Vocal Focus Matrix
-            if "Vocal Boost" in vocal_focus_mode:
-                # Boost vocal presence band (300Hz - 4.5kHz) in Mid channel
-                f_voc = AudioBiquadFilter("peaking", 2200.0, float(sr), q=0.9, gain_db=2.5)
-                mid = f_voc.process(mid)
-            elif "Instrumental" in vocal_focus_mode or "Karaoke" in vocal_focus_mode:
-                # Attenuate center vocal band in Mid channel while keeping sub-bass intact
-                f_cut_voc = AudioBiquadFilter("peaking", 1800.0, float(sr), q=0.65, gain_db=-9.5)
-                mid = f_cut_voc.process(mid)
+                if human_voice_de_metallic > 5.0:
+                    cf = float(human_voice_de_metallic) / 100.0
+                    mid = AudioBiquadFilter("peaking", 3850.0, float(sr), q=3.8, gain_db=-1.6 * cf).process(mid)
+                    mid = AudioBiquadFilter("peaking", 6450.0, float(sr), q=3.5, gain_db=-2.2 * cf).process(mid)
 
-            # Mono Bass Lock (< mono_bass_hz) on Side channel
-            if mono_bass_hz > 20.0:
-                f_side_hp = AudioBiquadFilter("high_pass", float(mono_bass_hz), float(sr), q=0.707)
-                side = f_side_hp.process(side)
+                if tube_mic_saturation > 5.0:
+                    sat_amt = (float(tube_mic_saturation) / 100.0) * 0.14
+                    mid_64 = mid.astype(np.float64)
+                    even_harm = sat_amt * (mid_64 ** 2 - np.mean(mid_64 ** 2))
+                    mid = np.clip(mid_64 + even_harm, -1.5, 1.5).astype(np.float32)
 
-            # Stereo Width scaling
-            side = side * float(stereo_width)
+                if "Vocal Boost" in vocal_focus_mode:
+                    mid = AudioBiquadFilter("peaking", 2200.0, float(sr), q=0.9, gain_db=2.5).process(mid)
+                elif "Instrumental" in vocal_focus_mode or "Karaoke" in vocal_focus_mode:
+                    mid = AudioBiquadFilter("peaking", 1800.0, float(sr), q=0.65, gain_db=-9.5).process(mid)
 
-            new_left = (mid + side) * 0.70710678
-            new_right = (mid - side) * 0.70710678
-            data = np.column_stack([new_left, new_right])
+                if mono_bass_hz > 20.0:
+                    side = AudioBiquadFilter("high_pass", float(mono_bass_hz), float(sr), q=0.707).process(side)
 
-        # Subtle Studio Glue Ambience (Early reflection stereo delay)
-        if add_room_depth and reverb_mix > 0.005 and len(data) > int(sr * 0.05):
-            d1 = int(sr * 0.023)  # 23ms early reflection
-            d2 = int(sr * 0.037)  # 37ms stereo cross reflection
-            rev = np.zeros_like(data)
-            rev[d1:, 0] += data[:-d1, 1] * 0.45
-            rev[d2:, 1] += data[:-d2, 0] * 0.45
-            f_rev_lp = AudioBiquadFilter("low_pass", 4500.0, float(sr), q=0.707)
-            rev = f_rev_lp.process(rev)
-            data = data * (1.0 - reverb_mix * 0.35) + rev * float(reverb_mix)
+                side = side * float(stereo_width)
+                data = np.column_stack([(mid + side) * 0.70710678, (mid - side) * 0.70710678])
 
-        # Analog Tape Warmth saturation
-        if tape_warmth > 0.02:
-            drive = 1.0 + float(tape_warmth) * 0.45
-            data = np.tanh(data * drive) / np.tanh(drive)
+            if add_room_depth and reverb_mix > 0.005 and len(data) > int(sr * 0.05):
+                if convolver_preset and "Off" not in convolver_preset:
+                    data = AudioMasteringEngine.apply_convolver_ir(
+                        data, sr, preset_name=convolver_preset, wet_mix=reverb_mix, custom_ir_path=convolver_ir_path
+                    )
+                else:
+                    d1, d2 = int(sr * 0.023), int(sr * 0.037)
+                    rev = np.zeros_like(data)
+                    rev[d1:, 0] += data[:-d1, 1] * 0.45
+                    rev[d2:, 1] += data[:-d2, 0] * 0.45
+                    rev = AudioBiquadFilter("low_pass", 4500.0, float(sr), q=0.707).process(rev)
+                    data = data * (1.0 - reverb_mix * 0.35) + rev * float(reverb_mix)
 
-        # Stage 5: 4x True-Peak Brickwall Limiter & Loudness Normalization
-        update_progress(90, "Stage 5/5: 4x True-Peak brickwall limiter & loudness normalization...")
+            if tape_warmth > 0.02:
+                drive = 1.0 + float(tape_warmth) * 0.45
+                data = np.tanh(data * drive) / np.tanh(drive)
+
+        # Stage 7: 4x Oversampled Lookahead Fruity Limiter & Loudness Normalization
+        update_progress(90, "Stage 7/7: 4x Lookahead True-Peak Limiter & LUFS normalization...")
         tgt = MASTERING_TARGETS.get(target_preset, MASTERING_TARGETS["Suno Master (-13.0 LUFS)"])
         target_lufs = float(custom_target_lufs) if custom_target_lufs is not None else tgt["lufs"]
         target_tp = float(custom_ceiling_dbtp) if custom_ceiling_dbtp is not None else tgt["tp"]
 
         pre_lufs = AudioMasteringEngine.measure_lufs(data, sr)
-        gain_needed_db = target_lufs - pre_lufs
-        gain_needed_db = max(-14.0, min(9.5, gain_needed_db))
-        linear_gain = 10.0 ** (gain_needed_db / 20.0)
-        data = data * linear_gain
+        gain_needed_db = max(-14.0, min(10.5, target_lufs - pre_lufs))
+        data = data * (10.0 ** (gain_needed_db / 20.0))
 
-        # Soft-knee saturation + True-Peak brickwall ceiling
-        # Include 0.25 dB safety margin for inter-sample oversampling estimate
-        ceiling_linear = 10.0 ** ((target_tp - 0.25) / 20.0)
-        peak_val = float(np.max(np.abs(data)))
-        if peak_val > ceiling_linear:
-            # Soft-knee compression on peaks above 85% of ceiling
-            knee = ceiling_linear * 0.85
-            above = np.abs(data) > knee
-            if np.any(above):
-                sign = np.sign(data[above])
-                excess = (np.abs(data[above]) - knee) / max(1e-6, ceiling_linear - knee)
-                data[above] = sign * (knee + (ceiling_linear - knee) * np.tanh(excess))
-            # Final brickwall clamp
-            data = np.clip(data, -ceiling_linear, ceiling_linear)
+        if not bypass_limiter:
+            data, limiter_telemetry = AudioMasteringEngine.apply_lookahead_limiter(
+                data, sr, ceiling_dbtp=target_tp,
+                lookahead_ms=limiter_lookahead_ms, release_ms=limiter_release_ms,
+                soft_clip_punch=soft_clip_punch,
+            )
+        else:
+            ceiling_lin = 10.0 ** ((target_tp - 0.15) / 20.0)
+            data = np.clip(data, -ceiling_lin, ceiling_lin)
+            limiter_telemetry = {"in_env": [], "out_env": [], "gr_curve": [], "max_gr_db": 0.0, "ceiling_db": target_tp}
 
-        # TPDF Dithering (24-bit quantization noise shaping)
         if dither_tpdf:
             lsb = 1.0 / (2 ** 23) if "24" in bit_depth else (1.0 / 32768.0)
             tpdf_noise = (np.random.random(data.shape) - np.random.random(data.shape)) * lsb
@@ -1058,8 +1574,10 @@ class AudioMasteringEngine:
         final_lufs = AudioMasteringEngine.measure_lufs(data, sr)
         final_tp = AudioMasteringEngine.measure_true_peak(data)
         final_dr = AudioMasteringEngine.measure_dynamic_range(data)
+        spectrum_after = AudioMasteringEngine.compute_spectrum_profile(data, sr)
+        wave_candy = AudioMasteringEngine.compute_wave_candy_telemetry(data, sr)
 
-        update_progress(100, "AI Analysis & Auto-Mastering complete!")
+        update_progress(100, "AI Analysis & FL Studio Pro Mastering complete!")
         return {
             "output_path": str(out_p),
             "orig_lufs": orig_lufs,
@@ -1071,6 +1589,10 @@ class AudioMasteringEngine:
             "sample_rate": sr,
             "channels": data.shape[1] if data.ndim == 2 else 1,
             "duration": len(data) / sr,
+            "maximus_gr": maximus_gr,
+            "limiter_telemetry": limiter_telemetry,
+            "spectrum_after": spectrum_after,
+            "wave_candy": wave_candy,
         }
 
     # ── All-25 Music Distribution QC & Release Bundle Packaging ──

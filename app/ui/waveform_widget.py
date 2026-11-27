@@ -553,10 +553,12 @@ class WaveformEditorPane(QWidget):
 class FLParametricEQWidget(QWidget):
     """
     Interactive FL Studio Parametric EQ 2 Frequency Response Curve & 7-Band Token Visualizer.
-    Allows dragging the 7 band tokens directly on the logarithmic 20Hz-20kHz curve canvas.
+    Supports dragging tokens on the logarithmic 20Hz-20kHz grid, mouse-wheel Q-width control,
+    dual Before/After FFT heatmaps, and Commercial Reference Curve overlay.
     """
 
     band_gain_changed = pyqtSignal(int, float)  # (band_index 0..6, new_gain_db)
+    band_q_changed = pyqtSignal(int, float)     # (band_index 0..6, new_q)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -574,15 +576,35 @@ class FLParametricEQWidget(QWidget):
             {"id": 7, "name": "Air", "type": "high_shelf", "freq": 12000.0, "gain": 2.0, "q": 0.707, "color": "#a855f7"},
         ]
         self._dragging_band: Optional[int] = None
+        self._hover_band: Optional[int] = None
         self.spectrum_db: Optional[np.ndarray] = None
+        self.after_spectrum_db: Optional[np.ndarray] = None
+        self.ref_spectrum_db: Optional[np.ndarray] = None
+        self.linear_phase: bool = False
+        self.eq_mode_label: str = "Stereo"
         self.is_dark: bool = True
         self.bg_color = QColor("#0b1120")
         self.grid_color = QColor("#1e293b")
         self.text_color = QColor("#94a3b8")
 
     def set_spectrum_data(self, spec_db: Optional[np.ndarray]):
-        """Sets real-time or track FFT spectrum profile for background overlay."""
+        """Sets source FFT spectrum profile for background overlay."""
         self.spectrum_db = spec_db
+        self.update()
+
+    def set_after_spectrum_data(self, spec_db: Optional[np.ndarray]):
+        """Sets post-mastered FFT spectrum profile for Before vs After comparison."""
+        self.after_spectrum_db = spec_db
+        self.update()
+
+    def set_reference_spectrum_data(self, spec_db: Optional[np.ndarray]):
+        """Sets commercial reference track spectral overlay curve."""
+        self.ref_spectrum_db = spec_db
+        self.update()
+
+    def set_eq_badges(self, linear_phase: bool, eq_mode_label: str):
+        self.linear_phase = bool(linear_phase)
+        self.eq_mode_label = str(eq_mode_label)
         self.update()
 
     def set_band_gains(self, gains: List[float]):
@@ -617,6 +639,19 @@ class FLParametricEQWidget(QWidget):
         gain = 15.0 - norm * 30.0
         return round(max(-12.0, min(12.0, gain)), 1)
 
+    def _draw_spectrum_bars(self, p: QPainter, spec: Optional[np.ndarray], w: int, h: int, fill_col: QColor):
+        if spec is None or len(spec) == 0:
+            return
+        n_bars = len(spec)
+        bar_freqs = np.logspace(math.log10(22.0), math.log10(19500.0), n_bars)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(fill_col))
+        for bi in range(n_bars):
+            bx = int(self._freq_to_x(float(bar_freqs[bi]), w))
+            by = int(self._gain_to_y(float(spec[bi]), h))
+            bh = max(2, (h - 18) - by)
+            p.drawRoundedRect(bx - 2, by, 4, bh, 1, 1)
+
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -649,21 +684,25 @@ class FLParametricEQWidget(QWidget):
             p.setPen(self.text_color)
             p.drawText(3, y + 3, f"{db_val:+}dB" if db_val != 0 else " 0dB")
 
-        # Draw Background FFT Spectrum Analyzer Bars (if loaded)
+        # Draw Background Before & After FFT Spectrum Analyzer Heatmaps
         spec = self.spectrum_db
         if spec is None or len(spec) == 0:
-            # Default subtle musical spectrum silhouette
             t_idx = np.linspace(0.0, 1.0, 72)
             spec = -4.0 + 5.5 * np.sin(t_idx * math.pi * 1.1) - 3.5 * (t_idx ** 1.6) + 1.4 * np.cos(t_idx * 18.0)
-        n_bars = len(spec)
-        bar_freqs = np.logspace(math.log10(22.0), math.log10(19500.0), n_bars)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QBrush(QColor(16, 185, 129, 34)))
-        for bi in range(n_bars):
-            bx = int(self._freq_to_x(float(bar_freqs[bi]), w))
-            by = int(self._gain_to_y(float(spec[bi]), h))
-            bh = max(2, (h - 18) - by)
-            p.drawRoundedRect(bx - 2, by, 4, bh, 1, 1)
+        self._draw_spectrum_bars(p, spec, w, h, QColor(245, 158, 11, 28) if self.after_spectrum_db is not None else QColor(16, 185, 129, 34))
+        if self.after_spectrum_db is not None and len(self.after_spectrum_db) > 0:
+            self._draw_spectrum_bars(p, self.after_spectrum_db, w, h, QColor(16, 185, 129, 44))
+
+        # Optional Commercial Reference Track Curve Overlay
+        if self.ref_spectrum_db is not None and len(self.ref_spectrum_db) > 2:
+            ref_freqs = np.logspace(math.log10(22.0), math.log10(19500.0), len(self.ref_spectrum_db))
+            ref_path = QPainterPath()
+            for ri, rv in enumerate(self.ref_spectrum_db):
+                rx = self._freq_to_x(float(ref_freqs[ri]), w)
+                ry = self._gain_to_y(float(rv), h)
+                ref_path.moveTo(rx, ry) if ri == 0 else ref_path.lineTo(rx, ry)
+            p.setPen(QPen(QColor("#c084fc"), 1.4, Qt.PenStyle.DashLine))
+            p.drawPath(ref_path)
 
         # Calculate Composite 7-Band Magnitude Response Curve
         n_pts = 180
@@ -694,7 +733,6 @@ class FLParametricEQWidget(QWidget):
         fill_path.lineTo(last_x, y_zero)
         fill_path.closeSubpath()
 
-        # Draw glowing curve fill & stroke
         grad = QLinearGradient(0, 0, 0, h)
         grad.setColorAt(0.0, QColor(56, 189, 248, 95))
         grad.setColorAt(0.5, QColor(16, 185, 129, 40))
@@ -704,6 +742,28 @@ class FLParametricEQWidget(QWidget):
         p.setPen(QPen(QColor("#38bdf8"), 2.0))
         p.drawPath(curve_path)
 
+        # Top-right Mode & Phase HUD Pill
+        badge_txt = f"{'LIN-PHASE' if self.linear_phase else 'MIN-PHASE'} · {self.eq_mode_label.upper()}"
+        p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        p.setBrush(QColor(15, 23, 42, 200))
+        p.setPen(QPen(QColor("#38bdf8" if self.linear_phase else "#334155"), 1))
+        b_rect = QRectF(w - 152, 5, 144, 16)
+        p.drawRoundedRect(b_rect, 4, 4)
+        p.setPen(QColor("#38bdf8" if self.linear_phase else "#94a3b8"))
+        p.drawText(b_rect, Qt.AlignmentFlag.AlignCenter, badge_txt)
+
+        # Active Band Telemetry HUD when hovered or dragged
+        active_b = self._dragging_band if self._dragging_band is not None else self._hover_band
+        if active_b is not None and 0 <= active_b < len(self.bands):
+            ab = self.bands[active_b]
+            hud = f"B{ab['id']} {ab['name']} · {int(ab['freq'])}Hz · {ab['gain']:+.1f}dB · Q:{ab['q']:.2f} (Wheel=Q)"
+            p.setBrush(QColor(15, 23, 42, 220))
+            p.setPen(QPen(QColor(ab["color"]), 1))
+            h_rect = QRectF(32, 5, 250, 16)
+            p.drawRoundedRect(h_rect, 4, 4)
+            p.setPen(QColor("#f8fafc"))
+            p.drawText(h_rect, Qt.AlignmentFlag.AlignCenter, hud)
+
         # Draw 7 Numbered FL EQ Tokens
         p.setFont(QFont("Segoe UI", 7, QFont.Weight.Black))
         for idx, b in enumerate(self.bands):
@@ -711,28 +771,30 @@ class FLParametricEQWidget(QWidget):
             by = self._gain_to_y(b["gain"], h)
             col = QColor(b["color"])
 
-            # Outer halo
-            p.setBrush(QBrush(QColor(col.red(), col.green(), col.blue(), 65)))
+            p.setBrush(QBrush(QColor(col.red(), col.green(), col.blue(), 80 if idx == active_b else 55)))
             p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QPointF(bx, by), 10.0, 10.0)
+            p.drawEllipse(QPointF(bx, by), 11.5 if idx == active_b else 10.0, 11.5 if idx == active_b else 10.0)
 
-            # Inner token circle
             p.setBrush(QBrush(col))
-            p.setPen(QPen(QColor("#ffffff"), 1.2))
+            p.setPen(QPen(QColor("#ffffff"), 1.6 if idx == active_b else 1.2))
             p.drawEllipse(QPointF(bx, by), 7.0, 7.0)
 
             p.setPen(QColor("#ffffff"))
             p.drawText(QRectF(bx - 7, by - 7, 14, 14), Qt.AlignmentFlag.AlignCenter, str(b["id"]))
 
-    def mousePressEvent(self, event):
+    def _hit_test_band(self, pos) -> Optional[int]:
         w, h = self.width(), self.height()
-        pos = event.pos()
         for idx, b in enumerate(self.bands):
             bx = self._freq_to_x(b["freq"], w)
             by = self._gain_to_y(b["gain"], h)
-            if math.hypot(pos.x() - bx, pos.y() - by) <= 13.0:
-                self._dragging_band = idx
-                return
+            if math.hypot(pos.x() - bx, pos.y() - by) <= 13.5:
+                return idx
+        return None
+
+    def mousePressEvent(self, event):
+        hit = self._hit_test_band(event.pos())
+        if hit is not None:
+            self._dragging_band = hit
 
     def mouseMoveEvent(self, event):
         if self._dragging_band is not None:
@@ -740,9 +802,26 @@ class FLParametricEQWidget(QWidget):
             self.bands[self._dragging_band]["gain"] = new_gain
             self.band_gain_changed.emit(self._dragging_band, new_gain)
             self.update()
+        else:
+            hit = self._hit_test_band(event.pos())
+            if hit != self._hover_band:
+                self._hover_band = hit
+                self.update()
 
     def mouseReleaseEvent(self, event):
         self._dragging_band = None
+
+    def wheelEvent(self, event):
+        target = self._dragging_band if self._dragging_band is not None else self._hover_band
+        if target is not None and 0 <= target < len(self.bands):
+            delta = 0.15 if event.angleDelta().y() > 0 else -0.15
+            new_q = round(max(0.4, min(6.0, self.bands[target]["q"] + delta)), 2)
+            self.bands[target]["q"] = new_q
+            self.band_q_changed.emit(target, new_q)
+            self.update()
+            event.accept()
+            return
+        super().wheelEvent(event)
 
 
 class RibbonTileButton(QPushButton):
@@ -871,4 +950,275 @@ class StereoPhaseCorrelationMeter(QWidget):
         p.drawText(w - 30, h - 9, "+1.0")
         status = f"Phase: {self.correlation:+.2f} (Mono-Safe)" if self.correlation >= 0.0 else f"Phase: {self.correlation:+.2f} (Wide/Cancel)"
         p.drawText(QRectF(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, status)
+
+
+class MaximusDynamicsWidget(QWidget):
+    """
+    FL Studio Maximus-inspired 4-Panel Multiband Transfer Curve & Gain-Reduction Visualizer
+    (LOW <140Hz, MID 140-3.5kHz, HIGH >3.5kHz, MASTER) with clickable Solo selection.
+    """
+
+    band_solo_requested = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(88)
+        self.setMaximumHeight(112)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.thresholds = {"LOW": -18.0, "MID": -16.0, "HIGH": -15.0, "MASTER": -1.0}
+        self.ratios = {"LOW": 2.8, "MID": 2.2, "HIGH": 2.5, "MASTER": 8.0}
+        self.gr_values = {"LOW": 1.4, "MID": 1.1, "HIGH": 0.9, "MASTER": 1.8}
+        self.solo_band = "None"
+        self.is_dark = True
+
+    def set_telemetry(
+        self,
+        thresholds: Optional[Dict[str, float]] = None,
+        ratios: Optional[Dict[str, float]] = None,
+        gr_values: Optional[Dict[str, float]] = None,
+        solo_band: Optional[str] = None,
+    ):
+        if thresholds:
+            self.thresholds.update(thresholds)
+        if ratios:
+            self.ratios.update(ratios)
+        if gr_values:
+            self.gr_values.update(gr_values)
+        if solo_band is not None:
+            self.solo_band = solo_band
+        self.update()
+
+    def apply_theme(self, theme_dict: dict):
+        self.is_dark = theme_dict.get("is_dark", True)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        bg = QColor("#090f1d") if self.is_dark else QColor("#0f172a")
+        p.fillRect(0, 0, w, h, bg)
+
+        panels = [
+            ("LOW", "#f97316"),
+            ("MID", "#22c55e"),
+            ("HIGH", "#38bdf8"),
+            ("MASTER", "#a855f7"),
+        ]
+        gap = 6
+        card_w = (w - gap * 5) / 4.0
+        card_h = h - 8
+
+        for idx, (name, col_hex) in enumerate(panels):
+            cx = gap + idx * (card_w + gap)
+            cy = 4
+            rect = QRectF(cx, cy, card_w, card_h)
+            col = QColor(col_hex)
+            is_solo = (self.solo_band.upper() == name)
+
+            p.setBrush(QColor(15, 23, 42))
+            p.setPen(QPen(col if is_solo else QColor("#334155"), 2.0 if is_solo else 1.0))
+            p.drawRoundedRect(rect, 5, 5)
+
+            # Inner graph area (left 78% curve, right 22% GR meter)
+            gx, gy = cx + 6, cy + 16
+            gw, gh = card_w - 22, card_h - 22
+            p.setPen(QPen(QColor("#1e293b"), 1, Qt.PenStyle.DotLine))
+            p.drawRect(QRectF(gx, gy, gw, gh))
+            p.drawLine(QPointF(gx, gy + gh), QPointF(gx + gw, gy))  # 1:1 unity ref
+
+            # Compression Transfer Curve
+            th = float(self.thresholds.get(name, -16.0))
+            rat = max(1.0, float(self.ratios.get(name, 2.5)))
+            curve = QPainterPath()
+            for s_i in range(25):
+                in_db = -36.0 + (36.0 * s_i / 24.0)
+                out_db = in_db if in_db <= th else th + (in_db - th) / rat
+                px = gx + ((in_db + 36.0) / 36.0) * gw
+                py = gy + gh - ((out_db + 36.0) / 36.0) * gh
+                curve.moveTo(px, py) if s_i == 0 else curve.lineTo(px, py)
+            p.setPen(QPen(col, 1.8))
+            p.drawPath(curve)
+
+            # Threshold knee marker
+            kx = gx + ((th + 36.0) / 36.0) * gw
+            ky = gy + gh - ((th + 36.0) / 36.0) * gh
+            p.setBrush(col)
+            p.setPen(QPen(QColor("#ffffff"), 1))
+            p.drawEllipse(QPointF(kx, ky), 3.0, 3.0)
+
+            # Right vertical Gain-Reduction meter bar (drops downward from top)
+            gr = min(12.0, abs(float(self.gr_values.get(name, 0.0))))
+            mx = cx + card_w - 11
+            p.fillRect(QRectF(mx, gy, 6, gh), QColor("#1e293b"))
+            gr_h = (gr / 12.0) * gh
+            if gr_h > 1.0:
+                p.fillRect(QRectF(mx, gy, 6, gr_h), col)
+
+            # Title & GR badge
+            p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+            p.setPen(col)
+            lbl = f"{name} · -{gr:.1f}dB" if not is_solo else f"SOLO {name}"
+            p.drawText(QRectF(cx + 4, cy + 2, card_w - 8, 13), Qt.AlignmentFlag.AlignCenter, lbl)
+
+    def mousePressEvent(self, event):
+        w = max(1, self.width())
+        idx = int(min(3, max(0, (event.pos().x() / w) * 4)))
+        names = ["LOW", "MID", "HIGH", "None"]
+        chosen = names[idx]
+        self.solo_band = "None" if self.solo_band == chosen else chosen
+        self.band_solo_requested.emit(self.solo_band)
+        self.update()
+
+
+class FruityLimiterGraphWidget(QWidget):
+    """
+    FL Studio Fruity Limiter Gain-Reduction & True-Peak Envelope Visualizer.
+    Draws input transient peaks (amber), output limiting envelope (emerald),
+    true-peak ceiling (red dashed), and gain reduction drop curve (violet).
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(76)
+        self.setMaximumHeight(96)
+        self.telemetry: Dict = {
+            "in_env": [-8.0, -5.0, -2.0, 0.5, -3.5, -1.0, 1.2, -4.0, -2.5, -6.0, -1.5, 0.2, -5.0],
+            "out_env": [-8.0, -5.0, -2.0, -1.0, -3.5, -1.1, -1.0, -4.0, -2.5, -6.0, -1.5, -1.0, -5.0],
+            "gr_curve": [0.0, 0.0, 0.0, -1.5, 0.0, -0.1, -2.2, 0.0, 0.0, 0.0, 0.0, -1.2, 0.0],
+            "max_gr_db": 2.2,
+            "ceiling_db": -1.0,
+        }
+        self.is_dark = True
+
+    def set_telemetry(self, telemetry: Dict):
+        if telemetry and telemetry.get("gr_curve"):
+            self.telemetry = telemetry
+            self.update()
+
+    def apply_theme(self, theme_dict: dict):
+        self.is_dark = theme_dict.get("is_dark", True)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        p.fillRect(0, 0, w, h, QColor("#090f1d"))
+        p.setPen(QPen(QColor("#1e293b"), 1))
+        p.drawRoundedRect(0, 0, w - 1, h - 1, 5, 5)
+
+        def _db_to_y(db_val: float) -> float:
+            # Top=+3 dB, Bottom=-18 dB
+            norm = (3.0 - max(-18.0, min(3.0, db_val))) / 21.0
+            return 14.0 + norm * (h - 20.0)
+
+        # Ceiling Dashed Line
+        ceil_db = float(self.telemetry.get("ceiling_db", -1.0))
+        cy = _db_to_y(ceil_db)
+        p.setPen(QPen(QColor("#ef4444"), 1.2, Qt.PenStyle.DashLine))
+        p.drawLine(4, int(cy), w - 4, int(cy))
+
+        in_env = self.telemetry.get("in_env") or []
+        out_env = self.telemetry.get("out_env") or []
+        gr_c = self.telemetry.get("gr_curve") or []
+        n = min(len(in_env), len(out_env), len(gr_c))
+        if n >= 2:
+            xs = np.linspace(6.0, w - 6.0, n)
+            in_path, out_path, gr_path = QPainterPath(), QPainterPath(), QPainterPath()
+            gr_path.moveTo(xs[0], 14.0)
+            for i in range(n):
+                iy, oy = _db_to_y(in_env[i]), _db_to_y(out_env[i])
+                gy = 14.0 + min(h - 20.0, abs(gr_c[i]) * ((h - 20.0) / 10.0))
+                in_path.moveTo(xs[i], iy) if i == 0 else in_path.lineTo(xs[i], iy)
+                out_path.moveTo(xs[i], oy) if i == 0 else out_path.lineTo(xs[i], oy)
+                gr_path.lineTo(xs[i], gy)
+            gr_path.lineTo(xs[-1], 14.0)
+            gr_path.closeSubpath()
+
+            p.fillPath(gr_path, QBrush(QColor(168, 85, 247, 70)))
+            p.setPen(QPen(QColor("#f59e0b"), 1.2))
+            p.drawPath(in_path)
+            p.setPen(QPen(QColor("#10b981"), 1.8))
+            p.drawPath(out_path)
+            p.setPen(QPen(QColor("#c084fc"), 1.5))
+            p.drawLine(QPointF(xs[0], 14.0), QPointF(xs[-1], 14.0))
+
+        p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        p.setPen(QColor("#94a3b8"))
+        max_gr = float(self.telemetry.get("max_gr_db", 0.0))
+        p.drawText(8, 12, f"FRUITY 4x LOOKAHEAD LIMITER · Ceiling: {ceil_db:.1f} dBTP · Max GR: -{max_gr:.2f} dB")
+
+
+class WaveCandyVectorscopeWidget(QWidget):
+    """
+    FL Studio Wave Candy Goniometer / Polar Vectorscope + Loudness Range (LRA / Crest) Meter.
+    Visualizes real Mid/Side Lissajous stereo field during analysis and after mastering.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(112, 112)
+        self.points: List[List[float]] = []
+        self.lra_lu: float = 4.2
+        self.crest_db: float = 9.8
+        self.is_dark: bool = True
+
+    def set_telemetry(self, telemetry: Dict):
+        if not telemetry:
+            return
+        self.points = telemetry.get("vectorscope_points") or []
+        self.lra_lu = float(telemetry.get("lra_lu", self.lra_lu))
+        self.crest_db = float(telemetry.get("crest_db", self.crest_db))
+        self.update()
+
+    def apply_theme(self, theme_dict: dict):
+        self.is_dark = theme_dict.get("is_dark", True)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        p.fillRect(0, 0, w, h, QColor("#090f1d"))
+        p.setPen(QPen(QColor("#334155"), 1))
+        p.drawRoundedRect(0, 0, w - 1, h - 1, 6, 6)
+
+        cx, cy = w / 2.0, (h - 14) / 2.0
+        rad = min(w, h - 18) * 0.42
+
+        # Polar circle + L/R diagonal grid
+        p.setPen(QPen(QColor("#1e293b"), 1, Qt.PenStyle.DotLine))
+        p.drawEllipse(QPointF(cx, cy), rad, rad)
+        p.drawLine(QPointF(cx - rad, cy - rad), QPointF(cx + rad, cy + rad))
+        p.drawLine(QPointF(cx - rad, cy + rad), QPointF(cx + rad, cy - rad))
+        p.drawLine(QPointF(cx, cy - rad), QPointF(cx, cy + rad))
+
+        # Vectorscope phosphor trace (s=horizontal width, m=vertical energy)
+        pts = self.points
+        if not pts:
+            t = np.linspace(0, 2 * math.pi, 48)
+            pts = [[round(0.32 * math.sin(a * 3), 3), round(0.75 * math.cos(a), 3)] for a in t]
+
+        p.setPen(QPen(QColor(56, 189, 248, 175), 1.4))
+        for i in range(len(pts)):
+            sx, my = pts[i][0], pts[i][1]
+            px = cx + sx * rad * 0.92
+            py = cy - my * rad * 0.92
+            p.drawPoint(QPointF(px, py))
+            if i > 0:
+                px0 = cx + pts[i - 1][0] * rad * 0.92
+                py0 = cy - pts[i - 1][1] * rad * 0.92
+                if math.hypot(px - px0, py - py0) < rad * 0.85:
+                    p.drawLine(QPointF(px0, py0), QPointF(px, py))
+
+        p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        p.setPen(QColor("#64748b"))
+        p.drawText(4, 10, "L")
+        p.drawText(w - 10, 10, "R")
+        p.setPen(QColor("#38bdf8"))
+        p.drawText(QRectF(0, h - 14, w, 13), Qt.AlignmentFlag.AlignCenter, f"LRA {self.lra_lu:.1f} · DR {self.crest_db:.1f}")
 

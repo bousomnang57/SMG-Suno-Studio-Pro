@@ -37,6 +37,8 @@ from app.config import config_manager
 from app.ui.styles import get_theme
 from app.audio_mastering_engine import (
     AudioMasteringEngine,
+    CONVOLVER_PRESETS,
+    FL_EDITION_PROFILES,
     MASTERING_TARGETS,
     DISTRIBUTOR_SPECS,
 )
@@ -44,6 +46,9 @@ from app.ui.waveform_widget import (
     WaveformEditorPane,
     CompactHorizontalLevelMeter,
     FLParametricEQWidget,
+    MaximusDynamicsWidget,
+    FruityLimiterGraphWidget,
+    WaveCandyVectorscopeWidget,
     RibbonTileButton,
     StereoPhaseCorrelationMeter,
 )
@@ -89,18 +94,42 @@ class MasterWorker(QThread):
                 eq_mid_gain=self.params.get("eq_mid_gain", 0.6),
                 eq_presence_gain=self.params.get("eq_presence_gain", 1.4),
                 eq_air_gain=self.params.get("eq_air_gain", 2.0),
+                eq_mode=self.params.get("eq_mode", "Stereo (L+R)"),
+                linear_phase_eq=self.params.get("linear_phase_eq", False),
+                dynamic_eq=self.params.get("dynamic_eq", True),
                 mb_low_gain=self.params.get("mb_low_gain", 0.5),
                 mb_mid_gain=self.params.get("mb_mid_gain", 0.0),
                 mb_high_gain=self.params.get("mb_high_gain", 0.5),
+                maximus_enabled=self.params.get("maximus_enabled", True),
+                maximus_low_thresh=self.params.get("maximus_low_thresh", -18.0),
+                maximus_mid_thresh=self.params.get("maximus_mid_thresh", -16.0),
+                maximus_high_thresh=self.params.get("maximus_high_thresh", -15.0),
+                maximus_low_ratio=self.params.get("maximus_low_ratio", 2.8),
+                maximus_mid_ratio=self.params.get("maximus_mid_ratio", 2.2),
+                maximus_high_ratio=self.params.get("maximus_high_ratio", 2.5),
+                maximus_sat=self.params.get("maximus_sat", 25.0),
+                maximus_solo=self.params.get("maximus_solo", "None"),
+                transient_attack=self.params.get("transient_attack", 15.0),
+                transient_sustain=self.params.get("transient_sustain", 0.0),
                 mono_bass_hz=self.params.get("mono_bass_hz", 120.0),
                 stereo_width=self.params.get("stereo_width", 1.25),
                 add_room_depth=self.params.get("add_room_depth", True),
                 reverb_mix=self.params.get("reverb_mix", 0.08),
+                convolver_preset=self.params.get("convolver_preset", "Off (Early Reflections)"),
+                convolver_ir_path=self.params.get("convolver_ir_path", ""),
                 tape_warmth=self.params.get("tape_warmth", 0.25),
                 vocal_focus_mode=self.params.get("vocal_focus_mode", "Full Mix (Standard)"),
                 custom_target_lufs=self.params.get("custom_target_lufs"),
                 custom_ceiling_dbtp=self.params.get("custom_ceiling_dbtp"),
                 soft_clip_punch=self.params.get("soft_clip_punch", 0.25),
+                limiter_lookahead_ms=self.params.get("limiter_lookahead_ms", 3.0),
+                limiter_release_ms=self.params.get("limiter_release_ms", 85.0),
+                bypass_eq=self.params.get("bypass_eq", False),
+                bypass_deai=self.params.get("bypass_deai", False),
+                bypass_maximus=self.params.get("bypass_maximus", False),
+                bypass_transient=self.params.get("bypass_transient", False),
+                bypass_stereo=self.params.get("bypass_stereo", False),
+                bypass_limiter=self.params.get("bypass_limiter", False),
                 dither_tpdf=self.params.get("dither_tpdf", True),
                 bit_depth=self.params.get("bit_depth", "24-bit"),
                 metadata=self.params.get("metadata"),
@@ -515,16 +544,59 @@ class AudioMasteringView(QWidget):
 
         r_layout.addWidget(wf_group)
 
+        # Initialize custom IR storage
+        self.convolver_ir_path: str = ""
+
+        # Compact FL Studio Signal-Flow Chain Strip (Toggle/Click to inspect or bypass any module)
+        chain_bar = QFrame()
+        chain_bar.setObjectName("masterHeaderCard")
+        chain_bar.setFixedHeight(28)
+        cb_lay = QHBoxLayout(chain_bar)
+        cb_lay.setContentsMargins(8, 2, 8, 2)
+        cb_lay.setSpacing(6)
+
+        lbl_chain = QLabel("FL Signal Flow:")
+        lbl_chain.setStyleSheet("font-size: 9.5px; font-weight: 800; color: #38bdf8;")
+        cb_lay.addWidget(lbl_chain)
+
+        def _make_chain_chk(text: str, tip: str, tab_idx: int) -> QCheckBox:
+            chk = QCheckBox(text)
+            chk.setChecked(True)
+            chk.setCursor(Qt.CursorShape.PointingHandCursor)
+            chk.setToolTip(f"{tip} (Uncheck to bypass in DSP render)")
+            chk.setStyleSheet("font-size: 9px; font-weight: 800;")
+            chk.clicked.connect(lambda: self.tabs.setCurrentIndex(tab_idx))
+            return chk
+
+        self.chk_mod_eq = _make_chain_chk("PEQ2", "7-Band FL Parametric EQ 2", 1)
+        self.chk_mod_deai = _make_chain_chk("De-AI", "Surgical Suno Resonance & Human Voice", 2)
+        self.chk_mod_maximus = _make_chain_chk("Maximus 3B", "FL Maximus 3-Band Multiband Dynamics", 2)
+        self.chk_mod_trans = _make_chain_chk("Transient", "All-Plugins Transient Attack/Sustain", 4)
+        self.chk_mod_stereo = _make_chain_chk("Stereo/IR", "Mid-Side Shaper & Fruity Convolver", 3)
+        self.chk_mod_limiter = _make_chain_chk("Limiter 4x", "Fruity 4x Lookahead Brickwall Limiter", 4)
+
+        for idx_m, m_chk in enumerate([
+            self.chk_mod_eq, self.chk_mod_deai, self.chk_mod_maximus,
+            self.chk_mod_trans, self.chk_mod_stereo, self.chk_mod_limiter
+        ]):
+            if idx_m > 0:
+                arr = QLabel("›")
+                arr.setStyleSheet("font-size: 11px; font-weight: 900; color: #64748b;")
+                cb_lay.addWidget(arr)
+            cb_lay.addWidget(m_chk)
+        cb_lay.addStretch(1)
+        r_layout.addWidget(chain_bar)
+
         # ── 6-Tab Pro Mastering & Distribution DSP Rack ──
         self.tabs = QTabWidget()
         self.tabs.setObjectName("masterRackTabs")
 
         self.tabs.addTab(self._create_analysis_tab(), "1. AI Analysis && Title")
         self.tabs.addTab(self._create_eq_tab(), "2. EQ 2 (FL Style)")
-        self.tabs.addTab(self._create_deai_tab(), "3. Human Voice && De-AI")
-        self.tabs.addTab(self._create_stereo_tab(), "4. Stereo, Reverb && Trim")
-        self.tabs.addTab(self._create_limiter_tab(), "5. Limiter && Export")
-        self.tabs.addTab(self._create_distribution_tab(), "6. Distribution (All 25)")
+        self.tabs.addTab(self._create_deai_tab(), "3. Maximus && De-AI")
+        self.tabs.addTab(self._create_stereo_tab(), "4. Stereo, IR && Trim")
+        self.tabs.addTab(self._create_limiter_tab(), "5. Limiter, Trans && Exp")
+        self.tabs.addTab(self._create_distribution_tab(), "6. Distro (All 25)")
 
         r_layout.addWidget(self.tabs, stretch=1)
         self.main_splitter.addWidget(right_panel)
@@ -614,16 +686,9 @@ class AudioMasteringView(QWidget):
         lay.setContentsMargins(10, 4, 10, 4)
         lay.setSpacing(10)
 
-        lay.addWidget(QLabel("Master Chain Preset:"))
+        lay.addWidget(QLabel("FL Edition Chain:"))
         self.combo_daw_chain_preset = QComboBox()
-        self.combo_daw_chain_preset.addItems([
-            "Suno v6 Pro De-Mud & Crystal Air (Recommended)",
-            "FL Studio PEQ2 + Maximus Loudness Master",
-            "Club / EDM Festival Sub & Sparkle (-11 LUFS)",
-            "Warm Analog Tape & Vintage Tube Glue",
-            "Khmer Romantic Ballad Vocal Silk",
-            "Instrumental / Karaoke Lead Vocal Reducer",
-        ])
+        self.combo_daw_chain_preset.addItems(list(FL_EDITION_PROFILES.keys()))
         self.combo_daw_chain_preset.currentIndexChanged.connect(self._on_daw_chain_preset_changed)
         lay.addWidget(self.combo_daw_chain_preset)
 
@@ -922,7 +987,13 @@ class AudioMasteringView(QWidget):
         top_row.addWidget(QLabel("Mode:"))
         self.combo_eq_mode = QComboBox()
         self.combo_eq_mode.addItems(["Stereo (L+R)", "Mid Only (Vocal)", "Side Only (Width)"])
+        self.combo_eq_mode.currentTextChanged.connect(self._update_eq_badges)
         top_row.addWidget(self.combo_eq_mode)
+
+        self.chk_linear_phase_eq = QCheckBox("Linear-Phase")
+        self.chk_linear_phase_eq.setToolTip("Zero-phase mastering EQ (prevents sub-bass phase smear; uncheck for punchy minimum-phase)")
+        self.chk_linear_phase_eq.toggled.connect(self._update_eq_badges)
+        top_row.addWidget(self.chk_linear_phase_eq)
 
         top_row.addWidget(QLabel("Preset:"))
         self.combo_eq_preset = QComboBox()
@@ -1056,7 +1127,7 @@ class AudioMasteringView(QWidget):
         l_deai.setContentsMargins(8, 10, 8, 8)
         l_deai.setVerticalSpacing(8)
 
-        l_deai.addWidget(QLabel("De-Harsh Metallic Sibilance (6.5k-9.5k Hz):"), 0, 0)
+        l_deai.addWidget(QLabel("De-Harsh (6.5k-9.5k Hz):"), 0, 0)
         self.slider_deharsh = QSlider(Qt.Orientation.Horizontal)
         self.slider_deharsh.setRange(0, 100)
         self.slider_deharsh.setValue(70)
@@ -1065,7 +1136,7 @@ class AudioMasteringView(QWidget):
         l_deai.addWidget(self.slider_deharsh, 0, 1)
         l_deai.addWidget(self.lbl_deharsh_val, 0, 2)
 
-        l_deai.addWidget(QLabel("De-Box Cardboard Mud (220-480 Hz):"), 1, 0)
+        l_deai.addWidget(QLabel("De-Box Mud (220-480 Hz):"), 1, 0)
         self.slider_debox = QSlider(Qt.Orientation.Horizontal)
         self.slider_debox.setRange(0, 100)
         self.slider_debox.setValue(80)
@@ -1074,7 +1145,7 @@ class AudioMasteringView(QWidget):
         l_deai.addWidget(self.slider_debox, 1, 1)
         l_deai.addWidget(self.lbl_debox_val, 1, 2)
 
-        l_deai.addWidget(QLabel("Phase Shimmer & MP3 Smear Cleaner:"), 2, 0)
+        l_deai.addWidget(QLabel("Phase & MP3 Smear:"), 2, 0)
         self.slider_dephase = QSlider(Qt.Orientation.Horizontal)
         self.slider_dephase.setRange(0, 100)
         self.slider_dephase.setValue(50)
@@ -1083,7 +1154,7 @@ class AudioMasteringView(QWidget):
         l_deai.addWidget(self.slider_dephase, 2, 1)
         l_deai.addWidget(self.lbl_dephase_val, 2, 2)
 
-        l_deai.addWidget(QLabel("Harmonic Air Exciter (Restore >14kHz Air):"), 3, 0)
+        l_deai.addWidget(QLabel("Air Exciter (>14kHz Air):"), 3, 0)
         self.slider_exciter = QSlider(Qt.Orientation.Horizontal)
         self.slider_exciter.setRange(0, 100)
         self.slider_exciter.setValue(35)
@@ -1092,7 +1163,7 @@ class AudioMasteringView(QWidget):
         l_deai.addWidget(self.slider_exciter, 3, 1)
         l_deai.addWidget(self.lbl_exciter_val, 3, 2)
 
-        l_deai.addWidget(QLabel("Dynamic Vocal De-Esser (5.8kHz Sibilance):"), 4, 0)
+        l_deai.addWidget(QLabel("Vocal De-Esser (5.8kHz):"), 4, 0)
         self.slider_deesser = QSlider(Qt.Orientation.Horizontal)
         self.slider_deesser.setRange(0, 100)
         self.slider_deesser.setValue(55)
@@ -1103,14 +1174,19 @@ class AudioMasteringView(QWidget):
 
         layout.addWidget(g_deai, stretch=1)
 
-        # Right Group: Multiband Dynamics & Human Voice Naturalizer (Suno -> Real Vocal)
-        g_mb = QGroupBox("Human Voice Naturalizer (U87 / Tube Mic) && Multiband Lock")
+        # Right Group: FL Studio Maximus 3-Band Dynamics & Human Voice Naturalizer
+        g_mb = QGroupBox("FL Studio Maximus 3-Band Dynamics && Human Voice (U87)")
         g_mb.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_mb = QGridLayout(g_mb)
         l_mb.setContentsMargins(8, 10, 8, 8)
-        l_mb.setVerticalSpacing(5)
+        l_mb.setVerticalSpacing(4)
 
-        l_mb.addWidget(QLabel("Human Voice Preset:"), 0, 0)
+        # Interactive 4-Panel FL Maximus Transfer & GR Visualizer
+        self.maximus_widget = MaximusDynamicsWidget(self)
+        self.maximus_widget.band_solo_requested.connect(self._on_maximus_solo_clicked)
+        l_mb.addWidget(self.maximus_widget, 0, 0, 1, 3)
+
+        l_mb.addWidget(QLabel("Human Voice Preset:"), 1, 0)
         self.combo_human_voice_preset = QComboBox()
         self.combo_human_voice_preset.addItems([
             "Neumann U87 Warm Pop Vocal",
@@ -1119,36 +1195,69 @@ class AudioMasteringView(QWidget):
             "Clean Studio Natural (Subtle)",
         ])
         self.combo_human_voice_preset.currentIndexChanged.connect(self._apply_human_voice_preset)
-        l_mb.addWidget(self.combo_human_voice_preset, 0, 1, 1, 2)
+        l_mb.addWidget(self.combo_human_voice_preset, 1, 1, 1, 2)
 
-        l_mb.addWidget(QLabel("Human Chest Warmth (185Hz Body):"), 1, 0)
+        l_mb.addWidget(QLabel("Voice Body / Clean / Tube:"), 2, 0)
+        hv_mini = QHBoxLayout()
+        hv_mini.setSpacing(6)
         self.slider_human_warmth = QSlider(Qt.Orientation.Horizontal)
         self.slider_human_warmth.setRange(0, 100)
         self.slider_human_warmth.setValue(65)
         self.lbl_human_warmth = QLabel("65%")
         self.slider_human_warmth.valueChanged.connect(lambda v: self.lbl_human_warmth.setText(f"{v}%"))
-        l_mb.addWidget(self.slider_human_warmth, 1, 1)
-        l_mb.addWidget(self.lbl_human_warmth, 1, 2)
-
-        l_mb.addWidget(QLabel("De-Metallicize AI Vocoder Overtones:"), 2, 0)
         self.slider_human_demetal = QSlider(Qt.Orientation.Horizontal)
         self.slider_human_demetal.setRange(0, 100)
         self.slider_human_demetal.setValue(75)
         self.lbl_human_demetal = QLabel("75%")
         self.slider_human_demetal.valueChanged.connect(lambda v: self.lbl_human_demetal.setText(f"{v}%"))
-        l_mb.addWidget(self.slider_human_demetal, 2, 1)
-        l_mb.addWidget(self.lbl_human_demetal, 2, 2)
-
-        l_mb.addWidget(QLabel("Tube Condenser Harmonics (Neve):"), 3, 0)
         self.slider_tube_mic = QSlider(Qt.Orientation.Horizontal)
         self.slider_tube_mic.setRange(0, 100)
         self.slider_tube_mic.setValue(40)
         self.lbl_tube_mic = QLabel("40%")
         self.slider_tube_mic.valueChanged.connect(lambda v: self.lbl_tube_mic.setText(f"{v}%"))
-        l_mb.addWidget(self.slider_tube_mic, 3, 1)
-        l_mb.addWidget(self.lbl_tube_mic, 3, 2)
+        hv_mini.addWidget(QLabel("Body"))
+        hv_mini.addWidget(self.slider_human_warmth)
+        hv_mini.addWidget(QLabel("Clean"))
+        hv_mini.addWidget(self.slider_human_demetal)
+        hv_mini.addWidget(QLabel("Tube"))
+        hv_mini.addWidget(self.slider_tube_mic)
+        l_mb.addLayout(hv_mini, 2, 1, 1, 2)
 
-        l_mb.addWidget(QLabel("Low / High Multiband Balance:"), 4, 0)
+        l_mb.addWidget(QLabel("Maximus Thresh / Sat:"), 3, 0)
+        mx_row = QHBoxLayout()
+        mx_row.setSpacing(5)
+        self.spin_max_low_th = QSpinBox()
+        self.spin_max_low_th.setRange(-36, -4)
+        self.spin_max_low_th.setValue(-18)
+        self.spin_max_low_th.setSuffix("L")
+        self.spin_max_mid_th = QSpinBox()
+        self.spin_max_mid_th.setRange(-36, -4)
+        self.spin_max_mid_th.setValue(-16)
+        self.spin_max_mid_th.setSuffix("M")
+        self.spin_max_high_th = QSpinBox()
+        self.spin_max_high_th.setRange(-36, -4)
+        self.spin_max_high_th.setValue(-15)
+        self.spin_max_high_th.setSuffix("H")
+        self.slider_maximus_sat = QSlider(Qt.Orientation.Horizontal)
+        self.slider_maximus_sat.setRange(0, 100)
+        self.slider_maximus_sat.setMinimumWidth(58)
+        self.slider_maximus_sat.setValue(25)
+        self.slider_maximus_sat.setToolTip("Maximus Tape/Soft Band Saturation %")
+        self.combo_maximus_solo = QComboBox()
+        self.combo_maximus_solo.addItems(["Full", "LOW", "MID", "HIGH"])
+        self.combo_maximus_solo.setFixedWidth(56)
+        for sp in (self.spin_max_low_th, self.spin_max_mid_th, self.spin_max_high_th):
+            sp.valueChanged.connect(self._sync_maximus_widget)
+        self.combo_maximus_solo.currentTextChanged.connect(self._sync_maximus_widget)
+        mx_row.addWidget(self.spin_max_low_th)
+        mx_row.addWidget(self.spin_max_mid_th)
+        mx_row.addWidget(self.spin_max_high_th)
+        mx_row.addWidget(QLabel("Sat"))
+        mx_row.addWidget(self.slider_maximus_sat, stretch=1)
+        mx_row.addWidget(self.combo_maximus_solo)
+        l_mb.addLayout(mx_row, 3, 1, 1, 2)
+
+        l_mb.addWidget(QLabel("Band Makeup & MonoHz:"), 4, 0)
         mb_mini = QHBoxLayout()
         self.slider_mb_low = QSlider(Qt.Orientation.Horizontal)
         self.slider_mb_low.setRange(-60, 60)
@@ -1163,15 +1272,17 @@ class AudioMasteringView(QWidget):
         self.slider_mono_bass.setRange(40, 200)
         self.slider_mono_bass.setValue(120)
         self.slider_mono_bass.setToolTip("Mono Bass Cutoff Hz")
-        mb_mini.addWidget(QLabel("Low"))
+        mb_mini.addWidget(QLabel("L"))
         mb_mini.addWidget(self.slider_mb_low)
-        mb_mini.addWidget(QLabel("High"))
+        mb_mini.addWidget(QLabel("M"))
+        mb_mini.addWidget(self.slider_mb_mid)
+        mb_mini.addWidget(QLabel("H"))
         mb_mini.addWidget(self.slider_mb_high)
-        mb_mini.addWidget(QLabel("MonoHz"))
+        mb_mini.addWidget(QLabel("Mono"))
         mb_mini.addWidget(self.slider_mono_bass)
         l_mb.addLayout(mb_mini, 4, 1, 1, 2)
 
-        btn_deai_render = QPushButton("🎤 Apply Human Voice Fix && Render B")
+        btn_deai_render = QPushButton("⚡ Apply Maximus + Human Voice && Render B")
         btn_deai_render.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_deai_render.setStyleSheet("background: #16a34a; color: #ffffff; font-weight: 800; font-size: 9.5px; padding: 5px 10px; border-radius: 4px;")
         btn_deai_render.clicked.connect(self._render_master_b)
@@ -1188,14 +1299,14 @@ class AudioMasteringView(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(12)
 
-        # Left Group: Stereo Imaging, Reverb & Analog Warmth
-        g_st = QGroupBox("Mid-Side Stereo Imager, Glue Reverb && Tape Warmth")
+        # Left Group: Stereo Imaging, Fruity Convolver IR & Wave Candy Vectorscope
+        g_st = QGroupBox("Mid-Side Imager, Fruity Convolver IR && Wave Candy")
         g_st.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_st = QGridLayout(g_st)
         l_st.setContentsMargins(8, 10, 8, 8)
-        l_st.setVerticalSpacing(6)
+        l_st.setVerticalSpacing(5)
 
-        l_st.addWidget(QLabel("Mid-Side Stereo Width (50% - 200%):"), 0, 0)
+        l_st.addWidget(QLabel("Mid-Side Stereo Width:"), 0, 0)
         self.slider_width = QSlider(Qt.Orientation.Horizontal)
         self.slider_width.setRange(50, 200)
         self.slider_width.setValue(125)
@@ -1204,27 +1315,46 @@ class AudioMasteringView(QWidget):
         l_st.addWidget(self.slider_width, 0, 1)
         l_st.addWidget(self.lbl_width_val, 0, 2)
 
-        l_st.addWidget(QLabel("Studio Glue Reverb Ambience:"), 1, 0)
+        l_st.addWidget(QLabel("Convolver IR Preset:"), 1, 0)
+        conv_row = QHBoxLayout()
+        self.combo_convolver_preset = QComboBox()
+        self.combo_convolver_preset.addItems(CONVOLVER_PRESETS)
+        self.combo_convolver_preset.currentTextChanged.connect(self._on_convolver_preset_changed)
+        self.btn_browse_ir = QPushButton("IR...")
+        self.btn_browse_ir.setFixedWidth(40)
+        self.btn_browse_ir.setToolTip("Load custom stereo .WAV Impulse Response for Fruity Convolver")
+        self.btn_browse_ir.clicked.connect(self._browse_custom_ir)
+        conv_row.addWidget(self.combo_convolver_preset, stretch=1)
+        conv_row.addWidget(self.btn_browse_ir)
+        l_st.addLayout(conv_row, 1, 1, 1, 2)
+
+        l_st.addWidget(QLabel("Ambience / IR Wet Mix:"), 2, 0)
         self.slider_reverb = QSlider(Qt.Orientation.Horizontal)
         self.slider_reverb.setRange(0, 35)
         self.slider_reverb.setValue(8)
         self.lbl_reverb_val = QLabel("8%")
         self.slider_reverb.valueChanged.connect(lambda v: self.lbl_reverb_val.setText(f"{v}%"))
-        l_st.addWidget(self.slider_reverb, 1, 1)
-        l_st.addWidget(self.lbl_reverb_val, 1, 2)
+        l_st.addWidget(self.slider_reverb, 2, 1)
+        l_st.addWidget(self.lbl_reverb_val, 2, 2)
 
-        l_st.addWidget(QLabel("Analog Tape Saturation & Warmth:"), 2, 0)
+        l_st.addWidget(QLabel("Analog Tape Saturation:"), 3, 0)
         self.slider_tape = QSlider(Qt.Orientation.Horizontal)
         self.slider_tape.setRange(0, 100)
         self.slider_tape.setValue(25)
         self.lbl_tape_val = QLabel("25%")
         self.slider_tape.valueChanged.connect(lambda v: self.lbl_tape_val.setText(f"{v}%"))
-        l_st.addWidget(self.slider_tape, 2, 1)
-        l_st.addWidget(self.lbl_tape_val, 2, 2)
+        l_st.addWidget(self.slider_tape, 3, 1)
+        l_st.addWidget(self.lbl_tape_val, 3, 2)
 
-        l_st.addWidget(QLabel("Stereo Phase Correlation Meter:"), 3, 0)
+        meter_col = QVBoxLayout()
+        meter_col.addWidget(QLabel("Phase & Wave Candy:"))
         self.phase_meter = StereoPhaseCorrelationMeter(self)
-        l_st.addWidget(self.phase_meter, 3, 1, 1, 2)
+        meter_col.addWidget(self.phase_meter)
+        meter_wrap = QHBoxLayout()
+        meter_wrap.addLayout(meter_col, stretch=1)
+        self.vectorscope = WaveCandyVectorscopeWidget(self)
+        meter_wrap.addWidget(self.vectorscope)
+        l_st.addLayout(meter_wrap, 4, 0, 1, 3)
 
         layout.addWidget(g_st, stretch=1)
 
@@ -1281,20 +1411,25 @@ class AudioMasteringView(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(12)
 
-        # Left Group: 4x True-Peak Brickwall Limiter
-        g_lim = QGroupBox("4x Oversampled True-Peak Brickwall Limiter")
+        # Left Group: 4x Lookahead Fruity Limiter + Transient Processor
+        g_lim = QGroupBox("Fruity 4x Lookahead Limiter && Transient Processor")
         g_lim.setStyleSheet("font-size: 10px; font-weight: 800;")
         l_lim = QGridLayout(g_lim)
         l_lim.setContentsMargins(8, 10, 8, 8)
-        l_lim.setVerticalSpacing(6)
+        l_lim.setVerticalSpacing(5)
 
-        l_lim.addWidget(QLabel("Streaming Platform Target:"), 0, 0)
+        self.limiter_graph = FruityLimiterGraphWidget(self)
+        l_lim.addWidget(self.limiter_graph, 0, 0, 1, 2)
+
+        l_lim.addWidget(QLabel("Platform Target:"), 1, 0)
         self.combo_target_preset = QComboBox()
         self.combo_target_preset.addItems(list(MASTERING_TARGETS.keys()))
         self.combo_target_preset.currentTextChanged.connect(self._on_target_preset_changed)
-        l_lim.addWidget(self.combo_target_preset, 0, 1)
+        l_lim.addWidget(self.combo_target_preset, 1, 1)
 
-        l_lim.addWidget(QLabel("True-Peak Ceiling (dBTP):"), 1, 0)
+        l_lim.addWidget(QLabel("Ceiling & Envelope:"), 2, 0)
+        lim_row = QHBoxLayout()
+        lim_row.setSpacing(5)
         self.combo_ceiling = QComboBox()
         self.combo_ceiling.addItems([
             "-1.0 dBTP (Spotify / Apple / Suno Pro)",
@@ -1302,17 +1437,45 @@ class AudioMasteringView(QWidget):
             "-0.3 dBTP (Club / DJ Loud Punch)",
             "-0.1 dBTP (CD / Broadcast Max)",
         ])
-        l_lim.addWidget(self.combo_ceiling, 1, 1)
+        self.spin_lookahead_ms = QDoubleSpinBox()
+        self.spin_lookahead_ms.setRange(0.5, 10.0)
+        self.spin_lookahead_ms.setSingleStep(0.5)
+        self.spin_lookahead_ms.setValue(3.0)
+        self.spin_lookahead_ms.setSuffix(" ms LA")
+        self.spin_release_ms = QSpinBox()
+        self.spin_release_ms.setRange(15, 400)
+        self.spin_release_ms.setValue(85)
+        self.spin_release_ms.setSuffix(" ms Rel")
+        lim_row.addWidget(self.combo_ceiling, stretch=1)
+        lim_row.addWidget(self.spin_lookahead_ms)
+        lim_row.addWidget(self.spin_release_ms)
+        l_lim.addLayout(lim_row, 2, 1)
 
-        l_lim.addWidget(QLabel("Transient Soft-Clip Punch:"), 2, 0)
+        l_lim.addWidget(QLabel("Transient & Clip:"), 3, 0)
+        tr_row = QHBoxLayout()
+        self.slider_transient_attack = QSlider(Qt.Orientation.Horizontal)
+        self.slider_transient_attack.setRange(-50, 100)
+        self.slider_transient_attack.setValue(15)
+        self.slider_transient_attack.setToolTip("FL Transient Attack Snap (-50% soft to +100% punchy drums)")
+        self.slider_transient_sustain = QSlider(Qt.Orientation.Horizontal)
+        self.slider_transient_sustain.setRange(-50, 50)
+        self.slider_transient_sustain.setValue(0)
+        self.slider_transient_sustain.setToolTip("FL Transient Sustain (-50% tight dry to +50% lush)")
         self.slider_soft_clip = QSlider(Qt.Orientation.Horizontal)
         self.slider_soft_clip.setRange(0, 100)
         self.slider_soft_clip.setValue(25)
-        l_lim.addWidget(self.slider_soft_clip, 2, 1)
+        self.slider_soft_clip.setToolTip("Pre-limiter Analog Soft-Clip Punch")
+        tr_row.addWidget(QLabel("Atk"))
+        tr_row.addWidget(self.slider_transient_attack)
+        tr_row.addWidget(QLabel("Sus"))
+        tr_row.addWidget(self.slider_transient_sustain)
+        tr_row.addWidget(QLabel("Clip"))
+        tr_row.addWidget(self.slider_soft_clip)
+        l_lim.addLayout(tr_row, 3, 1)
 
         self.chk_dither_tpdf = QCheckBox("Apply TPDF 24-bit Quantization Dithering")
         self.chk_dither_tpdf.setChecked(True)
-        l_lim.addWidget(self.chk_dither_tpdf, 3, 0, 1, 2)
+        l_lim.addWidget(self.chk_dither_tpdf, 4, 0, 1, 2)
 
         layout.addWidget(g_lim, stretch=1)
 
@@ -1675,9 +1838,12 @@ class AudioMasteringView(QWidget):
             if hasattr(self, "eq_curve_widget"):
                 spec = AudioMasteringEngine.compute_spectrum_profile(samples, sr)
                 self.eq_curve_widget.set_spectrum_data(spec)
+                self.eq_curve_widget.set_after_spectrum_data(None)
             if hasattr(self, "phase_meter"):
                 corr = AudioMasteringEngine.measure_phase_correlation(samples)
                 self.phase_meter.set_correlation(corr)
+            if hasattr(self, "vectorscope"):
+                self.vectorscope.set_telemetry(AudioMasteringEngine.compute_wave_candy_telemetry(samples, sr))
             dur = len(samples) / float(sr)
             self.spin_trim_out.setValue(round(dur, 2))
         except Exception as e:
@@ -1874,17 +2040,38 @@ class AudioMasteringView(QWidget):
             "eq_mid_gain": float(self.slider_mid.slider_widget.value()),
             "eq_presence_gain": float(self.slider_pres.slider_widget.value()),
             "eq_air_gain": float(self.slider_air.slider_widget.value()),
+            "eq_mode": self.combo_eq_mode.currentText(),
+            "linear_phase_eq": self.chk_linear_phase_eq.isChecked() if hasattr(self, "chk_linear_phase_eq") else False,
+            "dynamic_eq": True,
             "mb_low_gain": float(self.slider_mb_low.value()) / 10.0,
             "mb_mid_gain": float(self.slider_mb_mid.value()) / 10.0,
             "mb_high_gain": float(self.slider_mb_high.value()) / 10.0,
+            "maximus_enabled": self.chk_mod_maximus.isChecked() if hasattr(self, "chk_mod_maximus") else True,
+            "maximus_low_thresh": float(self.spin_max_low_th.value()) if hasattr(self, "spin_max_low_th") else -18.0,
+            "maximus_mid_thresh": float(self.spin_max_mid_th.value()) if hasattr(self, "spin_max_mid_th") else -16.0,
+            "maximus_high_thresh": float(self.spin_max_high_th.value()) if hasattr(self, "spin_max_high_th") else -15.0,
+            "maximus_sat": float(self.slider_maximus_sat.value()) if hasattr(self, "slider_maximus_sat") else 25.0,
+            "maximus_solo": "None" if (not hasattr(self, "combo_maximus_solo") or self.combo_maximus_solo.currentText() == "Full") else self.combo_maximus_solo.currentText(),
+            "transient_attack": float(self.slider_transient_attack.value()) if hasattr(self, "slider_transient_attack") else 15.0,
+            "transient_sustain": float(self.slider_transient_sustain.value()) if hasattr(self, "slider_transient_sustain") else 0.0,
             "mono_bass_hz": float(self.slider_mono_bass.value()),
             "stereo_width": float(self.slider_width.value()) / 100.0,
             "add_room_depth": self.slider_reverb.value() > 0,
             "reverb_mix": float(self.slider_reverb.value()) / 100.0,
+            "convolver_preset": self.combo_convolver_preset.currentText() if hasattr(self, "combo_convolver_preset") else "Off (Early Reflections)",
+            "convolver_ir_path": getattr(self, "convolver_ir_path", ""),
             "tape_warmth": float(self.slider_tape.value()) / 100.0,
             "vocal_focus_mode": self.combo_vocal_focus.currentText(),
             "custom_ceiling_dbtp": custom_tp,
             "soft_clip_punch": float(self.slider_soft_clip.value()) / 100.0,
+            "limiter_lookahead_ms": float(self.spin_lookahead_ms.value()) if hasattr(self, "spin_lookahead_ms") else 3.0,
+            "limiter_release_ms": float(self.spin_release_ms.value()) if hasattr(self, "spin_release_ms") else 85.0,
+            "bypass_eq": not self.chk_mod_eq.isChecked() if hasattr(self, "chk_mod_eq") else False,
+            "bypass_deai": not self.chk_mod_deai.isChecked() if hasattr(self, "chk_mod_deai") else False,
+            "bypass_maximus": not self.chk_mod_maximus.isChecked() if hasattr(self, "chk_mod_maximus") else False,
+            "bypass_transient": not self.chk_mod_trans.isChecked() if hasattr(self, "chk_mod_trans") else False,
+            "bypass_stereo": not self.chk_mod_stereo.isChecked() if hasattr(self, "chk_mod_stereo") else False,
+            "bypass_limiter": not self.chk_mod_limiter.isChecked() if hasattr(self, "chk_mod_limiter") else False,
             "dither_tpdf": self.chk_dither_tpdf.isChecked(),
             "bit_depth": bit_depth,
             "metadata": {
@@ -1956,6 +2143,23 @@ class AudioMasteringView(QWidget):
         try:
             samples, sr = AudioMasteringEngine.load_audio(out_path)
             self.waveform_pane.set_audio_data(samples, sr, is_mastered=True)
+            if hasattr(self, "eq_curve_widget") and res.get("spectrum_after") is not None:
+                self.eq_curve_widget.set_after_spectrum_data(res["spectrum_after"])
+            if hasattr(self, "maximus_widget") and res.get("maximus_gr"):
+                mgr = res["maximus_gr"]
+                self.maximus_widget.set_telemetry(
+                    gr_values={
+                        "LOW": mgr.get("low_gr", 0.0),
+                        "MID": mgr.get("mid_gr", 0.0),
+                        "HIGH": mgr.get("high_gr", 0.0),
+                        "MASTER": (res.get("limiter_telemetry") or {}).get("max_gr_db", 0.0),
+                    }
+                )
+            if hasattr(self, "limiter_graph") and res.get("limiter_telemetry"):
+                self.limiter_graph.set_telemetry(res["limiter_telemetry"])
+            if hasattr(self, "vectorscope") and res.get("wave_candy"):
+                self.vectorscope.set_telemetry(res["wave_candy"])
+                self.phase_meter.set_correlation(res["wave_candy"].get("phase_corr", 0.9))
         except Exception:
             pass
 
@@ -2171,48 +2375,95 @@ class AudioMasteringView(QWidget):
         self.txt_distro_qc.setText("\n".join(lines))
         self.lbl_status.setText(f"✅ Distribution Pack Ready: {res['pack_dir']}")
 
-    # ── Pro DAW Presets & Batch Operations ──
+    # ── FL Studio Editions Modules & Chain Presets ──
+
+    def _update_eq_badges(self):
+        if hasattr(self, "eq_curve_widget"):
+            mode_short = self.combo_eq_mode.currentText().split("(")[0].strip()
+            lin_p = self.chk_linear_phase_eq.isChecked() if hasattr(self, "chk_linear_phase_eq") else False
+            self.eq_curve_widget.set_eq_badges(lin_p, mode_short)
+
+    def _on_maximus_solo_clicked(self, band_name: str):
+        if hasattr(self, "combo_maximus_solo"):
+            self.combo_maximus_solo.blockSignals(True)
+            self.combo_maximus_solo.setCurrentText("Full" if band_name == "None" else band_name)
+            self.combo_maximus_solo.blockSignals(False)
+        self.lbl_status.setText(f"FL Maximus Monitor: {'Full Mix' if band_name == 'None' else f'SOLO {band_name} Band'}")
+
+    def _sync_maximus_widget(self):
+        if not hasattr(self, "maximus_widget"):
+            return
+        solo_txt = self.combo_maximus_solo.currentText() if hasattr(self, "combo_maximus_solo") else "Full"
+        self.maximus_widget.set_telemetry(
+            thresholds={
+                "LOW": float(self.spin_max_low_th.value()),
+                "MID": float(self.spin_max_mid_th.value()),
+                "HIGH": float(self.spin_max_high_th.value()),
+            },
+            solo_band="None" if solo_txt == "Full" else solo_txt,
+        )
+
+    def _on_convolver_preset_changed(self, preset_name: str):
+        if "Custom" in preset_name:
+            self._browse_custom_ir()
+        elif "Off" not in preset_name and self.slider_reverb.value() < 6:
+            self.slider_reverb.setValue(10)
+        self.lbl_status.setText(f"Fruity Convolver IR: {preset_name}")
+
+    def _browse_custom_ir(self):
+        ir_file, _ = QFileDialog.getOpenFileName(
+            self, "Select Studio Impulse Response (.wav)", "", "WAV Audio (*.wav)"
+        )
+        if ir_file and Path(ir_file).exists():
+            self.convolver_ir_path = ir_file
+            if self.slider_reverb.value() < 6:
+                self.slider_reverb.setValue(12)
+            self.lbl_status.setText(f"✓ Loaded Convolver Impulse: {Path(ir_file).name}")
 
     def _on_daw_chain_preset_changed(self, idx: int):
-        if idx == 0:  # Suno v6 Pro De-Mud & Crystal Air
-            self._on_eq_preset_changed(0)
-            self.slider_deharsh.setValue(70)
-            self.slider_debox.setValue(80)
-            self.slider_width.setValue(125)
-            self.combo_vocal_focus.setCurrentIndex(0)
-        elif idx == 1:  # FL Studio PEQ2 + Maximus
-            self._on_eq_preset_changed(3)
-            self.slider_deharsh.setValue(60)
-            self.slider_debox.setValue(75)
-            self.slider_width.setValue(130)
-            self.slider_soft_clip.setValue(45)
-        elif idx == 2:  # Club / EDM Festival
-            self._on_eq_preset_changed(3)
-            self.combo_target_preset.setCurrentText("Club / SoundCloud (-11.0 LUFS)")
-            self.slider_width.setValue(140)
-        elif idx == 3:  # Warm Analog Tape
-            self._on_eq_preset_changed(2)
-            self.slider_tape.setValue(55)
-            self.slider_reverb.setValue(12)
-        elif idx == 4:  # Khmer Romantic Ballad Vocal Silk
-            self._on_eq_preset_changed(1)
-            self.combo_vocal_focus.setCurrentIndex(1)
-            self.slider_reverb.setValue(15)
-        elif idx == 5:  # Instrumental / Karaoke Vocal Reducer
-            self.combo_vocal_focus.setCurrentIndex(2)
-        self.lbl_status.setText(f"Loaded Chain Preset: {self.combo_daw_chain_preset.currentText()}")
+        name = self.combo_daw_chain_preset.currentText()
+        prof = FL_EDITION_PROFILES.get(name)
+        if prof:
+            for i, val in enumerate(prof["eq_gains"]):
+                if i < len(self.eq_slider_cols):
+                    self.eq_slider_cols[i].slider_widget.setValue(int(val))
+            self._sync_eq_sliders_to_curve()
+            if hasattr(self, "chk_linear_phase_eq"):
+                self.chk_linear_phase_eq.setChecked(bool(prof.get("linear_phase_eq", False)))
+            if hasattr(self, "slider_maximus_sat"):
+                self.slider_maximus_sat.setValue(int(prof.get("maximus_sat", 25)))
+            if hasattr(self, "slider_transient_attack"):
+                self.slider_transient_attack.setValue(int(prof.get("transient_attack", 15)))
+            if hasattr(self, "slider_transient_sustain"):
+                self.slider_transient_sustain.setValue(int(prof.get("transient_sustain", 0)))
+            self.slider_deharsh.setValue(int(prof.get("deharsh", 70)))
+            self.slider_debox.setValue(int(prof.get("debox", 80)))
+            self.slider_width.setValue(int(prof.get("width", 125)))
+            self.slider_reverb.setValue(int(prof.get("reverb", 8)))
+            if hasattr(self, "combo_convolver_preset"):
+                self.combo_convolver_preset.setCurrentText(str(prof.get("convolver", "Off (Early Reflections)")))
+            self.slider_tape.setValue(int(prof.get("tape", 25)))
+            self.slider_soft_clip.setValue(int(prof.get("soft_clip", 25)))
+            tgt = str(prof.get("target_preset", ""))
+            if tgt and tgt in MASTERING_TARGETS:
+                self.combo_target_preset.setCurrentText(tgt)
+            if "Karaoke" in name:
+                self.combo_vocal_focus.setCurrentIndex(2)
+            elif "Khmer" in name:
+                self.combo_vocal_focus.setCurrentIndex(1)
+            else:
+                self.combo_vocal_focus.setCurrentIndex(0)
+        self.lbl_status.setText(f"Loaded FL Chain Preset: {name}")
 
     def _reset_all_dsp_controls(self):
-        self._on_eq_preset_changed(0)
-        self.slider_deharsh.setValue(70)
-        self.slider_debox.setValue(80)
+        self.combo_daw_chain_preset.setCurrentIndex(0)
+        self._on_daw_chain_preset_changed(0)
         self.slider_dephase.setValue(50)
         self.slider_exciter.setValue(35)
-        self.slider_width.setValue(125)
-        self.slider_reverb.setValue(8)
-        self.slider_tape.setValue(25)
-        self.combo_vocal_focus.setCurrentIndex(0)
-        self.lbl_status.setText("✓ Reset all DSP racks to factory Suno Pro defaults.")
+        for chk_name in ["chk_mod_eq", "chk_mod_deai", "chk_mod_maximus", "chk_mod_trans", "chk_mod_stereo", "chk_mod_limiter"]:
+            if hasattr(self, chk_name):
+                getattr(self, chk_name).setChecked(True)
+        self.lbl_status.setText("✓ Reset all FL Studio DSP modules to factory Suno Pro defaults.")
 
     def _on_target_preset_changed(self, preset_name: str):
         tgt = MASTERING_TARGETS.get(preset_name)
@@ -2308,6 +2559,8 @@ class AudioMasteringView(QWidget):
             for idx, g_val in enumerate(gains[:len(self.eq_slider_cols)]):
                 self.eq_slider_cols[idx].slider_widget.setValue(g_val)
             self._sync_eq_sliders_to_curve()
+            if hasattr(self, "eq_curve_widget") and match_res.get("ref_spectrum_db") is not None:
+                self.eq_curve_widget.set_reference_spectrum_data(match_res["ref_spectrum_db"])
             if hasattr(self, "lbl_ref_match_status"):
                 self.lbl_ref_match_status.setText(
                     f"✓ Matched Reference: {match_res['ref_name']} ({match_res['ref_lufs']:.1f} LUFS / {match_res['ref_tp']:.1f} dBTP | {match_res['ref_bpm']} BPM)"
@@ -2381,6 +2634,12 @@ class AudioMasteringView(QWidget):
             self.eq_curve_widget.apply_theme(t)
         if hasattr(self, "phase_meter"):
             self.phase_meter.apply_theme(t)
+        if hasattr(self, "maximus_widget"):
+            self.maximus_widget.apply_theme(t)
+        if hasattr(self, "limiter_graph"):
+            self.limiter_graph.apply_theme(t)
+        if hasattr(self, "vectorscope"):
+            self.vectorscope.apply_theme(t)
         if hasattr(self, "ribbon_tile_buttons"):
             for rbtn in self.ribbon_tile_buttons:
                 rbtn.apply_theme(is_dark)
